@@ -1,5 +1,8 @@
 # 拾页（ShiYe）
 
+[![CI](https://github.com/daipai001/shiye/actions/workflows/ci.yml/badge.svg)](https://github.com/daipai001/shiye/actions/workflows/ci.yml)
+[![CD](https://github.com/daipai001/shiye/actions/workflows/cd.yml/badge.svg)](https://github.com/daipai001/shiye/actions/workflows/cd.yml)
+
 > 收藏不是终点，能问才是。
 
 把浏览器书签文件夹变成可对话的个人知识库：任意网页点悬浮球，基于收藏内容提问，回答带原文引用，AI 用量和成本可查。
