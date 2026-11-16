@@ -1,0 +1,110 @@
+name: shiye
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: shiye-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: shiye
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    ports:
+      - "${MYSQL_PORT:-13306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./sql/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: shiye-redis
+    ports:
+      - "${REDIS_PORT:-16379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  user-api:
+    image: ${IMAGE_PREFIX:-shiye}/shiye-user-api:${IMAGE_TAG:-latest}
+    build:
+      context: ../backend/shiye-user-api
+    container_name: shiye-user-api
+    environment:
+      DB_URL: "jdbc:mysql://mysql:3306/shiye?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true"
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      USER_JWT_SECRET: ${USER_JWT_SECRET:-dev-user-secret-change-me-32-bytes-minimum}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-dev}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
+      EMBEDDING_DIMENSION: 1024
+    ports:
+      - "${USER_API_PORT:-18080}:18080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  admin-api:
+    image: ${IMAGE_PREFIX:-shiye}/shiye-admin-api:${IMAGE_TAG:-latest}
+    build:
+      context: ../backend/shiye-admin-api
+    container_name: shiye-admin-api
+    environment:
+      DB_URL: "jdbc:mysql://mysql:3306/shiye?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true"
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:-dev-admin-secret-change-me-32-bytes-minimum}
+    ports:
+      - "${ADMIN_API_PORT:-18081}:18081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  user-web:
+    image: ${IMAGE_PREFIX:-shiye}/shiye-user-web:${IMAGE_TAG:-latest}
+    build:
+      context: ../frontend/user-web
+    container_name: shiye-user-web
+    ports:
+      - "${USER_WEB_PORT:-15173}:80"
+    depends_on:
+      - user-api
+
+  admin-web:
+    image: ${IMAGE_PREFIX:-shiye}/shiye-admin-web:${IMAGE_TAG:-latest}
+    build:
+      context: ../frontend/admin-web
+    container_name: shiye-admin-web
+    ports:
+      - "${ADMIN_WEB_PORT:-15174}:80"
+    depends_on:
+      - admin-api
+
+volumes:
+  mysql-data:
+  redis-data:

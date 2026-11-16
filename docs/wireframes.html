@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拾页 · 页面草图</title>
+<style>
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: #e9edf3;
+    color: #1f2937;
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(255,255,255,.94);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #d9dee7;
+    padding: 10px 24px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .brand { font-weight: 700; font-size: 15px; white-space: nowrap; }
+  .brand span { font-weight: 400; color: #6b7280; font-size: 11px; margin-left: 6px; }
+  .tabs { display: flex; gap: 3px; flex-wrap: wrap; }
+  .tabs a {
+    color: #4b5563; text-decoration: none; font-size: 12px;
+    padding: 5px 10px; border-radius: 999px; white-space: nowrap;
+  }
+  .tabs a:hover { background: #eef2f8; color: #1f2937; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 80px; }
+  .intro {
+    background: #fff; border: 1px solid #d9dee7; border-radius: 12px;
+    padding: 18px 20px; margin-bottom: 30px;
+  }
+  .intro h1 { margin: 0 0 6px; font-size: 20px; }
+  .intro p { margin: 0; color: #4b5563; font-size: 12.5px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; font-size: 11.5px; color: #6b7280; }
+  .legend b { color: #2f6fed; }
+  .legend em { color: #b45309; font-style: normal; }
+  .screen { margin-bottom: 40px; scroll-margin-top: 78px; }
+  .screen-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .screen-head .num {
+    font-size: 11px; font-weight: 700; color: #2f6fed;
+    background: #e9f0ff; padding: 3px 8px; border-radius: 999px;
+  }
+  .screen-head h2 { margin: 0; font-size: 17px; }
+  .screen-head p { margin: 0; color: #6b7280; font-size: 12px; }
+  .frame {
+    background: #fff; border: 1px solid #cfd6e2; border-radius: 14px;
+    overflow: hidden; box-shadow: 0 8px 24px rgba(31,41,55,.06);
+  }
+  .chrome {
+    height: 38px; background: #f3f5f9; border-bottom: 1px solid #d9dee7;
+    display: flex; align-items: center; gap: 8px; padding: 0 14px;
+  }
+  .dots { display: flex; gap: 5px; flex: none; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #cfd6e2; }
+  .url {
+    flex: 1; max-width: 540px; height: 22px; background: #fff;
+    border: 1px solid #d9dee7; border-radius: 6px; color: #6b7280;
+    font-size: 11px; display: flex; align-items: center; padding: 0 10px;
+    overflow: hidden; white-space: nowrap;
+  }
+  .chrome .ext { margin-left: auto; display: flex; gap: 8px; align-items: center; color: #9ca3af; font-size: 11px; }
+  .app { display: grid; grid-template-columns: 208px 1fr; min-height: 620px; }
+  .sidebar {
+    background: #f8fafc; border-right: 1px solid #e2e7ef;
+    padding: 16px 12px; display: flex; flex-direction: column; gap: 5px;
+  }
+  .logo { font-weight: 700; font-size: 15px; padding: 4px 8px 14px; }
+  .logo small { display: block; font-weight: 400; color: #9ca3af; font-size: 10px; margin-top: 2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+    border-radius: 8px; color: #4b5563; font-size: 12.5px;
+  }
+  .nav-item.active { background: #e9f0ff; color: #2f6fed; font-weight: 600; }
+  .nav-item .ico { width: 16px; text-align: center; opacity: .8; font-size: 12px; }
+  .sidebar .spacer { flex: 1; }
+  .side-box {
+    background: #fff; border: 1px solid #e2e7ef; border-radius: 9px;
+    padding: 10px; font-size: 11px; color: #6b7280; margin-bottom: 6px;
+  }
+  .side-box b { color: #1f2937; }
+  .user { display: flex; align-items: center; gap: 8px; padding: 9px 6px 2px; font-size: 11.5px; }
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%; background: #dbe6ff;
+    color: #2f6fed; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 10.5px; flex: none;
+  }
+  .main { padding: 20px 24px 24px; min-width: 0; }
+  .main-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 15px; }
+  .main-head h3 { margin: 0; font-size: 18px; }
+  .main-head p { margin: 3px 0 0; color: #6b7280; font-size: 11.5px; }
+  .btn {
+    border: 0; background: #2f6fed; color: #fff; padding: 8px 12px;
+    border-radius: 8px; font-size: 12px; font-weight: 600; white-space: nowrap;
+  }
+  .btn-ghost { background: #fff; color: #374151; border: 1px solid #cfd6e2; }
+  .btn-sm { padding: 5px 9px; font-size: 11px; border-radius: 6px; }
+  .btn-soft { background: #e9f0ff; color: #2f6fed; border: 0; }
+  .input {
+    height: 36px; border: 1px solid #cfd6e2; border-radius: 8px;
+    background: #fff; display: flex; align-items: center; padding: 0 11px;
+    color: #9ca3af; font-size: 12px; overflow: hidden; white-space: nowrap;
+  }
+  .add-bar { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+  .add-bar .input { flex: 1; min-width: 240px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-bottom: 15px; }
+  .stat { background: #f8fafc; border: 1px solid #e2e7ef; border-radius: 10px; padding: 9px 11px; }
+  .stat b { display: block; font-size: 18px; line-height: 1.3; }
+  .stat span { color: #6b7280; font-size: 10.5px; }
+  .filter { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
+  .pill {
+    padding: 4px 9px; border-radius: 999px; border: 1px solid #d9dee7;
+    background: #fff; color: #4b5563; font-size: 10.5px;
+  }
+  .pill.active { background: #2f6fed; border-color: #2f6fed; color: #fff; }
+  .tag {
+    display: inline-flex; align-items: center; padding: 2px 7px;
+    border-radius: 999px; background: #f1f4f9; color: #5b6472; font-size: 10px;
+  }
+  .list { border: 1px solid #e2e7ef; border-radius: 10px; overflow: hidden; }
+  .row { display: flex; gap: 11px; padding: 11px 13px; border-bottom: 1px solid #edf0f5; align-items: flex-start; }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: #fafbfd; }
+  .file-ico {
+    width: 30px; height: 30px; border-radius: 8px; background: #eef2f8;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; flex: none;
+  }
+  .row-main { flex: 1; min-width: 0; }
+  .row-title { font-weight: 600; font-size: 12.5px; margin-bottom: 2px; }
+  .row-desc { color: #6b7280; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-meta { display: flex; align-items: center; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+  .row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex: none; }
+  .badge { font-size: 10px; padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+  .badge.ok { background: #e7f7f1; color: #0f9d76; }
+  .badge.run { background: #fff4e5; color: #b45309; }
+  .badge.fail { background: #fdeaea; color: #dc2626; }
+  .date { color: #9ca3af; font-size: 10px; }
+  .notes {
+    margin-top: 10px; background: #fff8ed; border: 1px solid #f3d9ae;
+    border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #6b4a12;
+  }
+  .notes b { color: #9a5b00; }
+  .notes ul { margin: 6px 0 0; padding-left: 18px; }
+  .notes li { margin: 3px 0; }
+
+  /* 02 detail */
+  .breadcrumb { color: #9ca3af; font-size: 10.5px; margin-bottom: 7px; }
+  .title-lg { font-size: 19px; margin: 0 0 5px; line-height: 1.35; }
+  .meta-line { color: #6b7280; font-size: 11px; display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .summary { background: #f5f8ff; border: 1px solid #d7e3ff; border-radius: 10px; padding: 11px 13px; margin-bottom: 13px; }
+  .summary h4 { margin: 0 0 5px; font-size: 11.5px; color: #2f6fed; }
+  .summary ul { margin: 0; padding-left: 17px; color: #374151; font-size: 11.5px; }
+  .tabbar { display: flex; gap: 15px; border-bottom: 1px solid #e2e7ef; margin-bottom: 12px; font-size: 11.5px; color: #6b7280; }
+  .tabbar b { color: #1f2937; border-bottom: 2px solid #2f6fed; padding: 0 0 7px; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 270px; gap: 14px; }
+  .article-body { border: 1px solid #e2e7ef; border-radius: 10px; padding: 13px; font-size: 11.5px; color: #4b5563; }
+  .article-body p { margin: 0 0 7px; }
+  .chunk { border: 1px dashed #b9c7e8; background: #f8faff; border-radius: 8px; padding: 10px; margin: 11px 0; position: relative; }
+  .chunk-label {
+    position: absolute; top: -8px; left: 10px; background: #e9f0ff; color: #2f6fed;
+    font-size: 9px; padding: 1px 6px; border-radius: 999px; border: 1px solid #d7e3ff;
+  }
+  .chunk-list { border: 1px solid #e2e7ef; border-radius: 10px; overflow: hidden; }
+  .chunk-item { padding: 9px 10px; border-bottom: 1px solid #edf0f5; font-size: 10.5px; color: #6b7280; }
+  .chunk-item:last-child { border-bottom: 0; }
+  .chunk-item.active { background: #eef4ff; }
+  .chunk-item b { font-size: 10.5px; color: #1f2937; }
+  .chunk-item span { color: #9ca3af; }
+
+  /* 03 chat */
+  .chat-layout { display: grid; grid-template-columns: 196px 1fr 250px; min-height: 640px; }
+  .conv-list { border-right: 1px solid #e2e7ef; background: #f8fafc; padding: 11px 9px; }
+  .conv-item { padding: 7px 8px; border-radius: 7px; font-size: 11px; color: #4b5563; margin-bottom: 2px; }
+  .conv-item.active { background: #e9f0ff; color: #2f6fed; font-weight: 600; }
+  .conv-item small { display: block; color: #9ca3af; font-size: 9.5px; margin-top: 2px; font-weight: 400; }
+  .chat-main { display: flex; flex-direction: column; min-width: 0; }
+  .chat-head { padding: 11px 15px; border-bottom: 1px solid #e2e7ef; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .chat-head b { font-size: 13px; margin-right: 3px; }
+  .chat-body { flex: 1; padding: 15px; overflow: auto; }
+  .msg { display: flex; gap: 8px; margin-bottom: 14px; }
+  .who {
+    width: 24px; height: 24px; border-radius: 7px; background: #eef2f8;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9.5px; flex: none; color: #6b7280;
+  }
+  .msg.user .who { background: #e9f0ff; color: #2f6fed; }
+  .msg.user .bubble { background: #e9f0ff; border-color: #d7e3ff; }
+  .bubble { background: #f8fafc; border: 1px solid #e2e7ef; border-radius: 10px; padding: 9px 11px; font-size: 11.5px; color: #374151; max-width: 94%; }
+  .bubble p { margin: 0 0 6px; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .cite { color: #2f6fed; font-weight: 700; font-size: 9.5px; vertical-align: super; }
+  .cite-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 8px; }
+  .cite-card { background: #fff; border: 1px solid #d9dee7; border-radius: 8px; padding: 7px; font-size: 9.5px; }
+  .cite-card b { display: block; color: #1f2937; margin-bottom: 2px; font-size: 10px; }
+  .cite-card span { color: #6b7280; }
+  .chat-input { border-top: 1px solid #e2e7ef; padding: 9px 13px; }
+  .chat-input .box { border: 1px solid #cfd6e2; border-radius: 10px; padding: 8px 9px; display: flex; align-items: flex-end; gap: 8px; }
+  .chat-input .fake-input { flex: 1; color: #9ca3af; font-size: 11.5px; min-height: 30px; }
+  .chat-input .hint { color: #9ca3af; font-size: 10px; margin-top: 5px; }
+  .retrieval { border-left: 1px solid #e2e7ef; background: #fbfcfe; padding: 11px; }
+  .retrieval h4 { margin: 0 0 3px; font-size: 11.5px; }
+  .retrieval .sub { color: #9ca3af; font-size: 10px; margin-bottom: 9px; }
+  .chunk-card { background: #fff; border: 1px solid #e2e7ef; border-radius: 8px; padding: 7px; margin-bottom: 6px; font-size: 10px; }
+  .chunk-card .score { float: right; color: #0f9d76; font-weight: 700; }
+  .chunk-card b { display: block; font-size: 10px; margin-bottom: 2px; padding-right: 34px; }
+  .chunk-card p { margin: 0; color: #6b7280; }
+
+  /* 04 settings */
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .set-card { border: 1px solid #e2e7ef; border-radius: 10px; padding: 13px; }
+  .set-card h4 { margin: 0 0 3px; font-size: 12.5px; }
+  .set-card .desc { color: #6b7280; font-size: 10.5px; margin-bottom: 9px; }
+  .field { margin-bottom: 8px; }
+  .field label { display: block; font-size: 10px; color: #6b7280; margin-bottom: 2px; }
+  .field .input { height: 31px; font-size: 11px; }
+  .field-row { display: flex; gap: 7px; }
+  .field-row > * { flex: 1; min-width: 0; }
+  .switch { width: 29px; height: 17px; border-radius: 999px; background: #cfd6e2; position: relative; display: inline-block; vertical-align: middle; flex: none; }
+  .switch.on { background: #2f6fed; }
+  .switch::after { content: ""; position: absolute; width: 13px; height: 13px; border-radius: 50%; background: #fff; top: 2px; left: 2px; }
+  .switch.on::after { left: 14px; }
+  .switch-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: #4b5563; padding: 5px 0; }
+  .usage-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px dashed #edf0f5; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 44px; margin-top: 8px; }
+  .bars i { flex: 1; background: #dbe6ff; border-radius: 2px 2px 0 0; }
+  .bars i:nth-child(5) { background: #2f6fed; }
+  .danger { color: #dc2626; }
+
+  /* 05 plugin */
+  .plugin-stage { background: #eef1f6; padding: 18px; }
+  .browser-window { background: #fff; border: 1px solid #cfd6e2; border-radius: 12px; overflow: hidden; position: relative; }
+  .browser-tabs { height: 34px; background: #dfe4ec; display: flex; align-items: flex-end; gap: 4px; padding: 0 10px; }
+  .b-tab { background: #fff; border-radius: 7px 7px 0 0; padding: 6px 12px; font-size: 10.5px; color: #4b5563; }
+  .toolbar { height: 42px; background: #f3f5f9; border-bottom: 1px solid #d9dee7; display: flex; align-items: center; gap: 7px; padding: 0 12px; }
+  .toolbar .url { max-width: none; flex: 1; }
+  .ext-icon {
+    width: 24px; height: 24px; border-radius: 6px; background: #e9f0ff; color: #2f6fed;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; border: 1px solid #c9d8ff; flex: none;
+  }
+  .browser-page { display: grid; grid-template-columns: 1fr 310px; min-height: 470px; }
+  .page-content { padding: 24px 30px; min-width: 0; }
+  .page-content h3 { font-size: 18px; margin: 0 0 6px; }
+  .page-content .byline { color: #9ca3af; font-size: 10.5px; margin-bottom: 16px; }
+  .line { height: 8px; background: #eef1f6; border-radius: 4px; margin-bottom: 7px; }
+  .line.w80 { width: 80%; } .line.w90 { width: 90%; } .line.w60 { width: 60%; } .line.w70 { width: 70%; }
+  .popup {
+    position: absolute; top: 82px; right: 14px; width: 320px;
+    background: #fff; border: 1px solid #cfd6e2; border-radius: 12px;
+    box-shadow: 0 12px 36px rgba(31,41,55,.18); padding: 13px; z-index: 2;
+  }
+  .popup h4 { margin: 0 0 2px; font-size: 12.5px; }
+  .popup .small { color: #9ca3af; font-size: 9.5px; }
+  .popup .preview { background: #f8fafc; border: 1px solid #e2e7ef; border-radius: 8px; padding: 8px; margin: 9px 0; font-size: 10.5px; }
+  .popup .preview b { display: block; margin-bottom: 2px; font-size: 11px; }
+  .popup .preview p { margin: 0; color: #6b7280; }
+  .popup .btn-row { display: flex; gap: 6px; }
+  .popup .btn-row .btn { flex: 1; text-align: center; }
+  .popup .footer { color: #9ca3af; font-size: 9.5px; margin-top: 8px; display: flex; justify-content: space-between; }
+  .side-panel { border-left: 1px solid #e2e7ef; background: #fbfcfe; display: flex; flex-direction: column; }
+  .side-panel .panel-head { padding: 9px 11px; border-bottom: 1px solid #e2e7ef; font-size: 11.5px; font-weight: 600; }
+  .side-panel .panel-body { flex: 1; padding: 9px; font-size: 10.5px; }
+  .side-panel .panel-input { border-top: 1px solid #e2e7ef; padding: 7px; }
+  .side-panel .msg { margin-bottom: 9px; }
+  .side-panel .bubble { font-size: 10.5px; padding: 7px 8px; }
+  .side-panel .chat-input .box { padding: 6px 7px; }
+  .side-panel .chat-input .fake-input { min-height: 22px; font-size: 10.5px; }
+
+  /* 06 admin */
+  .admin-layout { display: grid; grid-template-columns: 188px 1fr; min-height: 540px; }
+  .admin-nav { background: #1f2937; color: #cbd5e1; padding: 14px 10px; }
+  .admin-nav .logo { color: #fff; }
+  .admin-nav .nav-item { color: #cbd5e1; font-size: 11.5px; }
+  .admin-nav .nav-item.active { background: #334155; color: #fff; }
+  .admin-main { padding: 17px 19px; background: #f8fafc; }
+  .admin-main h3 { margin: 0 0 3px; font-size: 17px; }
+  .admin-main .sub { color: #6b7280; font-size: 11px; margin-bottom: 13px; }
+  .admin-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 13px; }
+  .admin-stat { background: #fff; border: 1px solid #e2e7ef; border-radius: 9px; padding: 9px; }
+  .admin-stat b { display: block; font-size: 17px; }
+  .admin-stat span { color: #6b7280; font-size: 10px; }
+  .table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e2e7ef; border-radius: 9px; overflow: hidden; font-size: 10.5px; }
+  .table th, .table td { text-align: left; padding: 7px 9px; border-bottom: 1px solid #edf0f5; }
+  .table th { background: #f8fafc; color: #6b7280; font-weight: 600; font-size: 10px; }
+  .table tr:last-child td { border-bottom: 0; }
+  .two-col { display: grid; grid-template-columns: 1.2fr .8fr; gap: 10px; }
+  .chart-box { background: #fff; border: 1px solid #e2e7ef; border-radius: 9px; padding: 10px; }
+  .chart { display: flex; align-items: flex-end; gap: 5px; height: 110px; margin-top: 10px; padding: 0 4px; }
+  .chart i { flex: 1; background: #dbe6ff; border-radius: 3px 3px 0 0; }
+  .chart i:nth-child(6) { background: #2f6fed; }
+
+  /* 07 floating */
+  .float-stage { position: relative; min-height: 560px; background: #fff; padding: 26px 30px; overflow: hidden; }
+  .fake-page { max-width: 620px; }
+  .fake-page h3 { font-size: 19px; margin: 0 0 6px; }
+  .fake-page .byline { color: #9ca3af; font-size: 10.5px; margin-bottom: 16px; }
+  .fake-page .line { height: 8px; background: #eef1f6; border-radius: 4px; margin-bottom: 7px; }
+  .float-ball {
+    position: absolute; right: 28px; bottom: 28px; width: 52px; height: 52px;
+    border-radius: 50%; background: #2f6fed; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 17px;
+    box-shadow: 0 10px 24px rgba(47,111,237,.35);
+    z-index: 5;
+  }
+  .float-ball::after {
+    content: ""; position: absolute; inset: -5px; border-radius: 50%;
+    border: 1px solid rgba(47,111,237,.25);
+  }
+  .float-panel {
+    position: absolute; right: 28px; bottom: 92px; width: 370px; height: 430px;
+    background: #fff; border: 1px solid #cfd6e2; border-radius: 14px;
+    box-shadow: 0 18px 48px rgba(31,41,55,.22);
+    display: flex; flex-direction: column; overflow: hidden; z-index: 4;
+  }
+  .fp-head { padding: 9px 11px; border-bottom: 1px solid #e2e7ef; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .fp-head b { font-size: 12.5px; margin-right: 2px; }
+  .fp-actions { margin-left: auto; color: #9ca3af; font-size: 11px; letter-spacing: 5px; }
+  .fp-context {
+    background: #f5f8ff; border-bottom: 1px solid #e2e7ef; padding: 6px 10px;
+    font-size: 10px; color: #4b5563; display: flex; align-items: center; gap: 5px;
+  }
+  .fp-context .tag { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fp-context .btn { margin-left: auto; }
+  .fp-body { flex: 1; padding: 10px; overflow: auto; }
+  .fp-body .msg { margin-bottom: 9px; }
+  .fp-body .who { width: 21px; height: 21px; font-size: 8.5px; }
+  .fp-body .bubble { font-size: 10.5px; padding: 7px 8px; }
+  .fp-body .cite-cards { grid-template-columns: 1fr; gap: 4px; }
+  .fp-body .cite-card { padding: 5px 6px; font-size: 9px; }
+  .fp-body .cite-card b { font-size: 9.5px; }
+  .fp-input { border-top: 1px solid #e2e7ef; padding: 7px 9px; }
+  .fp-input .box { border: 1px solid #cfd6e2; border-radius: 9px; padding: 6px 7px; display: flex; align-items: flex-end; gap: 6px; }
+  .fp-input .fake-input { flex: 1; color: #9ca3af; font-size: 10.5px; min-height: 22px; }
+  .fp-input .hint { color: #9ca3af; font-size: 9px; margin-top: 4px; }
+  .float-tip { position: absolute; right: 28px; bottom: 7px; font-size: 9px; color: #9ca3af; }
+
+  /* 08 bookmark import */
+  .badge.neutral { background: #f1f4f9; color: #6b7280; }
+  .bookmark-layout { display: grid; grid-template-columns: 238px 1fr; min-height: 560px; }
+  .folder-tree { border-right: 1px solid #e2e7ef; background: #f8fafc; padding: 14px 10px; }
+  .folder-title { font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: .5px; padding: 2px 8px 8px; }
+  .folder-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; font-size: 11.5px; color: #4b5563; }
+  .folder-item.active { background: #e9f0ff; color: #2f6fed; font-weight: 600; }
+  .folder-item.child { padding-left: 24px; font-size: 11px; }
+  .folder-item .count { margin-left: auto; color: #9ca3af; font-size: 9.5px; font-weight: 400; }
+  .import-main { padding: 18px 20px; min-width: 0; }
+  .import-summary { background: #f5f8ff; border: 1px solid #d7e3ff; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .import-summary b { font-size: 13px; }
+  .import-summary p { margin: 3px 0 0; color: #6b7280; font-size: 11px; }
+  .import-options { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10.5px; color: #4b5563; margin: 10px 0 2px; }
+  .check { display: flex; align-items: center; gap: 5px; }
+  .check i { width: 12px; height: 12px; border-radius: 3px; background: #2f6fed; display: inline-block; position: relative; flex: none; }
+  .check i::after { content: "✓"; color: #fff; font-size: 9px; position: absolute; top: -1px; left: 1px; }
+  .check.off i { background: #fff; border: 1px solid #cfd6e2; }
+  .check.off i::after { display: none; }
+  .import-actions { display: flex; align-items: center; gap: 8px; margin: 12px 0 14px; flex-wrap: wrap; }
+  .import-actions .meta { color: #9ca3af; font-size: 10px; margin-left: auto; }
+  .progress-line { height: 6px; background: #e7ecf5; border-radius: 999px; overflow: hidden; margin: 8px 0 4px; }
+  .progress-line i { display: block; height: 100%; width: 43%; background: #2f6fed; border-radius: 999px; }
+
+  @media (max-width: 900px) {
+    .app, .chat-layout, .admin-layout { grid-template-columns: 1fr; }
+    .sidebar, .conv-list, .admin-nav { display: none; }
+    .detail-grid, .settings-grid, .two-col, .browser-page { grid-template-columns: 1fr; }
+    .side-panel { border-left: 0; border-top: 1px solid #e2e7ef; }
+    .retrieval { border-left: 0; border-top: 1px solid #e2e7ef; }
+    .stats, .admin-stats { grid-template-columns: repeat(2, 1fr); }
+    .cite-cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">拾页 <span>页面草图 v0.1</span></div>
+  <nav class="tabs">
+    <a href="#library">01 资料库</a>
+    <a href="#detail">02 文章详情</a>
+    <a href="#chat">03 问答</a>
+    <a href="#settings">04 设置</a>
+    <a href="#plugin">05 插件</a>
+    <a href="#admin">06 可选后台</a>
+    <a href="#floating">07 浮动球</a>
+    <a href="#import">08 书签导入</a>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <div class="intro">
+    <h1>拾页 · AI 资料库 / 收藏夹</h1>
+    <p>把收藏的文章变成可以提问的知识库：收藏 → 解析 → 切片 → 向量化 → 问答（带引用）。这是线框图，重点看信息结构和交互，不是最终视觉。</p>
+    <div class="legend">
+      <span><b>蓝色</b> = 主操作 / 可点击</span>
+      <span><em>橙色</em> = 实现说明</span>
+      <span>灰色 = 占位内容</span>
+    </div>
+  </div>
+
+  <!-- 01 资料库 -->
+  <section class="screen" id="library">
+    <div class="screen-head">
+      <span class="num">01</span>
+      <h2>资料库（首页）</h2>
+      <p>用户收藏的所有文章都在这里，也是 RAG 的“数据源”</p>
+    </div>
+
+    <div class="frame">
+      <div class="chrome">
+        <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+        <div class="url">app.shiye.local/library</div>
+        <div class="ext">已登录 · user@example.com</div>
+      </div>
+
+      <div class="app">
+        <aside class="sidebar">
+          <div class="logo">拾页<small>AI 资料库</small></div>
+          <div class="nav-item active"><span class="ico">▦</span>资料库</div>
+          <div class="nav-item"><span class="ico">✦</span>问答</div>
+          <div class="nav-item"><span class="ico">◇</span>标签</div>
+          <div class="nav-item"><span class="ico">⚙</span>设置</div>
+          <div class="spacer"></div>
+          <div class="side-box"><b>索引队列</b><br>3 篇处理中 · 1 篇失败</div>
+          <div class="user"><span class="avatar">JT</span><span>JT · 个人空间</span></div>
+        </aside>
+
+        <div class="main">
+          <div class="main-head">
+            <div>
+              <h3>资料库</h3>
+              <p>128 篇资料 · 1,240 个切片 · 最近更新 2 分钟前</p>
+            </div>
+            <button class="btn">＋ 添加资料</button>
+          </div>
+
+          <div class="add-bar">
+            <div class="input">粘贴文章链接，回车抓取…</div>
+            <button class="btn">抓取</button>
+            <button class="btn btn-ghost">上传 PDF / Markdown</button>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><b>128</b><span>资料总数</span></div>
+            <div class="stat"><b>1,240</b><span>切片总数</span></div>
+            <div class="stat"><b>12</b><span>本周新增</span></div>
+            <div class="stat"><b>3</b><span>处理中</span></div>
+          </div>
+
+          <div class="filter">
+            <span class="pill active">全部</span>
+            <span class="pill">文章</span>
+            <span class="pill">PDF</span>
+            <span class="pill">处理中</span>
+            <span class="pill">失败</span>
+            <span style="width:8px"></span>
+            <span class="tag">RAG</span>
+            <span class="tag">Spring AI</span>
+            <span class="tag">检索</span>
+            <span class="tag">Redis</span>
+          </div>
+
+          <div class="list">
+            <div class="row">
+              <div class="file-ico">📄</div>
+              <div class="row-main">
+                <div class="row-title">RAG 切片策略：按段落还是按固定长度？</div>
+                <div class="row-desc">对比了固定长度、语义段落、标题层级三种切法，并给出中文长文的推荐参数…</div>
+                <div class="row-meta"><span class="tag">RAG</span><span class="tag">切片</span><span class="date">2026-11-08</span></div>
+              </div>
+              <div class="row-side"><span class="badge ok">已索引</span><span class="date">24 个切片</span></div>
+            </div>
+
+            <div class="row">
+              <div class="file-ico">📄</div>
+              <div class="row-main">
+                <div class="row-title">Spring AI 1.0 实战：ChatClient 与 VectorStore</div>
+                <div class="row-desc">从依赖配置到流式输出，记录接入 OpenAI 兼容接口和 Redis 向量库的踩坑…</div>
+                <div class="row-meta"><span class="tag">Spring AI</span><span class="tag">Java</span><span class="date">2026-11-06</span></div>
+              </div>
+              <div class="row-side"><span class="badge ok">已索引</span><span class="date">18 个切片</span></div>
+            </div>
+
+            <div class="row">
+              <div class="file-ico">📄</div>
+              <div class="row-main">
+                <div class="row-title">中文长文档的 RAG 实践</div>
+                <div class="row-desc">按标题层级先切一级，再在段内做二次切分；正在解析正文…</div>
+                <div class="row-meta"><span class="tag">RAG</span><span class="tag">中文</span><span class="date">2026-11-05</span></div>
+              </div>
+              <div class="row-side"><span class="badge run">解析中 68%</span><span class="date">预计 30 秒</span></div>
+            </div>
+
+            <div class="row">
+              <div class="file-ico">📄</div>
+              <div class="row-main">
+                <div class="row-title">Redis Stack 向量检索入门</div>
+                <div class="row-desc">RediSearch 的向量索引、metadata 过滤，以及和 Spring AI 的对接方式…</div>
+                <div class="row-meta"><span class="tag">Redis</span><span class="tag">向量</span><span class="date">2026-11-03</span></div>
+              </div>
+              <div class="row-side"><span class="badge ok">已索引</span><span class="date">15 个切片</span></div>
+            </div>
+
+            <div class="row">
+              <div class="file-ico">📕</div>
+              <div class="row-main">
+                <div class="row-title">为什么你的 RAG 回答总是没有引用</div>
+                <div class="row-desc">PDF 没有文本层，解析失败；需要 OCR 或换一份文件。</div>
+                <div class="row-meta"><span class="tag">RAG</span><span class="tag">评测</span><span class="date">2026-11-01</span></div>
+              </div>
+              <div class="row-side"><span class="badge fail">解析失败</span><span class="btn btn-sm btn-soft">重试</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <b>实现说明</b>
+      <ul>
+        <li>“粘贴链接”是 V1 的主入口；“上传 PDF / Markdown”是补充。浏览器插件放到 V2，不要一上来做。</li>
+        <li>状态流转：解析中 → 切片中 → 向量化中 → 已索引 / 失败。失败要能重试，且重试要幂等。</li>
+        <li>文章是“资料”，切片是 RAG 的最小检索单位；列表里显示切片数，方便判断解析质量。</li>
+        <li>标签可以先让 AI 自动生成，再允许手动修改；不要一开始做复杂的标签体系。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 02 文章详情 -->
+  <section class="screen" id="detail">
+    <div class="screen-head">
+      <span class="num">02</span>
+      <h2>文章详情</h2>
+      <p>看摘要、看切片、定位原文；也是排查“为什么答得不好”的地方</p>
+    </div>
+
+    <div class="frame">
+      <div class="chrome">
+        <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+        <div class="url">app.shiye.local/library/1024</div>
+        <div class="ext">已索引 · 24 个切片</div>
+      </div>
+
+      <div class="app">
+        <aside class="sidebar">
+          <div class="logo">拾页<small>AI 资料库</small></div>
+          <div class="nav-item active"><span class="ico">▦</span>资料库</div>
+          <div class="nav-item"><span class="ico">✦</span>问答</div>
+          <div class="nav-item"><span class="ico">◇</span>标签</div>
+          <div class="nav-item"><span class="ico">⚙</span>设置</div>
+          <div class="spacer"></div>
+          <div class="side-box"><b>当前资料</b><br>1,842 字 · 24 个切片<br>更新于 2026-11-08</div>
+          <div class="user"><span class="avatar">JT</span><span>JT · 个人空间</span></div>
+        </aside>
+
+        <div class="main">
+          <div class="breadcrumb">资料库 / RAG 切片策略：按段落还是按固定长度？</div>
+          <div class="main-head" style="margin-bottom:6px">
+            <div>
+              <h3 class="title-lg">RAG 切片策略：按段落还是按固定长度？</h3>
+              <div class="meta-line">
+                <span>来源：example.com/rag-chunking</span>
+                <span>2026-11-08</span>
+                <span>1,842 字</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn">与本文对话</button>
+            <button class="btn btn-ghost">重新解析</button>
+            <button class="btn btn-ghost">导出 Markdown</button>
+            <button class="btn btn-ghost danger">删除</button>
+          </div>
+
+          <div class="summary">
+            <h4>AI 摘要</h4>
+            <ul>
+              <li>固定长度切片实现简单，但容易把一句话切断；中文长文更推荐按标题 + 段落切。</li>
+              <li>推荐单块 500~800 字，重叠 10%~15%；chunk 大小要和 embedding 模型、topK 一起调。</li>
+              <li>切片不是越小越好：太小会丢上下文，太大会稀释检索命中率。</li>
+            </ul>
+          </div>
+
+          <div class="tabbar">
+            <b>正文</b><span>切片（24）</span><span>元数据</span>
+          </div>
+
+          <div class="detail-grid">
+            <div class="article-body">
+              <p>做 RAG 时，切片策略往往比换模型更影响最终效果。很多教程直接给一个固定长度，但在中文长文里，这样做很容易把一个小节拆成两半。</p>
+
+              <div class="chunk">
+                <span class="chunk-label">chunk #03 · 612 字</span>
+                <p>一种更稳的做法是先按标题层级切一级：每个二级标题下的内容作为一个候选块；如果超过 800 字，再在段内按句子边界做二次切分。</p>
+                <p>重叠的作用是防止答案正好落在切口附近。10%~15% 是一个经验值，但并不是硬性规定。</p>
+              </div>
+
+              <p>另一种观点认为，切片大小应该由问题和文档类型决定。FAQ、代码、论文的合理切法并不相同，不能用一个参数打天下。</p>
+
+              <div class="chunk">
+                <span class="chunk-label">chunk #04 · 588 字</span>
+                <p>如果检索效果不好，先看切片是否完整，再看 embedding 模型，最后才考虑 rerank。顺序反了会浪费很多时间。</p>
+              </div>
+
+              <p>最后，切片要保存原文位置（charStart / charEnd），否则问答里的引用无法跳回原文，用户就不会信任你的答案。</p>
+            </div>
+
+            <div>
+              <div class="chunk-list">
+                <div class="chunk-item active"><b>#03</b> · 612 字 · 0.87<br><span>一种更稳的做法是先按标题层级切一级…</span></div>
+                <div class="chunk-item"><b>#04</b> · 588 字 · 0.83<br><span>如果检索效果不好，先看切片是否完整…</span></div>
+                <div class="chunk-item"><b>#05</b> · 721 字 · 0.79<br><span>另一种观点认为，切片大小应该由问题…</span></div>
+                <div class="chunk-item"><b>#06</b> · 496 字 · 0.76<br><span>最后，切片要保存原文位置…</span></div>
+                <div class="chunk-item"><b>#07</b> · 655 字 · 0.71<br><span>FAQ、代码、论文的合理切法并不相同…</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <b>实现说明</b>
+      <ul>
+        <li>摘要是锦上添花，切片和原文定位才是核心。不要花太多时间在“摘要好不好看”上。</li>
+        <li>每个切片必须保存 <b>articleId / chunkIndex / charStart / charEnd</b>，引用才能跳回原文。</li>
+        <li>“重新解析”会重建切片和向量，要保证幂等：同一篇文章重复解析不能产生重复切片。</li>
+        <li>“与本文对话”= 把检索范围限定为单篇，适合长文精读。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 03 问答 -->
+  <section class="screen" id="chat">
+    <div class="screen-head">
+      <span class="num">03</span>
+      <h2>问答页（核心）</h2>
+      <p>流式回答 + 引用卡片 + 可展开的检索过程</p>
+    </div>
+
+    <div class="frame">
+      <div class="chrome">
+        <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+        <div class="url">app.shiye.local/chat</div>
+        <div class="ext">DeepSeek-V3 · 1.8s</div>
+      </div>
+
+      <div class="chat-layout">
+        <aside class="conv-list">
+          <button class="btn btn-soft" style="width:100%;margin-bottom:8px">＋ 新对话</button>
+          <div class="conv-item active">chunk size 的不同观点<small>今天 14:22 · 6 条消息</small></div>
+          <div class="conv-item">Spring AI 怎么接 Redis 向量库<small>今天 11:05 · 4 条消息</small></div>
+          <div class="conv-item">中文长文怎么切分<small>昨天 · 8 条消息</small></div>
+          <div class="conv-item">RAG 引用不准确怎么办<small>11-08 · 5 条消息</small></div>
+        </aside>
+
+        <div class="chat-main">
+          <div class="chat-head">
+            <b>资料库问答</b>
+            <span class="pill active">全部资料 · 128 篇</span>
+            <span class="pill">DeepSeek-V3</span>
+            <span class="pill">引用开启</span>
+          </div>
+
+          <div class="chat-body">
+            <div class="msg user">
+              <div class="who">JT</div>
+              <div class="bubble"><p>我收藏的文章里，chunk size 一般建议多大？有哪几种观点？</p></div>
+            </div>
+
+            <div class="msg">
+              <div class="who">AI</div>
+              <div class="bubble">
+                <p>你收藏的资料里主要有三种倾向：</p>
+                <p><b>1. 按语义段落切，单块 500~800 字，重叠 10%~15%。</b> 这是最常见的中文长文方案，重点是不要把一句话切断。<span class="cite">[1]</span></p>
+                <p><b>2. 先按标题层级切，再在段内二次切分。</b> 适合结构清晰的长文；如果一个小节超过 800 字，再按句子边界拆。<span class="cite">[2]</span></p>
+                <p><b>3. chunk 大小没有统一答案，要和 embedding 模型、topK 一起调。</b> FAQ、代码、论文的合理切法并不相同。<span class="cite">[3]</span></p>
+
+                <div class="cite-cards">
+                  <div class="cite-card"><b>[1] RAG 切片策略…</b><span>第 3 段 · 相似度 0.87</span></div>
+                  <div class="cite-card"><b>[2] 中文长文档的 RAG 实践</b><span>第 1 节 · 相似度 0.83</span></div>
+                  <div class="cite-card"><b>[3] 检索增强生成评测指南</b><span>第 5 段 · 相似度 0.79</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="msg user">
+              <div class="who">JT</div>
+              <div class="bubble"><p>那第二篇和第三篇的观点冲突吗？</p></div>
+            </div>
+
+            <div class="msg">
+              <div class="who">AI</div>
+              <div class="bubble"><p>不冲突，它们在不同层面：第二篇讲“怎么切”，第三篇讲“切完怎么评估”。前者给的是默认策略，后者强调的是参数要跟着数据和模型调…<span class="cite">[2][3]</span></p></div>
+            </div>
+          </div>
+
+          <div class="chat-input">
+            <div class="box">
+              <div class="fake-input">继续追问，或粘贴新的问题…</div>
+              <button class="btn btn-sm">发送</button>
+            </div>
+            <div class="hint">只基于你收藏的 128 篇资料回答；找不到会直接说“没有找到”。</div>
+          </div>
+        </div>
+
+        <aside class="retrieval">
+          <h4>本次检索</h4>
+          <div class="sub">向量 0.7 · 关键词 0.3 · rerank off</div>
+          <div class="chunk-card"><span class="score">0.87</span><b>RAG 切片策略…</b><p>chunk #03 · 612 字</p></div>
+          <div class="chunk-card"><span class="score">0.83</span><b>中文长文档的 RAG 实践</b><p>chunk #01 · 588 字</p></div>
+          <div class="chunk-card"><span class="score">0.79</span><b>检索增强生成评测指南</b><p>chunk #12 · 721 字</p></div>
+          <div class="chunk-card"><span class="score">0.76</span><b>RAG 切片策略…</b><p>chunk #04 · 588 字</p></div>
+          <div class="chunk-card"><span class="score">0.71</span><b>中文长文档的 RAG 实践</b><p>chunk #02 · 655 字</p></div>
+          <div class="side-box" style="margin-top:8px"><b>调试信息</b><br>query 改写：否<br>召回 10 → 重排 0 → 送入 5<br>首 token：0.9s · 总耗时：1.8s</div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="notes">
+      <b>实现说明</b>
+      <ul>
+        <li>引用不是装饰：每段答案都要能点回原文；回答里没有引用，说明检索或提示词有问题。</li>
+        <li>右侧“检索过程”面板是学习和调参用的，面试时也能讲清楚 topK、分数、延迟。</li>
+        <li>范围选择器解决“只能问收藏内容”的局限感：全部 / 单篇 / 某个标签。</li>
+        <li>空状态放 3 个建议问题，降低第一次使用门槛。</li>
+        <li>流式输出用 SSE；前端用 fetch + ReadableStream，不要用 EventSource（它不支持 POST）。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 04 设置 -->
+  <section class="screen" id="settings">
+    <div class="screen-head">
+      <span class="num">04</span>
+      <h2>设置页</h2>
+      <p>单用户项目用一个设置页就够了，不需要单独的管理后台</p>
+    </div>
+
+    <div class="frame">
+      <div class="chrome">
+        <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+        <div class="url">app.shiye.local/settings</div>
+        <div class="ext">配置只存后端</div>
+      </div>
+
+      <div class="app">
+        <aside class="sidebar">
+          <div class="logo">拾页<small>AI 资料库</small></div>
+          <div class="nav-item"><span class="ico">▦</span>资料库</div>
+          <div class="nav-item"><span class="ico">✦</span>问答</div>
+          <div class="nav-item"><span class="ico">◇</span>标签</div>
+          <div class="nav-item active"><span class="ico">⚙</span>设置</div>
+          <div class="spacer"></div>
+          <div class="side-box"><b>本月用量</b><br>1.2M tokens · ¥3.40</div>
+          <div class="user"><span class="avatar">JT</span><span>JT · 个人空间</span></div>
+        </aside>
+
+        <div class="main">
+          <div class="main-head">
+            <div>
+              <h3>设置</h3>
+              <p>模型、检索参数和数据管理</p>
+            </div>
+            <button class="btn">保存并测试连接</button>
+          </div>
+
+          <div class="settings-grid">
+            <div class="set-card">
+              <h4>Chat 模型</h4>
+              <div class="desc">用于问答和摘要，支持 OpenAI 兼容接口</div>
+              <div class="field"><label>Provider</label><div class="input">DeepSeek</div></div>
+              <div class="field"><label>Base URL</label><div class="input">https://api.deepseek.com/v1</div></div>
+              <div class="field-row">
+                <div class="field"><label>Model</label><div class="input">deepseek-chat</div></div>
+                <div class="field"><label>API Key</label><div class="input">••••••••••••</div></div>
+              </div>
+              <button class="btn btn-sm btn-ghost">测试连接</button>
+            </div>
+
+            <div class="set-card">
+              <h4>Embedding 模型</h4>
+              <div class="desc">用于切片向量化，必须和向量索引维度一致</div>
+              <div class="field"><label>Provider</label><div class="input">硅基流动</div></div>
+              <div class="field"><label>Model</label><div class="input">BAAI/bge-m3</div></div>
+              <div class="field-row">
+                <div class="field"><label>维度</label><div class="input">1024</div></div>
+                <div class="field"><label>批量大小</label><div class="input">16</div></div>
+              </div>
+              <button class="btn btn-sm btn-ghost">测试 Embedding</button>
+            </div>
+
+            <div class="set-card">
+              <h4>RAG 参数</h4>
+              <div class="desc">改动只影响新资料；旧资料需要重建索引</div>
+              <div class="field-row">
+                <div class="field"><label>切片大小（字）</label><div class="input">600</div></div>
+                <div class="field"><label>重叠（字）</label><div class="input">80</div></div>
+                <div class="field"><label>TopK</label><div class="input">8</div></div>
+              </div>
+              <div class="switch-line"><span>混合检索（向量 + 关键词）</span><span class="switch on"></span></div>
+              <div class="switch-line"><span>Rerank 重排</span><span class="switch"></span></div>
+              <div class="switch-line"><span>回答必须带引用</span><span class="switch on"></span></div>
+            </div>
+
+            <div class="set-card">
+              <h4>数据与用量</h4>
+              <div class="desc">导出、重建索引、查看成本</div>
+              <div class="usage-row"><span>本月 tokens</span><b>1.2M</b></div>
+              <div class="usage-row"><span>本月成本</span><b>¥3.40</b></div>
+              <div class="usage-row"><span>平均首 token</span><b>0.9s</b></div>
+              <div class="usage-row"><span>平均总耗时</span><b>1.8s</b></div>
+              <div class="bars">
+                <i style="height:35%"></i><i style="height:50%"></i><i style="height:40%"></i>
+                <i style="height:65%"></i><i style="height:80%"></i><i style="height:55%"></i>
+                <i style="height:70%"></i>
+              </div>
+              <div style="display:flex;gap:6px;margin-top:10px">
+                <button class="btn btn-sm btn-ghost">导出全部资料</button>
+                <button class="btn btn-sm btn-ghost">重建索引</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <b>实现说明</b>
+      <ul>
+        <li>单用户项目：设置页足够；不要为了“看起来完整”去做用户管理、RBAC、审计日志。</li>
+        <li>API Key 只存后端（加密或环境变量），前端只显示掩码，不要放 localStorage。</li>
+        <li>参数变更只影响新资料；要让旧资料生效，必须“重建索引”，并且要能后台跑、显示进度。</li>
+        <li>如果以后做多用户，再加独立管理后台：用户、索引任务、模型配置、用量。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 05 插件 -->
+  <section class="screen" id="plugin">
+    <div class="screen-head">
+      <span class="num">05</span>
+      <h2>浏览器插件（可选，V2）</h2>
+      <p>只做两件事：收藏当前页、侧边栏提问；不是整个项目</p>
+    </div>
+
+    <div class="frame">
+      <div class="plugin-stage">
+        <div class="browser-window">
+          <div class="browser-tabs">
+            <div class="b-tab">RAG 切片策略 - 示例博客</div>
+            <div class="b-tab" style="background:#eef1f6;color:#9ca3af">新标签页</div>
+          </div>
+          <div class="toolbar">
+            <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+            <div class="url">https://example.com/rag-chunking</div>
+            <div class="ext-icon">拾</div>
+            <div class="ext-icon" style="background:#f3f5f9;color:#9ca3af;border-color:#d9dee7">⋯</div>
+          </div>
+
+          <div class="browser-page">
+            <div class="page-content">
+              <h3>RAG 切片策略：按段落还是按固定长度？</h3>
+              <div class="byline">示例博客 · 2026-11-08 · 约 8 分钟阅读</div>
+              <div class="line w90"></div><div class="line w80"></div><div class="line w90"></div>
+              <div class="line w60"></div><div class="line w80"></div><div class="line w70"></div>
+              <div class="line w90"></div><div class="line w60"></div><div class="line w80"></div>
+              <div class="line w70"></div><div class="line w90"></div><div class="line w60"></div>
+            </div>
+
+            <aside class="side-panel">
+              <div class="panel-head">拾页 · 侧边栏</div>
+              <div class="panel-body">
+                <div class="side-box" style="margin-bottom:9px"><b>当前页面</b><br>RAG 切片策略：按段落还是按固定长度？</div>
+                <div class="msg user"><div class="who">JT</div><div class="bubble"><p>这篇的核心结论是什么？</p></div></div>
+                <div class="msg"><div class="who">AI</div><div class="bubble"><p>作者建议中文长文先按标题层级切，再在段内按句子边界二次切分，单块 500~800 字，重叠 10%~15%。<span class="cite">[1]</span></p></div></div>
+              </div>
+              <div class="panel-input">
+                <div class="chat-input" style="border-top:0;padding:0">
+                  <div class="box"><div class="fake-input">问这篇，或问整个资料库…</div><button class="btn btn-sm">发送</button></div>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          <div class="popup">
+            <h4>拾页</h4>
+            <div class="small">已读取当前页面 · 1,842 字</div>
+            <div class="preview">
+              <b>RAG 切片策略：按段落还是按固定长度？</b>
+              <p>自动摘要：三种切片策略的对比，以及中文长文的推荐参数…</p>
+              <div style="margin-top:6px"><span class="tag">RAG</span> <span class="tag">切片</span> <span class="tag">检索</span></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-sm">保存到资料库</button>
+              <button class="btn btn-sm btn-ghost">保存并提问</button>
+            </div>
+            <div class="footer"><span>已登录 · JT</span><span>设置</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <b>实现说明</b>
+      <ul>
+        <li>插件只做两个入口：popup 收藏当前页 + 侧边栏问答。不要把它做成第二个管理后台。</li>
+        <li>正文提取用 Readability.js；失败时回退到 <b>document.body.innerText</b>，先跑通再优化。</li>
+        <li>登录：网页端生成一次性 code，插件换 token；不要把密码存在 chrome.storage。</li>
+        <li>本地调试：Chrome 打开 <b>chrome://extensions</b> → 开发者模式 → 加载已解压的扩展程序。</li>
+        <li>V1 可以完全不做插件，先做“粘贴链接”；插件是体验优化，不是核心。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 06 可选后台 -->
+  <section class="screen" id="admin">
+    <div class="screen-head">
+      <span class="num">06</span>
+      <h2>可选：管理后台</h2>
+      <p>只有多用户 / 要运营时才需要；个人项目建议跳过</p>
+    </div>
+
+    <div class="frame">
+      <div class="chrome">
+        <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+        <div class="url">admin.shiye.local</div>
+        <div class="ext">仅管理员</div>
+      </div>
+
+      <div class="admin-layout">
+        <aside class="admin-nav">
+          <div class="logo">拾页<small style="color:#94a3b8">运营后台</small></div>
+          <div class="nav-item active"><span class="ico">▦</span>总览</div>
+          <div class="nav-item"><span class="ico">◉</span>用户</div>
+          <div class="nav-item"><span class="ico">▤</span>资料</div>
+          <div class="nav-item"><span class="ico">↻</span>索引任务</div>
+          <div class="nav-item"><span class="ico">⚙</span>模型配置</div>
+          <div class="nav-item"><span class="ico">◔</span>用量</div>
+        </aside>
+
+        <div class="admin-main">
+          <h3>总览</h3>
+          <div class="sub">最近 7 天 · 所有用户</div>
+
+          <div class="admin-stats">
+            <div class="admin-stat"><b>12</b><span>用户</span></div>
+            <div class="admin-stat"><b>1,024</b><span>资料</span></div>
+            <div class="admin-stat"><b>86</b><span>今日问答</span></div>
+            <div class="admin-stat"><b>2</b><span>失败任务</span></div>
+          </div>
+
+          <div class="two-col">
+            <div class="chart-box">
+              <b style="font-size:11px">索引任务</b>
+              <table class="table" style="margin-top:8px">
+                <tr><th>资料</th><th>用户</th><th>状态</th><th>耗时</th></tr>
+                <tr><td>中文长文档的 RAG 实践</td><td>JT</td><td><span class="badge run">向量化中</span></td><td>12s</td></tr>
+                <tr><td>RAG 切片策略…</td><td>JT</td><td><span class="badge ok">完成</span></td><td>8s</td></tr>
+                <tr><td>为什么你的 RAG 回答…</td><td>Alex</td><td><span class="badge fail">失败</span></td><td>3s</td></tr>
+                <tr><td>Redis Stack 向量检索入门</td><td>Mia</td><td><span class="badge ok">完成</span></td><td>6s</td></tr>
+              </table>
+            </div>
+
+            <div class="chart-box">
+              <b style="font-size:11px">近 7 天问答量</b>
+              <div class="chart">
+                <i style="height:35%"></i><i style="height:48%"></i><i style="height:42%"></i>
+                <i style="height:66%"></i><i style="height:58%"></i><i style="height:82%"></i>
+                <i style="height:70%"></i>
+              </div>
+              <div class="usage-row" style="margin-top:8px"><span>本月 tokens</span><b>3.8M</b></div>
+              <div class="usage-row"><span>本月成本</span><b>¥11.20</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <b>实现说明</b>
+      <ul>
+        <li>只有多用户、需要运营时才做；个人学习项目做设置页就够了。</li>
+        <li>你已经在 OfferDesk 做过 Vue 管理后台，这里不用重复练 CRUD；这个项目的重点是 RAG。</li>
+        <li>如果要做，控制在这 3 个页面：用户、索引任务、模型配置；不要上 RBAC / 审计 / 审批流。</li>
+        <li>后台的“模型配置”和用户端“设置页”是两套权限：只有管理员能改全局模型和密钥。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 07 浮动球 -->
+  <section class="screen" id="floating">
+    <div class="screen-head">
+      <span class="num">07</span>
+      <h2>浮动球形态（你描述的）</h2>
+      <p>任何网页右下角一个小球，点开就是 AI 对话，不用离开当前页</p>
+    </div>
+
+    <div class="frame">
+      <div class="chrome">
+        <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+        <div class="url">https://example.com/rag-chunking</div>
+        <div class="ext">任意网页 · 插件已启用</div>
+      </div>
+
+      <div class="float-stage">
+        <div class="fake-page">
+          <h3>RAG 切片策略：按段落还是按固定长度？</h3>
+          <div class="byline">示例博客 · 2026-11-08 · 约 8 分钟阅读</div>
+          <div class="line w90"></div><div class="line w80"></div><div class="line w90"></div>
+          <div class="line w60"></div><div class="line w80"></div><div class="line w70"></div>
+          <div class="line w90"></div><div class="line w60"></div><div class="line w80"></div>
+        </div>
+
+        <div class="float-panel">
+          <div class="fp-head">
+            <b>拾页</b>
+            <span class="pill active">资料库</span>
+            <span class="pill">当前页面</span>
+            <span class="pill">通用</span>
+            <span class="fp-actions">— ✕</span>
+          </div>
+          <div class="fp-context">
+            <span>当前页：</span>
+            <span class="tag">RAG 切片策略：按段落还是按固定长度？</span>
+            <button class="btn btn-sm btn-soft">收藏此页</button>
+          </div>
+          <div class="fp-body">
+            <div class="msg user">
+              <div class="who">JT</div>
+              <div class="bubble"><p>这篇和资料库里那篇中文长文的观点一致吗？</p></div>
+            </div>
+            <div class="msg">
+              <div class="who">AI</div>
+              <div class="bubble">
+                <p>一致。两篇都建议先按标题层级切，再在段内按句子边界二次切分；单块 500~800 字，重叠 10%~15%。<span class="cite">[1][2]</span></p>
+                <div class="cite-cards">
+                  <div class="cite-card"><b>[1] 当前页面 · 第 3 段</b><span>相似度 0.87 · 点击跳原文</span></div>
+                  <div class="cite-card"><b>[2] 中文长文档的 RAG 实践</b><span>资料库 · chunk #01</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="fp-input">
+            <div class="box">
+              <div class="fake-input">问资料库，或问当前页面…</div>
+              <button class="btn btn-sm">发送</button>
+            </div>
+            <div class="hint">Enter 发送 · Shift+Enter 换行 · Esc 收起</div>
+          </div>
+        </div>
+
+        <div class="float-ball">拾</div>
+        <div class="float-tip">拖动 / 点击展开 / 记住位置</div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <b>实现说明</b>
+      <ul>
+        <li>本质是 content script 往每个页面注入一个固定定位的容器，用 <b>Shadow DOM</b> 隔离样式；点球时再挂载 Vue 面板。</li>
+        <li>三种模式：<b>资料库</b>（RAG + 引用）、<b>当前页面</b>（临时上下文，不一定要收藏）、<b>通用</b>（不检索，直接问模型）。默认资料库。</li>
+        <li>浮动球用 <b>position: fixed + z-index: 2147483647</b>；拖动位置存 <b>chrome.storage.local</b>，下次记住。</li>
+        <li>当前页内容由 content script 读取：title、URL、选中文本、Readability 正文；提问时一起发给后端。</li>
+        <li>登录：网页端登录后生成一次性 code，插件换 token；token 存 chrome.storage.local，不要存密码。</li>
+        <li>MV3 不允许执行远程 JS：Vue 代码必须打包进插件；可以请求后端 API，但不能从 CDN 拉脚本执行。</li>
+        <li>不是所有页面都能注入：chrome://、扩展商店、PDF 内置阅读器等会被浏览器禁止，属于正常现象。</li>
+        <li>自己用不用“上传”：chrome://extensions → 开发者模式 → 加载已解压；发给朋友就打包 zip。</li>
+        <li>公开上架才麻烦：Chrome Web Store 一次性 $5 + 隐私政策 + 审核；Edge Add-ons 免费，国内更省事。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 08 书签导入 -->
+  <section class="screen" id="import">
+    <div class="screen-head">
+      <span class="num">08</span>
+      <h2>书签文件夹导入（插件设置页）</h2>
+      <p>选一个收藏文件夹，插件读链接，后端抓正文建索引</p>
+    </div>
+
+    <div class="frame">
+      <div class="chrome">
+        <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+        <div class="url">chrome-extension://xxxx/options.html</div>
+        <div class="ext">拾页 · 设置</div>
+      </div>
+
+      <div class="bookmark-layout">
+        <aside class="folder-tree">
+          <div class="folder-title">选择收藏文件夹</div>
+          <div class="folder-item"><span>▾</span>书签栏</div>
+          <div class="folder-item active child"><span>📁</span>技术文章<span class="count">42</span></div>
+          <div class="folder-item child" style="padding-left:42px"><span>📄</span>RAG<span class="count">18</span></div>
+          <div class="folder-item child" style="padding-left:42px"><span>📄</span>Java<span class="count">14</span></div>
+          <div class="folder-item child" style="padding-left:42px"><span>📄</span>前端<span class="count">10</span></div>
+          <div class="folder-item child"><span>📁</span>产品<span class="count">16</span></div>
+          <div class="folder-item child"><span>📁</span>稍后读<span class="count">28</span></div>
+          <div class="folder-item"><span>▸</span>其他书签</div>
+        </aside>
+
+        <div class="import-main">
+          <div class="import-summary">
+            <b>技术文章</b>
+            <p>42 个链接 · 包含 3 个子文件夹 · 已导入 18 个</p>
+            <div class="import-options">
+              <span class="check"><i></i>包含子文件夹</span>
+              <span class="check"><i></i>只导入 http/https</span>
+              <span class="check"><i></i>跳过已导入</span>
+            </div>
+          </div>
+
+          <div class="import-actions">
+            <button class="btn">开始导入 42 个链接</button>
+            <button class="btn btn-ghost">重新扫描书签</button>
+            <span class="meta">预计 3~5 分钟 · embedding 约 0.8M tokens</span>
+          </div>
+
+          <div class="progress-line"><i></i></div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:#6b7280;margin-bottom:10px">
+            <span>已处理 18 / 42</span><span>失败 2 · 剩余约 2 分钟</span>
+          </div>
+
+          <table class="table">
+            <tr><th>书签</th><th>状态</th><th>切片</th><th>操作</th></tr>
+            <tr><td>RAG 切片策略：按段落还是按固定长度？</td><td><span class="badge ok">已索引</span></td><td>24</td><td>查看</td></tr>
+            <tr><td>Spring AI 1.0 实战：ChatClient 与 VectorStore</td><td><span class="badge ok">已索引</span></td><td>18</td><td>查看</td></tr>
+            <tr><td>中文长文档的 RAG 实践</td><td><span class="badge run">抓取中 68%</span></td><td>—</td><td>暂停</td></tr>
+            <tr><td>Redis Stack 向量检索入门</td><td><span class="badge neutral">等待中</span></td><td>—</td><td>—</td></tr>
+            <tr><td>为什么你的 RAG 回答总是没有引用</td><td><span class="badge fail">需要登录</span></td><td>—</td><td><span class="btn btn-sm btn-soft">打开页面并收藏</span></td></tr>
+          </table>
+
+          <div style="display:flex;gap:6px;margin-top:10px">
+            <button class="btn btn-sm btn-ghost">暂停导入</button>
+            <button class="btn btn-sm btn-ghost">导出失败列表</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <b>实现说明</b>
+      <ul>
+        <li>插件用 <b>chrome.bookmarks.getSubTree(folderId)</b> 递归读取文件夹；这段逻辑放在 background service worker，面板通过 sendMessage 拿数据。</li>
+        <li>只把 <b>URL + 标题</b>发给后端，正文由后端抓取；不要试图在插件里批量打开所有书签，慢且容易被封。</li>
+        <li>后端按域名限速（如 1 请求/秒），失败重试 2 次；需要登录/反爬的页面直接标记“需手动”，让用户打开页面点悬浮球收藏。</li>
+        <li>去重：URL 规范化（去掉 utm、锚点）+ 内容 hash；同一篇重复导入不重复扣 embedding 费用。</li>
+        <li>书签变更监听：<b>chrome.bookmarks.onCreated / onRemoved</b>，新增链接可以自动入队；删除只标记归档，不自动删资料。</li>
+        <li>先限制一个文件夹、最多 50 条，跑通再放开；不要第一次就导入几千条。</li>
+        <li>权限 <b>bookmarks</b> 比较敏感，上架时审核会问用途；自己用加载已解压不受影响。</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+</body>
+</html>

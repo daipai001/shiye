@@ -1,0 +1,44 @@
+server:
+  port: 18081
+
+spring:
+  application:
+    name: shiye-admin-api
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/shiye?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 统一会话时区为 UTC，和 Java 侧 LocalDateTime.now(UTC) 对齐
+      connection-init-sql: SET time_zone = '+00:00'
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+  jackson:
+    time-zone: UTC
+    default-property-inclusion: non_null
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+shiye:
+  jwt:
+    # 必须与 USER_JWT_SECRET 不同；生产通过环境变量覆盖，至少 32 字节
+    admin-secret: ${ADMIN_JWT_SECRET:dev-admin-secret-change-me-32-bytes-minimum}
+    admin-expire-seconds: ${ADMIN_JWT_EXPIRE_SECONDS:900}
+    refresh-expire-seconds: ${REFRESH_EXPIRE_SECONDS:2592000}

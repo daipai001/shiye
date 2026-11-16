@@ -1,0 +1,15 @@
+body {
+  margin: 0;
+  background: #f7f7f5;
+  color: #1c1c1a;
+  font: 13px/1.6 "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+.popup { width: 300px; padding: 16px; }
+.brand { font-weight: 700; font-size: 16px; }
+.brand span { color: #9a9a94; font-size: 10px; font-weight: 400; margin-left: 4px; }
+.muted { color: #6f6f6a; margin: 4px 0 14px; }
+.row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid #e6e4df; border-bottom: 1px solid #e6e4df; }
+.actions { display: flex; gap: 8px; margin-top: 14px; }
+button { flex: 1; border: 1px solid #e6e4df; background: #fff; color: #1c1c1a; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+button.primary { background: #1c1c1a; color: #fff; border-color: #1c1c1a; }
+.hint { color: #9a9a94; font-size: 10.5px; margin: 12px 0 0; }

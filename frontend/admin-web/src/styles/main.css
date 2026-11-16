@@ -1,0 +1,57 @@
+:root {
+  --bg: #f7f7f5;
+  --panel: #ffffff;
+  --ink: #1c1c1a;
+  --muted: #6f6f6a;
+  --faint: #9a9a94;
+  --line: #e6e4df;
+  --primary: #5b5bd6;
+  --primary-soft: #efeffa;
+}
+* { box-sizing: border-box; }
+html, body, #app { margin: 0; min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+}
+a { color: var(--primary); text-decoration: none; }
+.muted { color: var(--muted); }
+.eyebrow { font-size: 10px; letter-spacing: 2px; font-weight: 800; color: var(--faint); margin-bottom: 8px; }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 230px; background: #fbfbf9; border-right: 1px solid var(--line); padding: 20px 12px; }
+.brand { font-weight: 700; font-size: 18px; padding: 4px 10px 22px; }
+.brand span { display: block; font-size: 10px; color: var(--faint); font-weight: 400; }
+.nav a { display: block; padding: 9px 11px; border-radius: 8px; color: var(--muted); font-size: 13px; margin-bottom: 2px; }
+.nav a:hover { background: #f1f0ec; color: var(--ink); }
+.nav a.router-link-active { background: #ecebe6; color: var(--ink); font-weight: 600; }
+.main { flex: 1; min-width: 0; }
+.topbar { height: 60px; background: rgba(255,255,255,.92); border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 24px; gap: 12px; }
+.topbar .spacer { flex: 1; }
+.badge { font-size: 10px; background: var(--primary-soft); color: var(--primary); border-radius: 999px; padding: 3px 8px; font-weight: 700; }
+.content { padding: 28px 32px; max-width: 1280px; }
+
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.page-head h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; }
+.page-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.card b { display: block; font-size: 28px; letter-spacing: -.03em; }
+.card span { color: var(--muted); font-size: 12px; }
+.placeholder { background: var(--panel); border: 1px dashed #cfccc4; border-radius: 12px; padding: 40px; color: var(--muted); text-align: center; }
+
+.login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--bg); }
+.login-card { width: 400px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px; }
+.login-card h1 { font-family: Georgia, "Songti SC", serif; font-size: 30px; margin: 0 0 4px; letter-spacing: -.02em; }
+.login-card p { margin: 0 0 16px; font-size: 12px; }
+.login-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; color: var(--faint); font-size: 11px; }
+
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .content { padding: 20px; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .page-head { flex-direction: column; }
+}

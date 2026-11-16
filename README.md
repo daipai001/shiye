@@ -1,0 +1,208 @@
+# 拾页（ShiYe）
+
+> 收藏不是终点，能问才是。
+
+把浏览器书签文件夹变成可对话的个人知识库：任意网页点悬浮球，基于收藏内容提问，回答带原文引用，AI 用量和成本可查。
+
+## 产品形态
+
+- **前台 Web**：资料库、文章详情、问答、设置、用量
+- **前台插件**：任意网页悬浮球、书签文件夹导入、收藏当前页
+- **后台管理端**：独立 `admin-web`，用量与成本、导入/索引任务、模型配置
+- **前台 API**：`shiye-user-api`，Web + 插件共用
+- **后台 API**：`shiye-admin-api`，管理端专用
+
+## 技术栈
+
+| 层 | 技术 |
+|---|---|
+| 前台 Web | Vue 3 + TypeScript + Vite + Pinia + Vue Router + Element Plus |
+| 前台插件 | Chrome MV3 + Vue 3 + TypeScript + Vite + Shadow DOM |
+| 后台 Web | Vue 3 + TypeScript + Vite + Pinia + Vue Router + Element Plus |
+| 前台 API | Spring Boot 3 + Java 21 + MyBatis + Spring AI |
+| 后台 API | Spring Boot 3 + Java 21 + MyBatis |
+| 数据库 | MySQL 8 |
+| 向量/缓存 | Redis Stack（RediSearch） |
+| 流式 | SSE（`SseEmitter`） |
+| 部署 | Docker Compose + Nginx |
+
+## 文档
+
+- [需求文档](docs/requirements.md)
+- [数据库设计](docs/schema.md)
+- [接口文档](docs/api.md)
+- [可点击原型](docs/prototype.html)（最新，演示用这个）
+- [静态草图](docs/wireframes.html)（早期归档）
+
+## 目录
+
+```
+shiye/
+├─ frontend/
+│  ├─ user-web/          # 前台 Web（Vue 3）
+│  ├─ user-extension/    # 前台插件（悬浮球 + 书签导入）
+│  └─ admin-web/         # 后台管理端（独立 Vue 3）
+├─ backend/
+│  ├─ shiye-common/      # 共享基础库
+│  ├─ shiye-user-api/    # 前台 API（Web + 插件共用）
+│  └─ shiye-admin-api/   # 后台 API（管理端专用）
+├─ docs/                 # 需求、接口、数据库设计
+├─ deploy/               # Docker Compose、Nginx、SQL
+└─ README.md
+```
+
+## 本地启动
+
+### 1. 数据库
+
+```sql
+CREATE DATABASE IF NOT EXISTS shiye
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+USE shiye;
+```
+
+```bash
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/schema.sql
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/seed.sql
+```
+
+- 管理员：`admin@shiye.local`
+- 初始密码：见项目负责人的私密记录；首次登录后修改
+- 迁移：`deploy/sql/migrations/V001__init.sql`
+- Docker 方式：`mvn -f backend/pom.xml package -DskipTests` 后 `docker compose -f deploy/docker-compose.yml up -d --build`
+
+### 2. 后端
+
+```bash
+cd backend
+mvn -DskipTests package
+java -jar shiye-user-api/target/shiye-user-api-0.1.0-SNAPSHOT.jar --spring.profiles.active=local
+java -jar shiye-admin-api/target/shiye-admin-api-0.1.0-SNAPSHOT.jar --spring.profiles.active=local
+```
+
+- 前台 API：`http://localhost:18080/api/v1`
+- 后台 API：`http://localhost:18081/admin/api/v1`
+- 健康检查：
+  - `http://localhost:18080/api/v1/health`
+  - `http://localhost:18081/admin/api/v1/health`
+- 本地配置：`backend/config/application-local.yml`（已被 `.gitignore` 忽略），包含 MySQL、Redis 和两个 JWT 密钥；不要提交真实密钥。
+- 本地 MySQL/Redis 使用 3306/6379；Docker Compose 映射到 13306/16379，避免冲突。
+
+### 3. 前端
+
+```bash
+cd frontend/user-web
+npm install
+npm run dev        # http://localhost:15173
+
+cd ../admin-web
+npm install
+npm run dev        # http://localhost:15174
+```
+
+### 4. 浏览器插件
+
+1. Chrome/Edge 打开 `chrome://extensions`
+2. 打开“开发者模式”
+3. “加载已解压的扩展程序” → 选择 `frontend/user-extension`
+4. 任意网页右下角会出现“拾”悬浮球；插件设置页可读取书签数量
+5. 在网页端「插件」页生成授权码，粘贴到插件设置页连接
+6. 连接后悬浮球支持资料库问答（流式 + 引用）和收藏当前页
+
+### 5. Docker Compose
+
+```bash
+cp deploy/.env.example deploy/.env
+# 编辑 deploy/.env：DB_PASSWORD、JWT、DeepSeek / Embedding key
+docker compose -f deploy/docker-compose.yml up -d --build
+```
+
+- 用户端：`http://localhost:15173`
+- 管理端：`http://localhost:15174`
+- 用户 API：`http://localhost:18080`
+- 管理 API：`http://localhost:18081`
+- MySQL：`13306`，Redis Stack：`16379`
+
+### 6. CI / CD
+
+- `.github/workflows/ci.yml`：push/PR 时跑后端单测、两个前端构建、插件语法检查，并启动 MySQL/Redis 跑真实 API smoke。
+- `.github/workflows/cd.yml`：推送 `v*` tag 或手动触发，构建并推送四个镜像到 GHCR。
+- 可选 SSH 部署：配置仓库变量 `ENABLE_DEPLOY=true`、`IMAGE_PREFIX=ghcr.io/<owner>`，以及 secrets `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` / `DEPLOY_PATH`。
+
+## 当前状态
+
+需求、数据库、接口、原型已定稿；Maven 多模块、两个 API、两个 Web、插件悬浮球骨架均已完成并可构建。
+
+认证模块已打通：
+
+- 用户注册、登录、刷新、登出
+- 管理员独立登录、刷新、登出
+- 插件一次性授权码 → 用户 token
+- 前端登录页接真实接口，access token 过期自动刷新
+- 用户端与管理端令牌按 audience + 独立密钥隔离
+
+书签导入 M2a 已打通：
+
+- `bookmark_folders` / `bookmark_imports` / `bookmark_items`
+- 文件夹创建/列表/设为唯一主文件夹
+- 导入任务创建、分批追加、列表、详情、条目分页
+- 暂停/恢复/取消/重试失败项
+- URL 规范化去重（锚点、`utm_*` 等追踪参数、尾斜杠）
+- `Idempotency-Key` 幂等、Redis 创建限流（5 次/分钟/用户）
+- 插件设置页：授权码连接、书签树、包含子文件夹、分批导入、最近任务与失败原因
+- 用户端「插件」页生成授权码；资料库页显示最近导入任务
+
+书签导入 M2b（抓取/解析/切片/向量化）已打通：
+
+- 定时 worker 消费 `PENDING` 条目：`FETCHING → 解析 → 切片 → embedding → READY / FAILED / SKIPPED`
+- Jsoup 正文提取、标题/摘要/语言/字数、段落/句子边界切片（500~800 字，约 100 字重叠）
+- `charStart/charEnd` 保存到切片，供引用跳转
+- SSRF 校验（协议/内网 IP/DNS）、超时、重定向上限、页面大小和正文长度限制
+- 跨导入按 `(user_id, url_hash)` 去重，已存在 `READY` 资料时条目标记 `SKIPPED / DUPLICATE_URL`
+- 向量写入 Redis：`kb:chunk:{chunkId}` + `kb:user:{userId}:chunks`
+- 资料 API：列表/统计/详情/切片/删除/重新索引；资料库页面支持搜索、状态筛选、详情抽屉和切片查看
+
+RAG 问答闭环已打通：
+
+- `POST /api/v1/chat/stream`：SSE 事件 `meta / citation / delta / usage / done / error`
+- DeepSeek 流式回答，复用本地 OfferDesk 配置（`shiye.ai.chat`，已 gitignore）
+- 问答范围 ALL / ARTICLE / FOLDER；检索结果按 `user_id` 过滤，单篇最多 3 个切片
+- 回答引用与 `citations` 落库，包含标题、片段、分数、`charStart/charEnd`
+- 会话/消息/引用持久化；问答页支持流式输出、引用卡片、会话列表
+- AI 用量记账：`ai_usage` + `user_usage_monthly`，记录 token、单价快照、成本、耗时
+- 用户月度配额和全站月度预算检查；问答页显示 token/成本进度
+- `/usage/quota`、`/usage/records` 已接入「用量」页面
+- `POST /articles/{id}/reindex`：换 embedding 模型后重新抓取/切片/向量化
+
+> **Embedding 默认是联调模式**：新环境未配置 key 时 `shiye.ai.embedding.provider=dev` 会生成确定性向量（模型名 `DEV-HASH-1024`），只用于跑通状态机，**不是 BGE-M3 语义向量**。
+> 配置真实 BGE-M3（OpenAI 兼容 `/embeddings`）：
+>
+> ```powershell
+> $env:EMBEDDING_PROVIDER="http"
+> $env:EMBEDDING_BASE_URL="https://api.siliconflow.cn/v1"
+> $env:EMBEDDING_API_KEY="你的 key"
+> $env:EMBEDDING_MODEL="BAAI/bge-m3"
+> $env:EMBEDDING_DIMENSION="1024"
+> ```
+>
+> 本机已切换到 BGE-M3 并验证：切片 `embedding_model=BAAI/bge-m3`、维度 1024，中文查询能命中相关英文切片（相似度约 0.60/0.49/0.46）。key 只存在于本地忽略配置，不提交仓库。
+>
+> 切换模型后旧切片需要重建索引；`POST /articles/{id}/reindex` 已接入。本机 Redis 8 没有 RediSearch，当前用 Hash 存向量，检索阶段先走应用层余弦；部署 Redis Stack 后可替换为 HNSW 索引。
+
+前端页面只有在 dev server 运行时才能打开；API 也不在时登录会提示“无法连接后端服务”。
+
+## 已知缺口（下一阶段）
+
+- 仓库默认 embedding 仍是 `dev`；新环境需按上面说明配置 BGE-M3 API Key。本机已配置并验证。
+- 本机 Redis 没有 RediSearch，检索走应用层余弦；数据量大后应换 Redis Stack HNSW。
+- 未做混合检索、RRF、rerank、AI 摘要/自动标签；摘要暂用 meta description 或正文前 220 字。
+- 插件悬浮球的资料库问答、收藏当前页，以及 `/articles/collect`、`/articles/upload` 尚未接入。
+- 注册/登录的 IP 限流和 `X-RateLimit-*` 响应头尚未接入；书签导入限流已接入。
+- 管理端导入、用户、用量、模型配置接口尚未接入，页面为占位。
+- 主文件夹自动同步（`chrome.bookmarks.onCreated/onRemoved`）属于 P1，尚未接入。
+
+## 下一步
+
+1. 插件悬浮球资料库问答 + 收藏当前页（`/articles/collect`）
+2. 真实 BGE-M3 配置 + 全量 reindex + Redis Stack HNSW
+3. 管理后台（总览、用户、用量、导入、模型配置）与混合检索/rerank

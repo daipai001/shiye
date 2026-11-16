@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>拾页 · 设置</title>
+    <link rel="stylesheet" href="./index.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-head">
+        <div>
+          <div class="eyebrow">SHIYE · EXTENSION</div>
+          <h1>插件设置</h1>
+          <p class="muted">连接账号、导入书签、管理悬浮球。</p>
+        </div>
+        <span id="backendState" class="pill">后端未检测</span>
+      </header>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>连接账号</h2>
+            <p class="muted">用网页端生成的一次性授权码连接，不需要在插件里输入密码。</p>
+          </div>
+          <span id="authState" class="pill">未连接</span>
+        </div>
+
+        <div id="authConnected" class="auth-connected" hidden>
+          <span class="avatar" id="userAvatar">拾</span>
+          <div class="grow">
+            <b id="userName">已连接</b>
+            <span id="userEmail"></span>
+          </div>
+          <button id="disconnect" class="ghost" type="button">断开连接</button>
+        </div>
+
+        <div id="authDisconnected">
+          <div class="inline-form">
+            <input id="authCode" class="input" placeholder="粘贴授权码，例如 SHIYE-ABCD2345" autocomplete="off" />
+            <button id="connect" class="primary" type="button">连接</button>
+          </div>
+          <p class="hint">
+            没有授权码？打开拾页网页端 → 插件 → 生成授权码，5 分钟内有效且只能使用一次。
+          </p>
+          <p id="authMessage" class="hint"></p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>书签导入</h2>
+            <p class="muted">每次选择一个文件夹；超过 50 条会自动分批追加到同一个导入任务。</p>
+          </div>
+          <button id="loadBookmarks" class="primary" type="button">读取书签</button>
+        </div>
+
+        <div id="folderPanel" hidden>
+          <div class="folder-toolbar">
+            <div class="grow">
+              <b id="selectedFolder">尚未选择文件夹</b>
+              <span id="selectedFolderMeta" class="hint"></span>
+            </div>
+            <label class="check">
+              <input id="recursive" type="checkbox" checked />
+              <span>包含子文件夹</span>
+            </label>
+          </div>
+
+          <div id="folderList" class="folder-list"></div>
+
+          <div class="import-actions">
+            <button id="startImport" class="primary" type="button">开始导入</button>
+            <span id="importHint" class="hint"></span>
+          </div>
+          <div id="importProgress" class="progress" hidden></div>
+        </div>
+
+        <p id="bookmarkHint" class="hint">连接账号后读取书签。</p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>最近导入</h2>
+            <p class="muted">任务状态、成功/失败/跳过数量与失败原因。</p>
+          </div>
+          <button id="refreshImports" class="ghost" type="button">刷新</button>
+        </div>
+        <div id="importList" class="import-list">
+          <p class="hint">连接账号后显示。</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>悬浮球</h2>
+            <p class="muted">控制是否在网页右下角显示悬浮球。</p>
+          </div>
+        </div>
+        <label class="row">
+          <span>在网页显示悬浮球</span>
+          <input id="ballEnabled" type="checkbox" />
+        </label>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>后端地址</h2>
+            <p class="muted">本地默认 <code>http://localhost:18080/api/v1</code>。</p>
+          </div>
+        </div>
+        <div class="inline-form">
+          <input id="apiBaseUrl" class="input" />
+          <button id="saveApi" class="primary" type="button">保存</button>
+        </div>
+        <p id="saveResult" class="hint"></p>
+      </section>
+    </main>
+    <script src="./index.js"></script>
+  </body>
+</html>

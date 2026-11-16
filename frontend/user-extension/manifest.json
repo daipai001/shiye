@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "拾页 ShiYe",
+  "version": "0.1.0",
+  "description": "把收藏夹变成可对话的知识库",
+  "permissions": ["bookmarks", "storage", "activeTab", "scripting"],
+  "host_permissions": ["http://localhost:18080/*", "http://127.0.0.1:18080/*"],
+  "background": {
+    "service_worker": "src/background/index.js"
+  },
+  "action": {
+    "default_title": "拾页",
+    "default_popup": "src/popup/index.html"
+  },
+  "options_ui": {
+    "page": "src/options/index.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["src/content/index.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Maven tests
+        working-directory: backend
+        run: mvn -B test
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [user-web, admin-web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/${{ matrix.app }}/package-lock.json
+      - name: Install
+        working-directory: frontend/${{ matrix.app }}
+        run: npm ci
+      - name: Build
+        working-directory: frontend/${{ matrix.app }}
+        run: npm run build
+
+  extension-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax check
+        working-directory: frontend/user-extension
+        run: |
+          find src -name '*.js' -print0 | xargs -0 -n1 node --check
+          node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('manifest ok')"
+
+  integration-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: shiye
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
+      - name: Initialize schema
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot shiye < deploy/sql/schema.sql
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot shiye < deploy/sql/seed.sql
+      - name: Build API
+        working-directory: backend
+        run: mvn -B -DskipTests package
+      - name: Start user API
+        run: |
+          nohup java -jar backend/shiye-user-api/target/shiye-user-api-0.1.0-SNAPSHOT.jar \
+            --spring.datasource.url='jdbc:mysql://127.0.0.1:3306/shiye?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true' \
+            --spring.datasource.username=root \
+            --spring.datasource.password=root \
+            --spring.data.redis.host=127.0.0.1 \
+            --spring.data.redis.port=6379 \
+            --shiye.jwt.user-secret=ci-user-secret-0123456789-abcdefghijklmnopqrstuvwxyz \
+            --shiye.ai.embedding.provider=dev \
+            --shiye.bookmark.worker-enabled=false \
+            > /tmp/shiye-user-api.log 2>&1 &
+          echo $! > /tmp/shiye-user-api.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18080/api/v1/health >/tmp/shiye-health.json; then
+              cat /tmp/shiye-health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'user API did not become healthy'
+          exit 1
+      - name: Smoke test
+        run: bash scripts/ci-smoke.sh
+      - name: Show API log on failure
+        if: failure()
+        run: tail -n 200 /tmp/shiye-user-api.log || true
+      - name: Stop API
+        if: always()
+        run: kill "$(cat /tmp/shiye-user-api.pid)" || true
