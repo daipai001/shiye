@@ -161,3 +161,31 @@ export interface UsageRecord {
   errorCode?: string | null
   createdAt: string
 }
+
+export interface UsageBreakdown {
+  label: string
+  calls: number
+  tokens: number
+  cost: number
+}
+
+export interface UsageDaily {
+  date: string
+  calls: number
+  tokens: number
+  cost: number
+  errors: number
+}
+
+export interface UsageSummary {
+  from: string
+  to: string
+  days: number
+  calls: number
+  tokens: number
+  cost: number
+  errors: number
+  scenes: UsageBreakdown[]
+  sources: UsageBreakdown[]
+  daily: UsageDaily[]
+}

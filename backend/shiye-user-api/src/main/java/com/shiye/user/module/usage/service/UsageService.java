@@ -4,6 +4,7 @@ import com.shiye.common.api.PageResult;
 import com.shiye.user.module.usage.domain.vo.QuotaVO;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
 import com.shiye.user.module.usage.domain.vo.UsageRecordVO;
+import com.shiye.user.module.usage.domain.vo.UsageSummaryVO;
 
 import java.math.BigDecimal;
 
@@ -32,4 +33,6 @@ public interface UsageService {
 
     PageResult<UsageRecordVO> records(long userId, int page, int pageSize,
                                       String source, String scene, String model, String status);
+
+    UsageSummaryVO summary(long userId, int days);
 }

@@ -1076,29 +1076,28 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 3.5 用量
 
-> **当前实现**：`GET /usage/quota`、`GET /usage/records` 已接入；`/usage/summary` 的聚合和趋势图在下一阶段实现。
-> 现有页面直接展示月度配额 + 调用明细。
+> **当前实现**：`GET /usage/quota`、`GET /usage/records`、`GET /usage/summary` 已接入；用量页展示月度配额、近 7 天趋势和调用明细。
+> 聚合按 UTC 日期计算，趋势缺失日期补 0。
 
 #### GET `/usage/summary`
 
 **认证**：用户
 
-**Query**：`range=today|7d|30d`（默认 7d）
+**Query**：`days=1..30`（默认 7）
 
 **响应**
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `range` | string | 范围 |
-| `tokens` | number | 总 token |
-| `cost` | string | 总成本 |
+| `from` / `to` | string | UTC 起始/结束日期 |
+| `days` | number | 实际聚合天数 |
 | `calls` | number | 调用数 |
-| `avgFirstTokenMs` | number | 平均首 token |
-| `avgLatencyMs` | number | 平均总耗时 |
-| `errorRate` | number | 0~1 |
-| `sourceBreakdown` | array | `{source,calls,tokens,cost}` |
-| `sceneBreakdown` | array | `{scene,calls,tokens,cost}` |
-| `series` | array | `{date,tokens,cost,calls}` |
+| `tokens` | number | 总 token |
+| `cost` | number | 总成本 |
+| `errors` | number | 失败调用数 |
+| `scenes` | array | `{label,calls,tokens,cost}`，按 token 降序 |
+| `sources` | array | `{label,calls,tokens,cost}`，按 token 降序 |
+| `daily` | array | `{date,calls,tokens,cost,errors}`，连续日期补 0 |
 
 ---
 

@@ -182,7 +182,7 @@ RAG 问答闭环已打通：
 - 会话/消息/引用持久化；问答页支持流式输出、引用卡片、会话列表
 - AI 用量记账：`ai_usage` + `user_usage_monthly`，记录 token、单价快照、成本、耗时
 - 用户月度配额和全站月度预算检查；问答页显示 token/成本进度
-- `/usage/quota`、`/usage/records` 已接入「用量」页面
+- `/usage/quota`、`/usage/records`、`/usage/summary` 已接入「用量」页面；趋势按 UTC 日期聚合，缺失日期补 0
 - `POST /articles/{id}/reindex`：换 embedding 模型后重新抓取/切片/向量化
 
 > **Embedding 默认是联调模式**：新环境未配置 key 时 `shiye.ai.embedding.provider=dev` 会生成确定性向量（模型名 `DEV-HASH-1024`），只用于跑通状态机，**不是 BGE-M3 语义向量**。
@@ -241,7 +241,7 @@ RAG 问答闭环已打通：
 - 本机 Redis 没有 RediSearch，向量检索走应用层余弦；数据量大后应换 Redis Stack HNSW。
 - 已做向量 + 关键词 + RRF 混合检索、BGE-reranker 二次重排、资料 AI 摘要/自动标签和插件当前页问答；书签自动同步尚未接入。
 - 管理端模型配置目前只读 + 连接测试，在线修改模型/key/价格尚未接入。
-- `/usage/summary` 趋势聚合、`/articles/upload` 尚未接入；管理端索引任务页基于 bookmark_items。
+- `/articles/upload` 尚未接入；管理端索引任务页基于 bookmark_items。
 - 注册/登录的 IP 限流和 `X-RateLimit-*` 响应头尚未接入；书签导入限流已接入。
 - 主文件夹自动同步（`chrome.bookmarks.onCreated/onRemoved`）属于 P1，尚未接入。
 

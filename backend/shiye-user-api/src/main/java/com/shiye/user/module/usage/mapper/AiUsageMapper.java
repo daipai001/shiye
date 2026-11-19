@@ -1,12 +1,16 @@
 package com.shiye.user.module.usage.mapper;
 
 import com.shiye.user.module.usage.domain.entity.AiUsageEntity;
+import com.shiye.user.module.usage.domain.entity.UsageBreakdownRow;
+import com.shiye.user.module.usage.domain.entity.UsageDailyRow;
+import com.shiye.user.module.usage.domain.entity.UsageRangeTotalsRow;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -67,4 +71,55 @@ public interface AiUsageMapper {
                @Param("scene") String scene,
                @Param("model") String model,
                @Param("status") String status);
+
+    @Select("""
+            SELECT COUNT(*) AS calls,
+                   COALESCE(SUM(total_tokens), 0) AS tokens,
+                   COALESCE(SUM(cost), 0) AS cost,
+                   COALESCE(SUM(status = 'FAILED'), 0) AS errors
+            FROM ai_usage
+            WHERE user_id = #{userId} AND created_at >= #{from}
+            """)
+    UsageRangeTotalsRow summary(@Param("userId") long userId,
+                                @Param("from") LocalDateTime from);
+
+    @Select("""
+            SELECT scene AS label,
+                   COUNT(*) AS calls,
+                   COALESCE(SUM(total_tokens), 0) AS tokens,
+                   COALESCE(SUM(cost), 0) AS cost
+            FROM ai_usage
+            WHERE user_id = #{userId} AND created_at >= #{from}
+            GROUP BY scene
+            ORDER BY tokens DESC, label ASC
+            """)
+    List<UsageBreakdownRow> summaryByScene(@Param("userId") long userId,
+                                           @Param("from") LocalDateTime from);
+
+    @Select("""
+            SELECT source AS label,
+                   COUNT(*) AS calls,
+                   COALESCE(SUM(total_tokens), 0) AS tokens,
+                   COALESCE(SUM(cost), 0) AS cost
+            FROM ai_usage
+            WHERE user_id = #{userId} AND created_at >= #{from}
+            GROUP BY source
+            ORDER BY tokens DESC, label ASC
+            """)
+    List<UsageBreakdownRow> summaryBySource(@Param("userId") long userId,
+                                            @Param("from") LocalDateTime from);
+
+    @Select("""
+            SELECT DATE(created_at) AS date,
+                   COUNT(*) AS calls,
+                   COALESCE(SUM(total_tokens), 0) AS tokens,
+                   COALESCE(SUM(cost), 0) AS cost,
+                   COALESCE(SUM(status = 'FAILED'), 0) AS errors
+            FROM ai_usage
+            WHERE user_id = #{userId} AND created_at >= #{from}
+            GROUP BY DATE(created_at)
+            ORDER BY date
+            """)
+    List<UsageDailyRow> summaryDaily(@Param("userId") long userId,
+                                     @Param("from") LocalDateTime from);
 }

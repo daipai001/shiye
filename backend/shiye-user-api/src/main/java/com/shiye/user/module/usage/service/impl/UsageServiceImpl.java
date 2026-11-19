@@ -6,10 +6,16 @@ import com.shiye.common.exception.BizException;
 import com.shiye.user.module.auth.domain.vo.UserQuotaVO;
 import com.shiye.user.module.auth.service.AuthService;
 import com.shiye.user.module.usage.domain.entity.AiUsageEntity;
+import com.shiye.user.module.usage.domain.entity.UsageBreakdownRow;
+import com.shiye.user.module.usage.domain.entity.UsageDailyRow;
+import com.shiye.user.module.usage.domain.entity.UsageRangeTotalsRow;
 import com.shiye.user.module.usage.domain.entity.UserUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.vo.QuotaVO;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
+import com.shiye.user.module.usage.domain.vo.UsageBreakdownVO;
+import com.shiye.user.module.usage.domain.vo.UsageDailyVO;
 import com.shiye.user.module.usage.domain.vo.UsageRecordVO;
+import com.shiye.user.module.usage.domain.vo.UsageSummaryVO;
 import com.shiye.user.module.usage.domain.vo.UsageTotals;
 import com.shiye.user.module.usage.mapper.AiUsageMapper;
 import com.shiye.user.module.usage.mapper.UserUsageMonthlyMapper;
@@ -24,7 +30,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class UsageServiceImpl implements UsageService {
@@ -252,6 +261,69 @@ public class UsageServiceImpl implements UsageService {
                 .map(UsageRecordVO::from)
                 .toList();
         return PageResult.of(items, total, safePage, safeSize);
+    }
+
+    @Override
+    public UsageSummaryVO summary(long userId, int days) {
+        int safeDays = Math.max(1, Math.min(days, 30));
+        LocalDate to = LocalDate.now(ZoneOffset.UTC);
+        LocalDate fromDate = to.minusDays(safeDays - 1L);
+        LocalDateTime from = fromDate.atStartOfDay();
+
+        UsageRangeTotalsRow totals = aiUsageMapper.summary(userId, from);
+        List<UsageBreakdownVO> scenes = aiUsageMapper.summaryByScene(userId, from).stream()
+                .map(row -> new UsageBreakdownVO(
+                        row.getLabel(),
+                        longValue(row.getCalls()),
+                        longValue(row.getTokens()),
+                        money(row.getCost())))
+                .toList();
+        List<UsageBreakdownVO> sources = aiUsageMapper.summaryBySource(userId, from).stream()
+                .map(row -> new UsageBreakdownVO(
+                        row.getLabel(),
+                        longValue(row.getCalls()),
+                        longValue(row.getTokens()),
+                        money(row.getCost())))
+                .toList();
+
+        Map<LocalDate, UsageDailyRow> byDate = new HashMap<>();
+        for (UsageDailyRow row : aiUsageMapper.summaryDaily(userId, from)) {
+            if (row.getDate() != null) {
+                byDate.put(row.getDate(), row);
+            }
+        }
+        List<UsageDailyVO> daily = new ArrayList<>(safeDays);
+        for (LocalDate date = fromDate; !date.isAfter(to); date = date.plusDays(1)) {
+            UsageDailyRow row = byDate.get(date);
+            daily.add(new UsageDailyVO(
+                    date,
+                    row == null ? 0 : longValue(row.getCalls()),
+                    row == null ? 0 : longValue(row.getTokens()),
+                    row == null ? BigDecimal.ZERO : money(row.getCost()),
+                    row == null ? 0 : longValue(row.getErrors())
+            ));
+        }
+
+        return new UsageSummaryVO(
+                fromDate,
+                to,
+                safeDays,
+                totals == null ? 0 : longValue(totals.getCalls()),
+                totals == null ? 0 : longValue(totals.getTokens()),
+                totals == null ? BigDecimal.ZERO : money(totals.getCost()),
+                totals == null ? 0 : longValue(totals.getErrors()),
+                scenes,
+                sources,
+                daily
+        );
+    }
+
+    private long longValue(Long value) {
+        return value == null ? 0 : value;
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     private String currentMonth() {

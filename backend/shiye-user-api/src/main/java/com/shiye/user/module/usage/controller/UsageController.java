@@ -5,6 +5,7 @@ import com.shiye.common.api.Result;
 import com.shiye.user.common.security.UserContext;
 import com.shiye.user.module.usage.domain.vo.QuotaVO;
 import com.shiye.user.module.usage.domain.vo.UsageRecordVO;
+import com.shiye.user.module.usage.domain.vo.UsageSummaryVO;
 import com.shiye.user.module.usage.service.UsageService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +25,12 @@ public class UsageController {
     @GetMapping("/quota")
     public Result<QuotaVO> quota() {
         return Result.ok(usageService.quota(UserContext.requireUserId()));
+    }
+
+    @GetMapping("/summary")
+    public Result<UsageSummaryVO> summary(
+            @RequestParam(defaultValue = "7") int days) {
+        return Result.ok(usageService.summary(UserContext.requireUserId(), days));
     }
 
     @GetMapping("/records")
