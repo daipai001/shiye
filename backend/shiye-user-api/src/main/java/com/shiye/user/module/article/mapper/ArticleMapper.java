@@ -34,9 +34,22 @@ public interface ArticleMapper {
             """)
     ArticleEntity findByIdAndUser(@Param("id") long id, @Param("userId") long userId);
 
+    @Select("""
+            SELECT id, user_id, title, url, url_hash, domain, source_type, author,
+                   published_at, fetched_at, summary, content_text, content_hash,
+                   word_count, language, status, file_asset_id, created_at, updated_at, deleted_at
+            FROM articles
+            WHERE user_id = #{userId} AND file_asset_id = #{fileAssetId} AND deleted_at IS NULL
+            LIMIT 1
+            """)
+    ArticleEntity findByFileAsset(@Param("userId") long userId,
+                                  @Param("fileAssetId") long fileAssetId);
+
     @Insert("""
-            INSERT INTO articles (user_id, title, url, url_hash, domain, source_type, status)
-            VALUES (#{userId}, #{title}, #{url}, #{urlHash}, #{domain}, #{sourceType}, #{status})
+            INSERT INTO articles (user_id, title, url, url_hash, domain, source_type, status,
+                                  file_asset_id)
+            VALUES (#{userId}, #{title}, #{url}, #{urlHash}, #{domain}, #{sourceType}, #{status},
+                    #{fileAssetId})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(ArticleEntity article);

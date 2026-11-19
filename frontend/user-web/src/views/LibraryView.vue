@@ -10,6 +10,7 @@ import type {
   ArticleDetail,
   ArticleStats,
   ArticleSummary,
+  ArticleUploadResponse,
   BookmarkImportSummary,
   PageResult,
   Tag,
@@ -25,6 +26,8 @@ const page = ref(1)
 const q = ref('')
 const statusFilter = ref('')
 const loading = ref(false)
+const uploading = ref(false)
+const uploadInput = ref<HTMLInputElement | null>(null)
 
 const imports = ref<BookmarkImportSummary[]>([])
 
@@ -119,6 +122,40 @@ function applySearch() {
   loadArticles()
 }
 
+function chooseUpload() {
+  uploadInput.value?.click()
+}
+
+async function handleUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) {
+    return
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    ElMessage.error('文件不能超过 20MB')
+    input.value = ''
+    return
+  }
+  uploading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await api.post<ApiResult<ArticleUploadResponse>>(
+      '/articles/upload',
+      formData,
+      { timeout: 180000 },
+    )
+    ElMessage.success(data.data.duplicate ? '这篇资料已经存在' : '已上传，正在解析、切片和向量化')
+    await Promise.all([loadStats(), loadArticles()])
+  } catch {
+    ElMessage.error('上传失败，请检查文件类型或稍后再试')
+  } finally {
+    uploading.value = false
+    input.value = ''
+  }
+}
+
 async function openArticle(article: ArticleSummary) {
   drawer.value = true
   detail.value = null
@@ -171,7 +208,17 @@ onMounted(loadAll)
         <h1>资料库</h1>
         <p>收藏的网页会在这里变成可检索的资料：抓正文、切片、向量化。</p>
       </div>
-      <el-button type="primary" @click="router.push('/plugin')">导入书签</el-button>
+      <div class="page-actions">
+        <input
+          ref="uploadInput"
+          type="file"
+          accept=".md,.markdown,.txt,.pdf"
+          class="file-input"
+          @change="handleUpload"
+        />
+        <el-button :loading="uploading" @click="chooseUpload">上传资料</el-button>
+        <el-button type="primary" @click="router.push('/plugin')">导入书签</el-button>
+      </div>
     </div>
 
     <div class="stats-grid">
@@ -333,6 +380,14 @@ onMounted(loadAll)
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   margin-bottom: 16px;
+}
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.file-input {
+  display: none;
 }
 .stat-card {
   background: #fff;

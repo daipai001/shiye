@@ -15,7 +15,9 @@ import com.shiye.user.module.article.mapper.ArticleFolderMapper;
 import com.shiye.user.module.article.mapper.ArticleMapper;
 import com.shiye.user.module.article.service.ArticleEnrichmentService;
 import com.shiye.user.module.article.service.ArticleIngestService;
+import com.shiye.user.module.article.service.ArticleUploadRateLimitService;
 import com.shiye.user.module.article.support.ArticleStatus;
+import com.shiye.user.module.article.support.ExtractedUpload;
 import com.shiye.user.module.article.support.FetchedPage;
 import com.shiye.user.module.article.support.HtmlArticleParser;
 import com.shiye.user.module.article.support.HttpPageFetcher;
@@ -24,6 +26,9 @@ import com.shiye.user.module.article.support.ParsedArticle;
 import com.shiye.user.module.article.support.TextChunk;
 import com.shiye.user.module.article.support.TextChunker;
 import com.shiye.user.module.article.support.TextStats;
+import com.shiye.user.module.article.support.UploadTextExtractor;
+import com.shiye.user.module.file.domain.entity.FileAssetEntity;
+import com.shiye.user.module.file.service.FileAssetService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -52,8 +57,12 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
     private final EmbeddingService embeddingService;
     private final ChunkVectorStore vectorStore;
     private final ArticleEnrichmentService enrichmentService;
+    private final FileAssetService fileAssetService;
+    private final UploadTextExtractor uploadTextExtractor;
+    private final ArticleUploadRateLimitService uploadRateLimitService;
     private final Executor ingestExecutor;
     private final int maxTextChars;
+    private final int maxUploadBytes;
 
     public ArticleIngestServiceImpl(ArticleMapper articleMapper,
                                     ArticleChunkMapper chunkMapper,
@@ -64,8 +73,12 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                                     EmbeddingService embeddingService,
                                     ChunkVectorStore vectorStore,
                                     ArticleEnrichmentService enrichmentService,
+                                    FileAssetService fileAssetService,
+                                    UploadTextExtractor uploadTextExtractor,
+                                    ArticleUploadRateLimitService uploadRateLimitService,
                                     @Qualifier("ingestExecutor") Executor ingestExecutor,
-                                    @Value("${shiye.article.max-text-chars:500000}") int maxTextChars) {
+                                    @Value("${shiye.article.max-text-chars:500000}") int maxTextChars,
+                                    @Value("${shiye.article.max-upload-bytes:20971520}") int maxUploadBytes) {
         this.articleMapper = articleMapper;
         this.chunkMapper = chunkMapper;
         this.folderMapper = folderMapper;
@@ -75,8 +88,12 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         this.embeddingService = embeddingService;
         this.vectorStore = vectorStore;
         this.enrichmentService = enrichmentService;
+        this.fileAssetService = fileAssetService;
+        this.uploadTextExtractor = uploadTextExtractor;
+        this.uploadRateLimitService = uploadRateLimitService;
         this.ingestExecutor = ingestExecutor;
         this.maxTextChars = Math.max(10000, maxTextChars);
+        this.maxUploadBytes = Math.max(1024, maxUploadBytes);
     }
 
     @Override
@@ -130,6 +147,72 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                     TextStats.wordCount(trimmed)
             );
             return new IngestOutcome(articleId, false);
+        } catch (IngestException ex) {
+            markFailed(articleId, userId);
+            throw ex;
+        } catch (EmbeddingException ex) {
+            markFailed(articleId, userId);
+            throw new IngestException(ex.getCode(), ex.getMessage(), ex);
+        } catch (VectorStoreException ex) {
+            markFailed(articleId, userId);
+            throw new IngestException("VECTOR_STORE_UNAVAILABLE", "向量库暂不可用", ex);
+        } catch (Exception ex) {
+            markFailed(articleId, userId);
+            throw new IngestException("INGEST_FAILED", "入库失败", ex);
+        }
+    }
+
+    @Override
+    public UploadOutcome upload(long userId, String originalName, String mimeType,
+                                byte[] bytes, String title) {
+        if (bytes == null || bytes.length == 0) {
+            throw new IngestException("EMPTY_FILE", "文件为空");
+        }
+        if (bytes.length > maxUploadBytes) {
+            throw new IngestException("FILE_TOO_LARGE", "文件不能超过 20MB");
+        }
+        uploadRateLimitService.check(userId);
+
+        String fileName = safeFileName(originalName);
+        ExtractedUpload extracted = uploadTextExtractor.extract(fileName, mimeType, bytes);
+        String content = extracted.text();
+        if (content.length() > maxTextChars) {
+            content = content.substring(0, maxTextChars);
+        }
+        String sha256 = Hashes.sha256Hex(bytes);
+        FileAssetEntity asset = fileAssetService.findOrCreate(
+                userId, bytes, fileName, extracted.mimeType(), sha256, extracted.extension());
+
+        ArticleEntity article = articleMapper.findByFileAsset(userId, asset.getId());
+        if (article != null && ArticleStatus.READY.name().equals(article.getStatus())) {
+            return new UploadOutcome(asset.getId(), article.getId(), true);
+        }
+        String finalTitle = defaultTitle(title, fileName);
+        if (article == null) {
+            article = new ArticleEntity();
+            article.setUserId(userId);
+            article.setTitle(truncate(finalTitle, 512));
+            article.setSourceType("UPLOAD");
+            article.setStatus(ArticleStatus.PENDING.name());
+            article.setFileAssetId(asset.getId());
+            articleMapper.insert(article);
+        } else {
+            articleMapper.updateStatus(article.getId(), userId, ArticleStatus.PENDING.name());
+        }
+
+        long articleId = article.getId();
+        try {
+            persistContent(
+                    userId,
+                    articleId,
+                    finalTitle,
+                    null,
+                    TextStats.summary(content, 220),
+                    content,
+                    TextStats.language(content),
+                    TextStats.wordCount(content)
+            );
+            return new UploadOutcome(asset.getId(), articleId, false);
         } catch (IngestException ex) {
             markFailed(articleId, userId);
             throw ex;
@@ -358,6 +441,27 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         } catch (RuntimeException ex) {
             log.warn("mark article {} failed: {}", articleId, ex.getMessage());
         }
+    }
+
+    private String safeFileName(String originalName) {
+        if (originalName == null || originalName.isBlank()) {
+            return "upload";
+        }
+        String name = originalName.trim();
+        int slash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
+        if (slash >= 0 && slash < name.length() - 1) {
+            name = name.substring(slash + 1);
+        }
+        return name.isBlank() ? "upload" : name;
+    }
+
+    private String defaultTitle(String title, String fileName) {
+        if (title != null && !title.isBlank()) {
+            return title.trim();
+        }
+        int dot = fileName.lastIndexOf('.');
+        String stem = dot > 0 ? fileName.substring(0, dot) : fileName;
+        return stem.isBlank() ? "上传资料" : stem;
     }
 
     private String truncate(String value, int max) {

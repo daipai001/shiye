@@ -80,6 +80,13 @@ export interface ArticleDetail extends ArticleSummary {
   fetchedAt?: string | null
 }
 
+export interface ArticleUploadResponse {
+  fileAssetId: string
+  articleId: string
+  status: string
+  duplicate: boolean
+}
+
 export interface ArticleChunk {
   id: string
   chunkIndex: number

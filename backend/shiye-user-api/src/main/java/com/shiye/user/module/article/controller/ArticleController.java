@@ -12,9 +12,11 @@ import com.shiye.user.module.article.domain.vo.ArticleDetailVO;
 import com.shiye.user.module.article.domain.vo.ArticleReindexResponse;
 import com.shiye.user.module.article.domain.vo.ArticleStatsVO;
 import com.shiye.user.module.article.domain.vo.ArticleSummaryVO;
+import com.shiye.user.module.article.domain.vo.ArticleUploadResponse;
 import com.shiye.user.module.article.service.ArticleIngestService;
 import com.shiye.user.module.article.service.ArticleQueryService;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,7 +24,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/v1/articles")
@@ -86,6 +92,34 @@ public class ArticleController {
         }
         return Result.ok(new ArticleCollectResponse(
                 String.valueOf(outcome.articleId()), "READY", outcome.duplicate()));
+    }
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<ArticleUploadResponse> upload(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(required = false) String title) {
+        if (file == null || file.isEmpty()) {
+            throw new BizException(ErrorCode.VALIDATION_ERROR, "请选择要上传的文件");
+        }
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException ex) {
+            throw new BizException(ErrorCode.INTERNAL_ERROR, "读取上传文件失败");
+        }
+        ArticleIngestService.UploadOutcome outcome = articleIngestService.upload(
+                UserContext.requireUserId(),
+                file.getOriginalFilename(),
+                file.getContentType(),
+                bytes,
+                title
+        );
+        return Result.ok(new ArticleUploadResponse(
+                String.valueOf(outcome.fileAssetId()),
+                String.valueOf(outcome.articleId()),
+                "READY",
+                outcome.duplicate()
+        ));
     }
 
     @PostMapping("/{id}/reindex")

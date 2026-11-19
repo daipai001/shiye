@@ -9,8 +9,14 @@ public interface ArticleIngestService {
 
     IngestOutcome collectPage(long userId, String url, String title, String content);
 
+    UploadOutcome upload(long userId, String originalName, String mimeType,
+                         byte[] bytes, String title);
+
     void reindex(long userId, long articleId);
 
     record IngestOutcome(long articleId, boolean duplicate) {
+    }
+
+    record UploadOutcome(long fileAssetId, long articleId, boolean duplicate) {
     }
 }

@@ -645,7 +645,7 @@ admin-web → POST /admin/api/v1/auth/login
 ### 3.3 资料与标签
 
 > **M2b 当前实现范围**：`GET /articles`、`GET /articles/stats`、`GET /articles/{id}`、`GET /articles/{id}/chunks`、`DELETE /articles/{id}`；书签导入 worker 自动抓取/解析/切片/向量化。
-> `POST /articles/collect`、`POST /articles/{id}/reindex` 已接入；资料 READY 后异步生成 AI 摘要和标签，`tags` 已在资料列表/详情返回，文件夹筛选在后续里程碑接入。
+> `POST /articles/collect`、`POST /articles/upload`、`POST /articles/{id}/reindex` 已接入；资料 READY 后异步生成 AI 摘要和标签，`tags` 已在资料列表/详情返回，文件夹筛选在后续里程碑接入。
 > `GET /tags` 已接入；`folders` 字段暂不返回。所有时间字段为 UTC，前端负责本地化显示。
 
 #### POST `/articles/collect`
@@ -689,14 +689,12 @@ admin-web → POST /admin/api/v1/auth/login
 
 **Content-Type**：`multipart/form-data`
 
-**幂等**：建议 `Idempotency-Key`
-
 **表单**
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `file` | file | 是 | PDF/Markdown/TXT，≤20MB |
-| `title` | string | 否 | 默认文件名 |
+| `file` | file | 是 | PDF / Markdown / TXT，≤20MB |
+| `title` | string | 否 | 默认取文件名（去扩展名） |
 
 **响应**
 
@@ -704,9 +702,12 @@ admin-web → POST /admin/api/v1/auth/login
 |---|---|---|
 | `fileAssetId` | string | 文件资产 |
 | `articleId` | string | 资料 ID |
-| `status` | string | PENDING/PARSING |
+| `status` | string | 固定 `READY`（同步解析/切片/向量化完成后返回） |
+| `duplicate` | boolean | 同一用户相同文件已存在时为 true |
 
-**错误**：40003、40004、40902、42901、50204
+**错误**：40001、40003、40004、42901、50204
+
+> 文件保存到 `FILE_UPLOAD_DIR`（默认 `./data/uploads`），正文提取后进入现有切片/向量化/摘要标签流程。PDF 解析失败返回 50204；相同 SHA-256 文件直接复用已有资料。
 
 ---
 

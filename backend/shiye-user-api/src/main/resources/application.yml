@@ -24,7 +24,7 @@ spring:
   servlet:
     multipart:
       max-file-size: 20MB
-      max-request-size: 20MB
+      max-request-size: 21MB
 
 mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
@@ -96,6 +96,8 @@ shiye:
   usage:
     global-monthly-tokens: ${GLOBAL_MONTHLY_TOKENS:2000000}
     global-monthly-cost: ${GLOBAL_MONTHLY_COST:20.00}
+  file:
+    upload-dir: ${FILE_UPLOAD_DIR:./data/uploads}
   bookmark:
     worker-enabled: ${BOOKMARK_WORKER_ENABLED:true}
     worker-delay-ms: ${BOOKMARK_WORKER_DELAY_MS:3000}
@@ -104,6 +106,7 @@ shiye:
     max-page-bytes: ${BOOKMARK_MAX_PAGE_BYTES:5242880}
   article:
     max-text-chars: ${ARTICLE_MAX_TEXT_CHARS:500000}
+    max-upload-bytes: ${ARTICLE_MAX_UPLOAD_BYTES:20971520}
     chunk-target-size: ${CHUNK_TARGET_SIZE:700}
     chunk-max-size: ${CHUNK_MAX_SIZE:900}
     chunk-min-size: ${CHUNK_MIN_SIZE:200}
