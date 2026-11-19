@@ -48,6 +48,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       USER_JWT_SECRET: ${USER_JWT_SECRET:-dev-user-secret-change-me-32-bytes-minimum}
+      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-10}
       AI_ENABLED: ${AI_ENABLED:-false}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}

@@ -148,6 +148,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 - 管理员独立登录、刷新、登出
 - 插件一次性授权码 → 用户 token
 - 前端登录页接真实接口，access token 过期自动刷新
+- 注册/登录 IP 限流（默认 10 次/分钟/IP），返回 `X-RateLimit-*` 响应头
 - 用户端与管理端令牌按 audience + 独立密钥隔离
 
 书签导入 M2a 已打通：
@@ -242,7 +243,7 @@ RAG 问答闭环已打通：
 - 已做向量 + 关键词 + RRF 混合检索、BGE-reranker 二次重排、资料 AI 摘要/自动标签和插件当前页问答；书签自动同步尚未接入。
 - 管理端模型配置目前只读 + 连接测试，在线修改模型/key/价格尚未接入。
 - `/articles/upload` 尚未接入；管理端索引任务页基于 bookmark_items。
-- 注册/登录的 IP 限流和 `X-RateLimit-*` 响应头尚未接入；书签导入限流已接入。
+- 注册/登录 IP 限流（10 次/分钟/IP）+ `X-RateLimit-*` 响应头已接入；问答/文件上传限流尚未接入。
 - 主文件夹自动同步（`chrome.bookmarks.onCreated/onRemoved`）属于 P1，尚未接入。
 
 ## 下一步

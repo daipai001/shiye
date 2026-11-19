@@ -46,6 +46,8 @@ shiye:
     user-secret: ${USER_JWT_SECRET:dev-user-secret-change-me-32-bytes-minimum}
     user-expire-seconds: ${USER_JWT_EXPIRE_SECONDS:900}
     refresh-expire-seconds: ${REFRESH_EXPIRE_SECONDS:2592000}
+  auth:
+    rate-limit-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:10}
   ai:
     enabled: ${AI_ENABLED:false}
     chat:

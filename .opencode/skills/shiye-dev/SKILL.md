@@ -39,7 +39,7 @@ description: Use for any ShiYe (拾页) development task. Before coding, audit d
 - 模型：Chat DeepSeek；Embedding BGE-M3
 - 成本：全局预算 + 单用户配额 + 限流；所有 AI 调用必须记 usage
 - 视觉：v0.6 Linear / Notion 风；纸感、细边框、排版驱动，不再做重色块
-- 当前已完成：认证、书签导入 M2a/M2b、资料 API/资料库 UI、RAG 问答（DeepSeek SSE + 引用 + 会话/消息）、BGE-M3 + FULLTEXT + RRF 混合检索、BGE-reranker 重排（失败回退）、资料 AI 摘要/自动标签（SUMMARY 用量）、当前页临时问答、用量趋势聚合、usage/配额与用量页、reindex、插件悬浮球问答/收藏当前页、管理后台（总览/用户配额/用量/导入/任务/模型只读+测试）、CI/CD。模型在线编辑、书签自动同步未接入
+- 当前已完成：认证（含登录/注册 IP 限流）、书签导入 M2a/M2b、资料 API/资料库 UI、RAG 问答（DeepSeek SSE + 引用 + 会话/消息）、BGE-M3 + FULLTEXT + RRF 混合检索、BGE-reranker 重排（失败回退）、资料 AI 摘要/自动标签（SUMMARY 用量）、当前页临时问答、用量趋势聚合、usage/配额与用量页、reindex、插件悬浮球问答/收藏当前页、管理后台（总览/用户配额/用量/导入/任务/模型只读+测试）、CI/CD。模型在线编辑、书签自动同步未接入
 
 ## A. 编码前：接口/数据库文档审计
 
