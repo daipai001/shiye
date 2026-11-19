@@ -48,6 +48,8 @@ shiye:
     refresh-expire-seconds: ${REFRESH_EXPIRE_SECONDS:2592000}
   auth:
     rate-limit-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:10}
+  chat:
+    rate-limit-per-minute: ${CHAT_RATE_LIMIT_PER_MINUTE:10}
   ai:
     enabled: ${AI_ENABLED:false}
     chat:

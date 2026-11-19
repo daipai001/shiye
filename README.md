@@ -171,7 +171,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 - SSRF 校验（协议/内网 IP/DNS）、超时、重定向上限、页面大小和正文长度限制
 - 跨导入按 `(user_id, url_hash)` 去重，已存在 `READY` 资料时条目标记 `SKIPPED / DUPLICATE_URL`
 - 向量写入 Redis：`kb:chunk:{chunkId}` + `kb:user:{userId}:chunks`
-- 资料 API：列表/统计/详情/切片/删除/重新索引；资料库页面支持搜索、状态筛选、详情抽屉和切片查看
+- 资料 API：列表/统计/详情/切片/删除/重新索引；资料库页面支持搜索、状态筛选、标签筛选、详情抽屉和切片查看
 
 RAG 问答闭环已打通：
 
@@ -244,7 +244,7 @@ RAG 问答闭环已打通：
 - 本机 Redis 没有 RediSearch，向量检索走应用层余弦；数据量大后应换 Redis Stack HNSW。
 - 已做向量 + 关键词 + RRF 混合检索、BGE-reranker 二次重排、资料 AI 摘要/自动标签、插件当前页问答和书签新增/修改/移动自动同步；书签删除同步尚未接入。
 - 管理端模型配置目前只读 + 连接测试，在线修改模型/key/价格尚未接入。
-- 问答限流尚未接入；注册/登录、书签导入创建和文件上传限流已接入。
+- 问答限流已接入（10 次/分钟/用户）；管理端操作限流尚未接入。
 - 书签删除同步（`chrome.bookmarks.onRemoved`）尚未接入；新增/修改/移动已自动同步到所选文件夹。
 
 ## 下一步

@@ -25,6 +25,8 @@ const total = ref(0)
 const page = ref(1)
 const q = ref('')
 const statusFilter = ref('')
+const tagFilter = ref('')
+const tags = ref<Tag[]>([])
 const loading = ref(false)
 const uploading = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
@@ -91,6 +93,7 @@ async function loadArticles() {
         pageSize,
         q: q.value.trim() || undefined,
         status: statusFilter.value || undefined,
+        tagId: tagFilter.value || undefined,
       },
     })
     articles.value = data.data.items
@@ -113,8 +116,17 @@ async function loadImports() {
   }
 }
 
+async function loadTags() {
+  try {
+    const { data } = await api.get<ApiResult<{ items: Tag[] }>>('/tags')
+    tags.value = data.data.items
+  } catch {
+    tags.value = []
+  }
+}
+
 async function loadAll() {
-  await Promise.all([loadStats(), loadArticles(), loadImports()])
+  await Promise.all([loadStats(), loadArticles(), loadImports(), loadTags()])
 }
 
 function applySearch() {
@@ -250,6 +262,21 @@ onMounted(loadAll)
             <el-option label="向量化中" value="EMBEDDING" />
             <el-option label="已索引" value="READY" />
             <el-option label="失败" value="FAILED" />
+          </el-select>
+          <el-select
+            v-model="tagFilter"
+            class="status-select"
+            placeholder="全部标签"
+            clearable
+            filterable
+            @change="applySearch"
+          >
+            <el-option
+              v-for="tag in tags"
+              :key="tag.id"
+              :label="`${tag.name} (${tag.articleCount || 0})`"
+              :value="tag.id"
+            />
           </el-select>
           <el-button text :loading="loading" @click="loadAll">刷新</el-button>
         </div>

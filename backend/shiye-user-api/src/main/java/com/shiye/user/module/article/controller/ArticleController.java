@@ -49,9 +49,10 @@ public class ArticleController {
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String sourceType) {
+            @RequestParam(required = false) String sourceType,
+            @RequestParam(required = false) Long tagId) {
         return Result.ok(articleQueryService.list(
-                UserContext.requireUserId(), page, pageSize, q, status, sourceType));
+                UserContext.requireUserId(), page, pageSize, q, status, sourceType, tagId));
     }
 
     @GetMapping("/stats")

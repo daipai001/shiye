@@ -45,7 +45,8 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
 
     @Override
     public PageResult<ArticleSummaryVO> list(long userId, int page, int pageSize,
-                                             String q, String status, String sourceType) {
+                                             String q, String status, String sourceType,
+                                             Long tagId) {
         int safePage = Math.max(1, page);
         int safeSize = safePageSize(pageSize);
         String qFilter = normalizeQuery(q);
@@ -55,13 +56,14 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         String sourceFilter = sourceType == null || sourceType.isBlank()
                 ? null
                 : ArticleSourceType.parse(sourceType).name();
+        Long tagFilter = tagId == null || tagId <= 0 ? null : tagId;
 
-        long total = articleMapper.count(userId, qFilter, statusFilter, sourceFilter);
+        long total = articleMapper.count(userId, qFilter, statusFilter, sourceFilter, tagFilter);
         if (total == 0) {
             return PageResult.empty(safePage, safeSize);
         }
         List<ArticleEntity> entities = articleMapper.findPage(
-                userId, qFilter, statusFilter, sourceFilter,
+                userId, qFilter, statusFilter, sourceFilter, tagFilter,
                 (safePage - 1) * safeSize, safeSize);
         List<Long> articleIds = entities.stream().map(ArticleEntity::getId).toList();
         Map<Long, List<TagVO>> tags = tagService.byArticleIds(userId, articleIds);
@@ -100,9 +102,9 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
 
     @Override
     public ArticleStatsVO stats(long userId) {
-        long total = articleMapper.count(userId, null, null, null);
-        long ready = articleMapper.count(userId, null, ArticleStatus.READY.name(), null);
-        long failed = articleMapper.count(userId, null, ArticleStatus.FAILED.name(), null);
+        long total = articleMapper.count(userId, null, null, null, null);
+        long ready = articleMapper.count(userId, null, ArticleStatus.READY.name(), null, null);
+        long failed = articleMapper.count(userId, null, ArticleStatus.FAILED.name(), null, null);
         long processing = articleMapper.countProcessing(userId);
         return new ArticleStatsVO(total, ready, processing, failed);
     }

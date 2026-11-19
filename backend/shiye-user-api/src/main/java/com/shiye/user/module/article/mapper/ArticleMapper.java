@@ -112,6 +112,11 @@ public interface ArticleMapper {
             <if test="q != null and q != ''">
               AND (a.title LIKE CONCAT('%', #{q}, '%') OR a.summary LIKE CONCAT('%', #{q}, '%'))
             </if>
+            <if test="tagId != null">
+              AND EXISTS (SELECT 1 FROM article_tags at
+                          WHERE at.article_id = a.id AND at.user_id = a.user_id
+                            AND at.tag_id = #{tagId})
+            </if>
             ORDER BY a.updated_at DESC, a.id DESC
             LIMIT #{limit} OFFSET #{offset}
             </script>
@@ -120,6 +125,7 @@ public interface ArticleMapper {
                                  @Param("q") String q,
                                  @Param("status") String status,
                                  @Param("sourceType") String sourceType,
+                                 @Param("tagId") Long tagId,
                                  @Param("offset") int offset,
                                  @Param("limit") int limit);
 
@@ -133,12 +139,18 @@ public interface ArticleMapper {
             <if test="q != null and q != ''">
               AND (a.title LIKE CONCAT('%', #{q}, '%') OR a.summary LIKE CONCAT('%', #{q}, '%'))
             </if>
+            <if test="tagId != null">
+              AND EXISTS (SELECT 1 FROM article_tags at
+                          WHERE at.article_id = a.id AND at.user_id = a.user_id
+                            AND at.tag_id = #{tagId})
+            </if>
             </script>
             """)
     long count(@Param("userId") long userId,
                @Param("q") String q,
                @Param("status") String status,
-               @Param("sourceType") String sourceType);
+               @Param("sourceType") String sourceType,
+               @Param("tagId") Long tagId);
 
     @Select("""
             SELECT COUNT(*)
