@@ -249,10 +249,18 @@ export interface AdminSettings {
   ragCitationRequired: boolean
   registrationInvitationRequired: boolean
   registrationInvitationCode?: string | null
+  alertWebhookEnabled: boolean
+  alertWebhookUrl?: string | null
   source: string
 }
 
 export type AdminSettingsUpdatePayload = Omit<AdminSettings, 'source'>
+
+export interface AlertTestResult {
+  ok: boolean
+  status?: number | null
+  message: string
+}
 
 export interface ModelTestResult {
   ok: boolean

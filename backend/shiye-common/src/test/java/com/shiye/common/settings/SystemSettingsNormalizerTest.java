@@ -12,13 +12,13 @@ class SystemSettingsNormalizerTest {
 
     private final SystemSettings defaults = new SystemSettings(
             true, 200000, new BigDecimal("5.0"), 2000000, new BigDecimal("20.0"),
-            0.8, 10, 0, 700, 100, 8, true, true, true, false, null);
+            0.8, 10, 0, 700, 100, 8, true, true, true, false, null, false, null);
 
     @Test
     void clampsInvalidValues() {
         SystemSettings parsed = new SystemSettings(
                 false, -1, new BigDecimal("-1"), -1, new BigDecimal("-2"),
-                1.5, 0, 50000, 99999, -1, 99, false, null, null, true, "ABC");
+                1.5, 0, 50000, 99999, -1, 99, false, null, null, true, "ABC", false, null);
 
         SystemSettings normalized = SystemSettingsNormalizer.normalize(defaults, parsed);
 
@@ -42,7 +42,7 @@ class SystemSettingsNormalizerTest {
     void allowsZeroOverlap() {
         SystemSettings parsed = new SystemSettings(
                 true, 200000, new BigDecimal("5.0"), 2000000, new BigDecimal("20.0"),
-                0.8, 10, 0, 700, 0, 8, true, true, true, false, null);
+                0.8, 10, 0, 700, 0, 8, true, true, true, false, null, false, null);
 
         SystemSettings normalized = SystemSettingsNormalizer.normalize(defaults, parsed);
 

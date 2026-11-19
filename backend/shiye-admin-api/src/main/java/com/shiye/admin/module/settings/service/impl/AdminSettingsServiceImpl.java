@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shiye.admin.module.settings.domain.dto.AdminBudgetUpdateRequest;
 import com.shiye.admin.module.settings.domain.dto.AdminSettingsUpdateRequest;
 import com.shiye.admin.module.settings.domain.vo.AdminSettingsVO;
+import com.shiye.admin.module.settings.domain.vo.AlertTestVO;
 import com.shiye.admin.module.settings.mapper.AdminSettingsMapper;
 import com.shiye.admin.module.settings.service.AdminSettingsService;
 import com.shiye.common.settings.SystemSettings;
 import com.shiye.common.settings.SystemSettingsNormalizer;
+import com.shiye.common.webhook.WebhookClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Service
 public class AdminSettingsServiceImpl implements AdminSettingsService {
@@ -23,11 +30,13 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
 
     private final AdminSettingsMapper mapper;
     private final ObjectMapper objectMapper;
+    private final WebhookClient webhookClient;
     private final SystemSettings defaults;
 
     public AdminSettingsServiceImpl(
             AdminSettingsMapper mapper,
             ObjectMapper objectMapper,
+            WebhookClient webhookClient,
             @Value("${shiye.registration.enabled:true}") boolean registrationEnabled,
             @Value("${shiye.registration.default-token-quota:200000}") long defaultMonthlyTokens,
             @Value("${shiye.registration.default-cost-quota:5.000000}") BigDecimal defaultMonthlyCost,
@@ -43,9 +52,12 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
             @Value("${shiye.ai.retrieval.rerank-enabled:true}") boolean ragRerankEnabled,
             @Value("${shiye.ai.citation-required:true}") boolean ragCitationRequired,
             @Value("${shiye.registration.invitation-required:false}") boolean invitationRequired,
-            @Value("${shiye.registration.invitation-code:}") String invitationCode) {
+            @Value("${shiye.registration.invitation-code:}") String invitationCode,
+            @Value("${shiye.alert.webhook-enabled:false}") boolean alertWebhookEnabled,
+            @Value("${shiye.alert.webhook-url:}") String alertWebhookUrl) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
+        this.webhookClient = webhookClient;
         this.defaults = new SystemSettings(
                 registrationEnabled,
                 defaultMonthlyTokens,
@@ -62,7 +74,9 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 ragRerankEnabled,
                 ragCitationRequired,
                 invitationRequired,
-                invitationCode
+                invitationCode,
+                alertWebhookEnabled,
+                alertWebhookUrl
         );
     }
 
@@ -90,7 +104,9 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 request.ragRerankEnabled(),
                 request.ragCitationRequired(),
                 request.registrationInvitationRequired(),
-                request.registrationInvitationCode()
+                request.registrationInvitationCode(),
+                request.alertWebhookEnabled(),
+                request.alertWebhookUrl()
         );
         SystemSettings saved = save(next, adminId);
         return toVO(saved, "DATABASE");
@@ -116,10 +132,33 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 current.ragRerankEnabled(),
                 current.ragCitationRequired(),
                 current.registrationInvitationRequired(),
-                current.registrationInvitationCode()
+                current.registrationInvitationCode(),
+                current.alertWebhookEnabled(),
+                current.alertWebhookUrl()
         );
         SystemSettings saved = save(next, adminId);
         return toVO(saved, "DATABASE");
+    }
+
+    @Override
+    public AlertTestVO testWebhook() {
+        SystemSettings settings = current();
+        if (!Boolean.TRUE.equals(settings.alertWebhookEnabled())) {
+            return new AlertTestVO(false, null, "Webhook 未启用");
+        }
+        String url = settings.alertWebhookUrl();
+        if (url == null || url.isBlank()) {
+            return new AlertTestVO(false, null, "未配置 Webhook URL");
+        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("event", "ALERT_TEST");
+        payload.put("level", "TEST");
+        payload.put("month", YearMonth.now(ZoneOffset.UTC).toString());
+        payload.put("message", "拾页 Webhook 测试");
+        payload.put("sentAt", OffsetDateTime.now(ZoneOffset.UTC).toString());
+        WebhookClient.WebhookResult result = webhookClient.send(url, payload);
+        return new AlertTestVO(result.ok(),
+                result.status() == 0 ? null : result.status(), result.message());
     }
 
     @Override
@@ -175,6 +214,8 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 Boolean.TRUE.equals(settings.ragCitationRequired()),
                 Boolean.TRUE.equals(settings.registrationInvitationRequired()),
                 settings.registrationInvitationCode(),
+                Boolean.TRUE.equals(settings.alertWebhookEnabled()),
+                settings.alertWebhookUrl(),
                 source
         );
     }

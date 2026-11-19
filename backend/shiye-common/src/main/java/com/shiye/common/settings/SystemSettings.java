@@ -21,6 +21,8 @@ public record SystemSettings(
         Boolean ragRerankEnabled,
         Boolean ragCitationRequired,
         Boolean registrationInvitationRequired,
-        String registrationInvitationCode
+        String registrationInvitationCode,
+        Boolean alertWebhookEnabled,
+        String alertWebhookUrl
 ) {
 }

@@ -78,6 +78,9 @@ shiye:
     invitation-code: ${REGISTRATION_INVITATION_CODE:}
     default-token-quota: ${REGISTRATION_DEFAULT_TOKEN_QUOTA:200000}
     default-cost-quota: ${REGISTRATION_DEFAULT_COST_QUOTA:5.000000}
+  alert:
+    webhook-enabled: ${ALERT_WEBHOOK_ENABLED:false}
+    webhook-url: ${ALERT_WEBHOOK_URL:}
   usage:
     global-monthly-tokens: ${GLOBAL_MONTHLY_TOKENS:2000000}
     global-monthly-cost: ${GLOBAL_MONTHLY_COST:20.00}

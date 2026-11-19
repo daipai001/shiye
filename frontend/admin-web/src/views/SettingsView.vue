@@ -5,6 +5,7 @@ import api from '../api/client'
 import type {
   AdminSettings,
   AdminSettingsUpdatePayload,
+  AlertTestResult,
   ApiResult,
 } from '../api/types'
 
@@ -12,6 +13,7 @@ const config = ref<AdminSettings | null>(null)
 const form = ref<AdminSettingsUpdatePayload>(defaults())
 const loading = ref(false)
 const saving = ref(false)
+const testingWebhook = ref(false)
 
 function defaults(): AdminSettingsUpdatePayload {
   return {
@@ -31,6 +33,8 @@ function defaults(): AdminSettingsUpdatePayload {
     ragCitationRequired: true,
     registrationInvitationRequired: false,
     registrationInvitationCode: '',
+    alertWebhookEnabled: false,
+    alertWebhookUrl: '',
   }
 }
 
@@ -52,6 +56,8 @@ function fillForm(settings: AdminSettings) {
     ragCitationRequired: settings.ragCitationRequired,
     registrationInvitationRequired: settings.registrationInvitationRequired,
     registrationInvitationCode: settings.registrationInvitationCode || '',
+    alertWebhookEnabled: settings.alertWebhookEnabled,
+    alertWebhookUrl: settings.alertWebhookUrl || '',
   }
 }
 
@@ -89,6 +95,22 @@ async function save() {
     ElMessage.error('保存失败，请检查参数范围')
   } finally {
     saving.value = false
+  }
+}
+
+async function testWebhook() {
+  testingWebhook.value = true
+  try {
+    const { data } = await api.post<ApiResult<AlertTestResult>>('/settings/alert-test')
+    if (data.data.ok) {
+      ElMessage.success(`Webhook 测试成功（HTTP ${data.data.status}）`)
+    } else {
+      ElMessage.warning(data.data.message)
+    }
+  } catch {
+    ElMessage.error('Webhook 测试请求失败')
+  } finally {
+    testingWebhook.value = false
   }
 }
 
@@ -209,6 +231,26 @@ onMounted(load)
         </div>
         <p class="hint">每日上限按 UTC 日期统计；填 0 表示不限制。</p>
 
+        <div class="section-title">告警 Webhook</div>
+        <div class="form-grid">
+          <el-form-item label="启用 Webhook">
+            <el-switch v-model="form.alertWebhookEnabled" />
+          </el-form-item>
+          <el-form-item label="Webhook URL">
+            <el-input
+              v-model="form.alertWebhookUrl"
+              maxlength="512"
+              placeholder="https://example.com/hooks/shiye"
+            />
+          </el-form-item>
+        </div>
+        <div class="webhook-actions">
+          <el-button :loading="testingWebhook" @click="testWebhook">测试 Webhook</el-button>
+        </div>
+        <p class="hint">
+          达到告警阈值或全站预算用尽时，user-api 会向该 URL POST 一次事件；同一月份同一级别只发送一次。
+        </p>
+
         <div class="section-title">RAG 检索</div>
         <div class="form-grid">
           <el-form-item label="切片目标字数">
@@ -308,6 +350,9 @@ onMounted(load)
   margin-top: 20px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
+}
+.webhook-actions {
+  margin: 2px 0 4px;
 }
 .empty {
   border: 1px dashed #d7d4cc;

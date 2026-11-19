@@ -88,6 +88,12 @@ public class UsageServiceImpl implements UsageService {
     }
 
     @Override
+    public UsageTotals monthTotals() {
+        UsageTotals totals = monthlyMapper.sumByMonth(currentMonth());
+        return totals == null ? new UsageTotals(0, BigDecimal.ZERO, 0) : totals;
+    }
+
+    @Override
     public void assertCanChat(long userId) {
         SystemSettings settings = systemSettingsService.current();
         QuotaVO quota = quota(userId);

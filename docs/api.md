@@ -1232,8 +1232,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 4.2 总览与用量
 
-> **当前实现**：总览、用量列表/汇总/CSV 导出、用户列表与配额/状态、导入任务与条目、索引任务、模型在线配置、系统设置/预算在线编辑、连接测试、RAG 评测、审计日志已接入。
-> 告警通知仍待接入。
+> **当前实现**：总览、用量列表/汇总/CSV 导出、用户列表与配额/状态、导入任务与条目、索引任务、模型在线配置、系统设置/预算在线编辑、Webhook 告警测试、RAG 评测、审计日志已接入。
 
 #### GET `/overview`
 
@@ -1628,6 +1627,8 @@ admin-web → POST /admin/api/v1/auth/login
   "ragCitationRequired": true,
   "registrationInvitationRequired": false,
   "registrationInvitationCode": null,
+  "alertWebhookEnabled": false,
+  "alertWebhookUrl": null,
   "source": "DATABASE"
 }
 ```
@@ -1649,7 +1650,7 @@ admin-web → POST /admin/api/v1/auth/login
 | `defaultMonthlyCost` | string | 新用户默认月成本配额 |
 | `globalMonthlyTokens` | number | 全站月 token 预算 |
 | `globalMonthlyCost` | string | 全站月成本预算 |
-| `alertThreshold` | number | 0~1，当前只保存展示 |
+| `alertThreshold` | number | 0~1，达到比例发 WARNING，预算用尽发 EXCEEDED |
 | `chatRateLimitPerMinute` | number | 问答限流，1~1000 |
 | `dailyTokenLimit` | number | 每日 token 上限，0=不限制 |
 | `ragChunkTargetSize` | number | 切片目标字数，200~2000 |
@@ -1660,10 +1661,48 @@ admin-web → POST /admin/api/v1/auth/login
 | `ragCitationRequired` | boolean | 是否强制模型输出引用编号 |
 | `registrationInvitationRequired` | boolean | 注册是否需要邀请码 |
 | `registrationInvitationCode` | string/null | 邀请码；为空时关闭邀请校验 |
+| `alertWebhookEnabled` | boolean | 是否启用预算告警 Webhook |
+| `alertWebhookUrl` | string/null | http/https Webhook URL，最长 512 |
 
 **响应**：更新后的设置（含 `source`）
 
 > 保存到 `system_settings.system.settings`，user-api 5 秒内生效。注册开关和默认配额只影响之后注册的新用户；全站预算、问答限流、topK、混合检索、rerank、强制引用和每日上限作用于之后的 AI 调用。chunk 字数/重叠只影响之后新入库或重新索引的资料。
+
+**错误**：40001
+
+---
+
+#### POST `/settings/alert-test`
+
+**认证**：管理员
+
+**请求**：无
+
+**响应**
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `ok` | boolean | 是否发送成功（2xx） |
+| `status` | number/null | Webhook 返回的 HTTP 状态码 |
+| `message` | string | 结果说明 |
+
+> 使用当前已保存的 `alertWebhookUrl` 发送一条 `event=ALERT_TEST` 的 JSON；未启用或未配置 URL 时返回 `ok=false`。操作会写入审计日志 `ALERT_WEBHOOK_TEST`。
+
+**告警正文**
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `event` | string | `BUDGET_ALERT` |
+| `level` | string | `WARNING` / `EXCEEDED` |
+| `month` | string | `YYYY-MM`（UTC） |
+| `tokens` / `cost` | number | 当月全站已用 |
+| `tokenBudget` / `costBudget` | number | 当月预算 |
+| `tokenRatio` / `costRatio` | number | 已用比例，4 位小数 |
+| `alertThreshold` | number | 当前告警阈值 |
+| `message` | string | 中文说明 |
+| `sentAt` | string | UTC ISO 时间 |
+
+> 同一月份同一级别只发送一次；发送失败不写去重键，下个调度周期重试。
 
 **错误**：40001
 
@@ -1687,7 +1726,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
-### 4.6 审计与评测（P1/P2）
+### 4.6 审计与评测
 
 #### GET `/audit-logs`
 
@@ -1769,18 +1808,21 @@ admin-web → POST /admin/api/v1/auth/login
 | 03 | 文章详情 | `GET /articles/{id}`、`GET /articles/{id}/chunks`、`POST /articles/{id}/reindex` |
 | 04 | 问答 | `POST /chat/stream`、`GET /conversations`、`GET /conversations/{id}/messages` |
 | 05 | 用量 | `GET /usage/summary`、`GET /usage/records`、`GET /usage/quota` |
-| 06 | 设置 | `GET/PUT /users/me/plugin-settings`、`PUT /users/me/password` |
+| 06 | 设置 | `GET/PUT /users/me/plugin-settings`、`PATCH /users/me`、`POST /users/me/password` |
 | 07 | 管理后台-总览 | `GET /admin/api/v1/overview` |
 | 08 | 管理后台-用量 | `GET /admin/api/v1/usage`、`GET /admin/api/v1/usage/export` |
 | 09 | 管理后台-用户与配额 | `GET /admin/api/v1/users`、`PUT /admin/api/v1/users/{id}/status`、`PUT /admin/api/v1/users/{id}/quota` |
 | 10 | 管理后台-书签导入 | `GET /admin/api/v1/imports`、`POST /admin/api/v1/imports/{id}/retry` |
 | 11 | 管理后台-索引任务 | `GET /admin/api/v1/tasks`、`POST /admin/api/v1/tasks/{id}/retry` |
-| 12 | 管理后台-模型配置 | `GET/PUT /admin/api/v1/models`、`POST /admin/api/v1/models/test`、`PUT /admin/api/v1/budget` |
-| 13 | 插件-悬浮球 | `POST /chat/stream`、`POST /chat/page-stream`、`POST /articles/collect`、`GET/PUT /users/me/plugin-settings` |
-| 14 | 插件-书签导入 | `POST /bookmark-imports`、`GET /bookmark-imports/{id}/items` |
-| 15 | 插件-登录授权 | `POST /auth/extension-code`、`POST /auth/extension-token` |
-| 16 | Web-插件管理 | `GET/PUT /users/me/plugin-settings`、`POST /auth/extension-code` |
-| 17 | 管理后台-登录 | `POST /admin/api/v1/auth/login` |
+| 12 | 管理后台-模型配置 | `GET/PUT /admin/api/v1/models`、`POST /admin/api/v1/models/test` |
+| 13 | 管理后台-系统设置 | `GET/PUT /admin/api/v1/settings`、`PUT /admin/api/v1/budget`、`POST /admin/api/v1/settings/alert-test` |
+| 14 | 管理后台-RAG 评测 | `GET/POST /admin/api/v1/eval/cases`、`GET/POST /admin/api/v1/eval/runs`、`GET /admin/api/v1/eval/runs/{id}` |
+| 15 | 管理后台-审计日志 | `GET /admin/api/v1/audit-logs` |
+| 16 | 插件-悬浮球 | `POST /chat/stream`、`POST /chat/page-stream`、`POST /articles/collect`、`GET/PUT /users/me/plugin-settings` |
+| 17 | 插件-书签导入 | `POST /bookmark-imports`、`GET /bookmark-imports/{id}/items` |
+| 18 | 插件-登录授权 | `POST /auth/extension-code`、`POST /auth/extension-token` |
+| 19 | Web-插件管理 | `GET/PUT /users/me/plugin-settings`、`POST /auth/extension-code` |
+| 20 | 管理后台-登录 | `POST /admin/api/v1/auth/login` |
 
 ---
 

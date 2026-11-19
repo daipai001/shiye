@@ -28,7 +28,10 @@ public final class SystemSettingsNormalizer {
                 boolOrFallback(source.registrationInvitationRequired(),
                         fallback.registrationInvitationRequired()),
                 textOrFallback(source.registrationInvitationCode(),
-                        fallback.registrationInvitationCode())
+                        fallback.registrationInvitationCode()),
+                boolOrFallback(source.alertWebhookEnabled(),
+                        fallback.alertWebhookEnabled()),
+                textOrFallback(source.alertWebhookUrl(), fallback.alertWebhookUrl())
         );
     }
 

@@ -45,6 +45,8 @@ public class RuntimeSystemSettingsService {
             @Value("${shiye.ai.citation-required:true}") boolean ragCitationRequired,
             @Value("${shiye.registration.invitation-required:false}") boolean invitationRequired,
             @Value("${shiye.registration.invitation-code:}") String invitationCode,
+            @Value("${shiye.alert.webhook-enabled:false}") boolean alertWebhookEnabled,
+            @Value("${shiye.alert.webhook-url:}") String alertWebhookUrl,
             @Value("${shiye.settings.refresh-ms:5000}") long refreshMs) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
@@ -65,7 +67,9 @@ public class RuntimeSystemSettingsService {
                 ragRerankEnabled,
                 ragCitationRequired,
                 invitationRequired,
-                invitationCode
+                invitationCode,
+                alertWebhookEnabled,
+                alertWebhookUrl
         );
         this.cached = defaults;
     }

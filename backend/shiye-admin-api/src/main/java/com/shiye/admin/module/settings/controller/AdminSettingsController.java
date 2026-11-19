@@ -5,10 +5,12 @@ import com.shiye.admin.module.audit.service.AdminAuditService;
 import com.shiye.admin.module.settings.domain.dto.AdminBudgetUpdateRequest;
 import com.shiye.admin.module.settings.domain.dto.AdminSettingsUpdateRequest;
 import com.shiye.admin.module.settings.domain.vo.AdminSettingsVO;
+import com.shiye.admin.module.settings.domain.vo.AlertTestVO;
 import com.shiye.admin.module.settings.service.AdminSettingsService;
 import com.shiye.common.api.Result;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -55,5 +57,14 @@ public class AdminSettingsController {
                         "globalMonthlyCost", updated.globalMonthlyCost(),
                         "alertThreshold", updated.alertThreshold()));
         return Result.ok(updated);
+    }
+
+    @PostMapping("/settings/alert-test")
+    public Result<AlertTestVO> testAlertWebhook() {
+        AlertTestVO result = settingsService.testWebhook();
+        auditService.record("ALERT_WEBHOOK_TEST", "SYSTEM_SETTINGS", null,
+                java.util.Map.of("ok", result.ok(), "status",
+                        result.status() == null ? 0 : result.status()));
+        return Result.ok(result);
     }
 }

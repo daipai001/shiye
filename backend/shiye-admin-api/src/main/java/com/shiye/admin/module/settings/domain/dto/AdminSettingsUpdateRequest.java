@@ -5,6 +5,8 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
@@ -24,6 +26,10 @@ public record AdminSettingsUpdateRequest(
         boolean ragRerankEnabled,
         boolean ragCitationRequired,
         boolean registrationInvitationRequired,
-        String registrationInvitationCode
+        @Size(max = 64) String registrationInvitationCode,
+        boolean alertWebhookEnabled,
+        @Size(max = 512)
+        @Pattern(regexp = "^$|(?i)^https?://.+", message = "Webhook URL 必须以 http:// 或 https:// 开头")
+        String alertWebhookUrl
 ) {
 }

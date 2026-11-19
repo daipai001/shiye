@@ -5,12 +5,15 @@ import com.shiye.user.module.usage.domain.vo.QuotaVO;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
 import com.shiye.user.module.usage.domain.vo.UsageRecordVO;
 import com.shiye.user.module.usage.domain.vo.UsageSummaryVO;
+import com.shiye.user.module.usage.domain.vo.UsageTotals;
 
 import java.math.BigDecimal;
 
 public interface UsageService {
 
     QuotaVO quota(long userId);
+
+    UsageTotals monthTotals();
 
     void assertCanChat(long userId);
 

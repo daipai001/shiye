@@ -754,7 +754,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 **关键 key**
 
 - 当前已使用：`ai.model.config`（单个 JSON，包含 Chat / Embedding / Rerank 覆盖值，`is_secret=1`）
-- 当前已使用：`system.settings`（注册开关、默认配额、全局预算、告警阈值、限流、每日上限、RAG chunk/topK/混合检索/rerank/强制引用，`is_secret=0`）
+- 当前已使用：`system.settings`（注册开关、邀请码、默认配额、全局预算、告警阈值、Webhook 告警、限流、每日上限、RAG chunk/topK/混合检索/rerank/强制引用，`is_secret=0`）
 - 预留：`registration_enabled`、`default_monthly_tokens`、`default_monthly_cost`、`global_monthly_tokens`、`global_monthly_cost`、`alert_threshold`、`rate_limit_per_minute`、`daily_token_limit`
 - 预留：`rag_chunk_size` / `rag_chunk_overlap` / `rag_top_k` / `rag_hybrid_enabled` / `rag_rerank_enabled` / `rag_citation_required`
 

@@ -19,6 +19,8 @@ public record AdminSettingsVO(
         boolean ragCitationRequired,
         boolean registrationInvitationRequired,
         String registrationInvitationCode,
+        boolean alertWebhookEnabled,
+        String alertWebhookUrl,
         String source
 ) {
 }

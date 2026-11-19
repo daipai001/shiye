@@ -2809,9 +2809,12 @@ function renderSettings() {
         <div class="field"><label>新用户默认 tokens</label><input class="input" value="20 万"></div>
         <div class="field"><label>告警阈值</label><input class="input" value="80%"></div>
       </div>
+      <div class="switch-line"><span>预算告警 Webhook</span><span class="switch"></span></div>
+      <div class="field"><label>Webhook URL</label><input class="input" placeholder="https://example.com/hooks/shiye"></div>
       <div class="section-actions">
         <button class="btn btn-sm" data-action="save-settings">保存</button>
         <button class="btn btn-sm btn-ghost" data-action="open-budget">调整预算</button>
+        <button class="btn btn-sm btn-ghost" data-action="toast" data-message="Webhook 测试已发送（模拟）">测试 Webhook</button>
       </div>
       <div class="price-note">测试期建议小额：全局 ¥20/月，新用户 20 万 tokens/月；随时可在后台调整。</div>
     </div>
