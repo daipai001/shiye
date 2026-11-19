@@ -245,7 +245,8 @@ CREATE TABLE IF NOT EXISTS `article_chunks` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_chunks_article_index` (`article_id`, `chunk_index`),
   KEY `idx_chunks_user_article` (`user_id`, `article_id`),
-  KEY `idx_chunks_vector` (`vector_id`)
+  KEY `idx_chunks_vector` (`vector_id`),
+  FULLTEXT KEY `ft_chunks_content` (`content`) WITH PARSER ngram
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='资料切片';
 
 CREATE TABLE IF NOT EXISTS `article_folders` (

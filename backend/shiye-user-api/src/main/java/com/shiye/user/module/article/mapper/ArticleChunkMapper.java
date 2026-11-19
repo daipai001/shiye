@@ -1,6 +1,7 @@
 package com.shiye.user.module.article.mapper;
 
 import com.shiye.user.module.article.domain.entity.ArticleChunkEntity;
+import com.shiye.user.module.article.domain.entity.ArticleChunkSearchRow;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -68,4 +69,28 @@ public interface ArticleChunkMapper {
 
     @Delete("DELETE FROM article_chunks WHERE article_id = #{articleId} AND user_id = #{userId}")
     int deleteByArticle(@Param("articleId") long articleId, @Param("userId") long userId);
+
+    @Select("""
+            <script>
+            SELECT id, article_id, user_id, content, char_start, char_end,
+                   MATCH(content) AGAINST(#{query} IN NATURAL LANGUAGE MODE) AS score
+            FROM article_chunks
+            WHERE user_id = #{userId}
+              AND MATCH(content) AGAINST(#{query} IN NATURAL LANGUAGE MODE)
+            <if test="articleId != null"> AND article_id = #{articleId}</if>
+            <if test="articleIds != null">
+              AND article_id IN
+              <foreach collection="articleIds" item="id" open="(" separator="," close=")">
+                #{id}
+              </foreach>
+            </if>
+            ORDER BY score DESC
+            LIMIT #{limit}
+            </script>
+            """)
+    List<ArticleChunkSearchRow> searchKeyword(@Param("userId") long userId,
+                                              @Param("query") String query,
+                                              @Param("articleId") Long articleId,
+                                              @Param("articleIds") List<Long> articleIds,
+                                              @Param("limit") int limit);
 }

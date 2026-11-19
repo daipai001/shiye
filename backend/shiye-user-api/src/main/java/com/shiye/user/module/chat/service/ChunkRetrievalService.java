@@ -3,10 +3,14 @@ package com.shiye.user.module.chat.service;
 import com.shiye.common.api.ErrorCode;
 import com.shiye.common.exception.BizException;
 import com.shiye.user.common.ai.embedding.EmbeddingService;
+import com.shiye.user.module.article.domain.entity.ArticleChunkSearchRow;
 import com.shiye.user.module.article.domain.entity.ArticleEntity;
+import com.shiye.user.module.article.mapper.ArticleChunkMapper;
 import com.shiye.user.module.article.mapper.ArticleFolderMapper;
 import com.shiye.user.module.article.mapper.ArticleMapper;
 import com.shiye.user.module.chat.support.RetrievedChunk;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -16,44 +20,64 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * 本地 V1 检索：Redis 读取用户 chunk 向量，应用层余弦相似度。
- * 部署 Redis Stack 后替换为 RediSearch HNSW + user_id 过滤。
+ * RAG 检索：
+ * - 向量召回：Redis 读取用户 chunk 向量，应用层余弦；
+ * - 关键词召回：MySQL ngram FULLTEXT；
+ * - RRF 融合两路排名。部署 Redis Stack 后可将向量部分替换为 RediSearch HNSW。
  */
 @Service
 public class ChunkRetrievalService {
+
+    private static final Logger log = LoggerFactory.getLogger(ChunkRetrievalService.class);
 
     private final EmbeddingService embeddingService;
     private final StringRedisTemplate redisTemplate;
     private final ArticleMapper articleMapper;
     private final ArticleFolderMapper folderMapper;
+    private final ArticleChunkMapper chunkMapper;
     private final int defaultTopK;
     private final int maxPerArticle;
     private final double minScore;
     private final int maxScanChunks;
+    private final int vectorCandidates;
+    private final int keywordCandidates;
+    private final int rrfK;
+    private final boolean hybridEnabled;
 
     public ChunkRetrievalService(
             EmbeddingService embeddingService,
             StringRedisTemplate redisTemplate,
             ArticleMapper articleMapper,
             ArticleFolderMapper folderMapper,
+            ArticleChunkMapper chunkMapper,
             @Value("${shiye.ai.retrieval.top-k:8}") int defaultTopK,
             @Value("${shiye.ai.retrieval.max-per-article:3}") int maxPerArticle,
             @Value("${shiye.ai.retrieval.min-score:0.2}") double minScore,
-            @Value("${shiye.ai.retrieval.max-scan-chunks:5000}") int maxScanChunks) {
+            @Value("${shiye.ai.retrieval.max-scan-chunks:5000}") int maxScanChunks,
+            @Value("${shiye.ai.retrieval.vector-candidates:30}") int vectorCandidates,
+            @Value("${shiye.ai.retrieval.keyword-candidates:20}") int keywordCandidates,
+            @Value("${shiye.ai.retrieval.rrf-k:60}") int rrfK,
+            @Value("${shiye.ai.retrieval.hybrid-enabled:true}") boolean hybridEnabled) {
         this.embeddingService = embeddingService;
         this.redisTemplate = redisTemplate;
         this.articleMapper = articleMapper;
         this.folderMapper = folderMapper;
+        this.chunkMapper = chunkMapper;
         this.defaultTopK = Math.max(1, Math.min(defaultTopK, 20));
         this.maxPerArticle = Math.max(1, maxPerArticle);
         this.minScore = minScore;
         this.maxScanChunks = Math.max(100, maxScanChunks);
+        this.vectorCandidates = Math.max(1, Math.min(vectorCandidates, 100));
+        this.keywordCandidates = Math.max(1, Math.min(keywordCandidates, 100));
+        this.rrfK = Math.max(1, rrfK);
+        this.hybridEnabled = hybridEnabled;
     }
 
     public List<RetrievedChunk> retrieve(long userId, String query,
@@ -66,69 +90,19 @@ public class ChunkRetrievalService {
             return List.of();
         }
 
-        List<float[]> queryVectors = embeddingService.embed(List.of(query));
-        if (queryVectors.isEmpty()) {
-            return List.of();
-        }
-        float[] queryVector = queryVectors.get(0);
-        String model = embeddingService.model();
-        Set<String> chunkIds = redisTemplate.opsForSet().members(userKey(userId));
-        if (chunkIds == null || chunkIds.isEmpty()) {
-            return List.of();
-        }
+        List<Candidate> vectorResults = vectorCandidates(userId, query, allowedArticleIds);
+        List<Candidate> keywordResults = hybridEnabled
+                ? keywordCandidates(userId, query, scope, scopeId, allowedArticleIds)
+                : List.of();
 
-        List<Candidate> candidates = new ArrayList<>();
-        int scanned = 0;
-        for (String chunkId : chunkIds) {
-            if (++scanned > maxScanChunks) {
-                break;
-            }
-            Map<Object, Object> fields = redisTemplate.opsForHash().entries(chunkKey(chunkId));
-            if (fields.isEmpty()) {
-                continue;
-            }
-            if (!model.equals(stringValue(fields.get("embedding_model")))) {
-                continue;
-            }
-            Long articleId = longValue(fields.get("article_id"));
-            if (articleId == null) {
-                continue;
-            }
-            if (allowedArticleIds != null && !allowedArticleIds.contains(articleId)) {
-                continue;
-            }
-            float[] vector = decode(stringValue(fields.get("vector")));
-            if (vector == null || vector.length != queryVector.length) {
-                continue;
-            }
-            double score = cosine(queryVector, vector);
-            candidates.add(new Candidate(
-                    articleId,
-                    longValue(fields.get("chunk_id")),
-                    stringValue(fields.get("content")),
-                    intValue(fields.get("char_start")),
-                    intValue(fields.get("char_end")),
-                    score
-            ));
-        }
-
-        double effectiveMinScore = model.startsWith("DEV-HASH") ? -1.0 : minScore;
-        candidates.removeIf(candidate -> candidate.score() < effectiveMinScore);
-        candidates.sort(Comparator.comparingDouble(Candidate::score).reversed());
-
-        int topK = requestedTopK == null ? defaultTopK : Math.max(1, Math.min(requestedTopK, 20));
-        Map<Long, Integer> perArticle = new HashMap<>();
-        List<Candidate> selected = new ArrayList<>();
-        for (Candidate candidate : candidates) {
-            if (selected.size() >= topK) {
-                break;
-            }
-            int count = perArticle.getOrDefault(candidate.articleId(), 0);
-            if (count >= maxPerArticle) {
-                continue;
-            }
-            perArticle.put(candidate.articleId(), count + 1);
-            selected.add(candidate);
+        List<Candidate> selected;
+        if (!hybridEnabled || keywordResults.isEmpty()) {
+            selected = selectTop(vectorResults, requestedTopK, Comparator.comparingDouble(Candidate::vectorScore).reversed());
+        } else if (vectorResults.isEmpty()) {
+            selected = selectTop(keywordResults, requestedTopK,
+                    Comparator.comparingDouble(Candidate::keywordScore).reversed());
+        } else {
+            selected = fuseWithRrf(vectorResults, keywordResults, requestedTopK);
         }
         if (selected.isEmpty()) {
             return List.of();
@@ -155,12 +129,163 @@ public class ChunkRetrievalService {
                     article.getTitle(),
                     article.getUrl(),
                     candidate.content(),
-                    candidate.score(),
+                    candidate.displayScore(),
                     candidate.charStart(),
                     candidate.charEnd()
             ));
         }
         return results;
+    }
+
+    private List<Candidate> vectorCandidates(long userId, String query, Set<Long> allowedArticleIds) {
+        List<float[]> queryVectors = embeddingService.embed(List.of(query));
+        if (queryVectors.isEmpty()) {
+            return List.of();
+        }
+        float[] queryVector = queryVectors.get(0);
+        String model = embeddingService.model();
+        Set<String> chunkIds = redisTemplate.opsForSet().members(userKey(userId));
+        if (chunkIds == null || chunkIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Candidate> candidates = new ArrayList<>();
+        int scanned = 0;
+        for (String chunkId : chunkIds) {
+            if (++scanned > maxScanChunks) {
+                break;
+            }
+            Map<Object, Object> fields = redisTemplate.opsForHash().entries(chunkKey(chunkId));
+            if (fields.isEmpty()) {
+                continue;
+            }
+            if (!model.equals(stringValue(fields.get("embedding_model")))) {
+                continue;
+            }
+            Long articleId = longValue(fields.get("article_id"));
+            Long parsedChunkId = longValue(fields.get("chunk_id"));
+            if (articleId == null || parsedChunkId == null) {
+                continue;
+            }
+            if (allowedArticleIds != null && !allowedArticleIds.contains(articleId)) {
+                continue;
+            }
+            float[] vector = decode(stringValue(fields.get("vector")));
+            if (vector == null || vector.length != queryVector.length) {
+                continue;
+            }
+            Candidate candidate = new Candidate(
+                    articleId,
+                    parsedChunkId,
+                    stringValue(fields.get("content")),
+                    intValue(fields.get("char_start")),
+                    intValue(fields.get("char_end"))
+            );
+            candidate.vectorScore = cosine(queryVector, vector);
+            candidates.add(candidate);
+        }
+
+        double effectiveMinScore = model.startsWith("DEV-HASH") ? -1.0 : minScore;
+        candidates.removeIf(candidate -> candidate.vectorScore() < effectiveMinScore);
+        candidates.sort(Comparator.comparingDouble(Candidate::vectorScore).reversed());
+        if (candidates.size() > vectorCandidates) {
+            return new ArrayList<>(candidates.subList(0, vectorCandidates));
+        }
+        return candidates;
+    }
+
+    private List<Candidate> keywordCandidates(long userId, String query, String scope,
+                                              Long scopeId, Set<Long> allowedArticleIds) {
+        try {
+            Long articleId = "ARTICLE".equals(scope) ? scopeId : null;
+            List<Long> articleIds = "FOLDER".equals(scope) && allowedArticleIds != null
+                    ? new ArrayList<>(allowedArticleIds)
+                    : null;
+            List<ArticleChunkSearchRow> rows = chunkMapper.searchKeyword(
+                    userId, query, articleId, articleIds, keywordCandidates);
+            List<Candidate> candidates = new ArrayList<>(rows.size());
+            for (ArticleChunkSearchRow row : rows) {
+                Candidate candidate = new Candidate(
+                        row.getArticleId(),
+                        row.getId(),
+                        row.getContent(),
+                        row.getCharStart() == null ? 0 : row.getCharStart(),
+                        row.getCharEnd() == null ? 0 : row.getCharEnd()
+                );
+                candidate.keywordScore = row.getScore() == null ? 0 : row.getScore();
+                candidates.add(candidate);
+            }
+            return candidates;
+        } catch (RuntimeException ex) {
+            log.warn("keyword retrieval unavailable, fallback to vector only: {}", ex.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<Candidate> fuseWithRrf(List<Candidate> vectorResults,
+                                        List<Candidate> keywordResults,
+                                        Integer requestedTopK) {
+        Map<Long, Candidate> merged = new LinkedHashMap<>();
+        for (int i = 0; i < vectorResults.size(); i++) {
+            Candidate source = vectorResults.get(i);
+            Candidate target = merged.computeIfAbsent(source.chunkId(), id -> source.copy());
+            target.vectorScore = source.vectorScore;
+            target.rrfScore += 1.0 / (rrfK + i + 1);
+        }
+        double maxKeyword = keywordResults.stream()
+                .mapToDouble(Candidate::keywordScore)
+                .max()
+                .orElse(1.0);
+        if (maxKeyword <= 0) {
+            maxKeyword = 1.0;
+        }
+        for (int i = 0; i < keywordResults.size(); i++) {
+            Candidate source = keywordResults.get(i);
+            Candidate target = merged.computeIfAbsent(source.chunkId(), id -> source.copy());
+            target.keywordScore = source.keywordScore;
+            target.rrfScore += 1.0 / (rrfK + i + 1);
+        }
+        for (Candidate candidate : merged.values()) {
+            double vectorPart = Math.max(0, candidate.vectorScore);
+            double keywordPart = Math.min(1.0, candidate.keywordScore / maxKeyword) * 0.85;
+            candidate.displayScoreValue = Math.max(vectorPart, keywordPart);
+        }
+        List<Candidate> ordered = new ArrayList<>(merged.values());
+        ordered.sort(Comparator
+                .comparingDouble(Candidate::rrfScore).reversed()
+                .thenComparing(Comparator.comparingDouble(Candidate::displayScore).reversed()));
+        int topK = requestedTopK == null ? defaultTopK : Math.max(1, Math.min(requestedTopK, 20));
+        return limitPerArticle(ordered, topK);
+    }
+
+    private List<Candidate> selectTop(List<Candidate> candidates, Integer requestedTopK,
+                                      Comparator<Candidate> comparator) {
+        List<Candidate> ordered = new ArrayList<>(candidates);
+        ordered.sort(comparator);
+        int topK = requestedTopK == null ? defaultTopK : Math.max(1, Math.min(requestedTopK, 20));
+        return limitPerArticle(ordered, topK);
+    }
+
+    private List<Candidate> limitPerArticle(List<Candidate> ordered, int topK) {
+        Map<Long, Integer> perArticle = new HashMap<>();
+        List<Candidate> selected = new ArrayList<>();
+        for (Candidate candidate : ordered) {
+            if (selected.size() >= topK) {
+                break;
+            }
+            int count = perArticle.getOrDefault(candidate.articleId(), 0);
+            if (count >= maxPerArticle) {
+                continue;
+            }
+            perArticle.put(candidate.articleId(), count + 1);
+            if (candidate.displayScoreValue == 0) {
+                candidate.displayScoreValue = candidate.vectorScore() > 0
+                        ? candidate.vectorScore()
+                        : Math.min(0.85, Math.max(0, candidate.keywordScore() / 10.0));
+            }
+            selected.add(candidate);
+        }
+        return selected;
     }
 
     private Set<Long> resolveScope(long userId, String scope, Long scopeId) {
@@ -246,13 +371,64 @@ public class ChunkRetrievalService {
         return parsed == null ? 0 : parsed.intValue();
     }
 
-    private record Candidate(
-            long articleId,
-            long chunkId,
-            String content,
-            int charStart,
-            int charEnd,
-            double score
-    ) {
+    private static final class Candidate {
+        private final long articleId;
+        private final long chunkId;
+        private final String content;
+        private final int charStart;
+        private final int charEnd;
+        private double vectorScore;
+        private double keywordScore;
+        private double rrfScore;
+        private double displayScoreValue;
+
+        private Candidate(long articleId, long chunkId, String content,
+                          int charStart, int charEnd) {
+            this.articleId = articleId;
+            this.chunkId = chunkId;
+            this.content = content;
+            this.charStart = charStart;
+            this.charEnd = charEnd;
+        }
+
+        private Candidate copy() {
+            return new Candidate(articleId, chunkId, content, charStart, charEnd);
+        }
+
+        private long articleId() {
+            return articleId;
+        }
+
+        private long chunkId() {
+            return chunkId;
+        }
+
+        private String content() {
+            return content;
+        }
+
+        private int charStart() {
+            return charStart;
+        }
+
+        private int charEnd() {
+            return charEnd;
+        }
+
+        private double vectorScore() {
+            return vectorScore;
+        }
+
+        private double keywordScore() {
+            return keywordScore;
+        }
+
+        private double rrfScore() {
+            return rrfScore;
+        }
+
+        private double displayScore() {
+            return displayScoreValue;
+        }
     }
 }

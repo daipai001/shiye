@@ -71,6 +71,10 @@ shiye:
       max-per-article: ${RETRIEVAL_MAX_PER_ARTICLE:3}
       min-score: ${RETRIEVAL_MIN_SCORE:0.2}
       max-scan-chunks: ${RETRIEVAL_MAX_SCAN_CHUNKS:5000}
+      vector-candidates: ${RETRIEVAL_VECTOR_CANDIDATES:30}
+      keyword-candidates: ${RETRIEVAL_KEYWORD_CANDIDATES:20}
+      rrf-k: ${RETRIEVAL_RRF_K:60}
+      hybrid-enabled: ${RETRIEVAL_HYBRID_ENABLED:true}
   usage:
     global-monthly-tokens: ${GLOBAL_MONTHLY_TOKENS:2000000}
     global-monthly-cost: ${GLOBAL_MONTHLY_COST:20.00}

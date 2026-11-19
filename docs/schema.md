@@ -458,8 +458,9 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 - `UNIQUE uk_chunks_article_index (article_id, chunk_index)`
 - `idx_chunks_user_article (user_id, article_id)`
 - `idx_chunks_vector (vector_id)`
+- `FULLTEXT ft_chunks_content (content) WITH PARSER ngram`（P1 混合检索关键词召回）
 
-**说明**：`char_start/char_end` 是引用跳转关键；重建索引先删旧 chunk/vector。
+**说明**：`char_start/char_end` 是引用跳转关键；重建索引先删旧 chunk/vector。全文索引由 `migrations/V002__chunk_fulltext.sql` 增量添加。
 
 ---
 
