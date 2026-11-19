@@ -77,6 +77,14 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:-dev-admin-secret-change-me-32-bytes-minimum}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-dev}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
+      EMBEDDING_DIMENSION: 1024
     ports:
       - "${ADMIN_API_PORT:-18081}:18081"
     depends_on:
