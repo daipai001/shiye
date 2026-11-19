@@ -11,6 +11,7 @@ public class UserPluginSettingsEntity {
     private Boolean ballEnabled;
     private String defaultMode;
     private String defaultScope;
+    private Long defaultScopeId;
     private String shortcut;
     private String siteBlacklist;
     private LocalDateTime createdAt;

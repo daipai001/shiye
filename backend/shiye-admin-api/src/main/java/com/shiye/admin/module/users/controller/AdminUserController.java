@@ -2,6 +2,7 @@ package com.shiye.admin.module.users.controller;
 
 import com.shiye.admin.module.audit.service.AdminAuditService;
 import com.shiye.admin.module.users.domain.dto.AdminUserQuotaRequest;
+import com.shiye.admin.module.users.domain.dto.AdminUserPasswordResetRequest;
 import com.shiye.admin.module.users.domain.dto.AdminUserStatusRequest;
 import com.shiye.admin.module.users.domain.vo.AdminUserVO;
 import com.shiye.admin.module.users.service.AdminUserService;
@@ -61,5 +62,13 @@ public class AdminUserController {
                 java.util.Map.of("monthlyTokenQuota", request.monthlyTokenQuota(),
                         "monthlyCostQuota", request.monthlyCostQuota()));
         return Result.ok(updated);
+    }
+
+    @PutMapping("/{id}/password")
+    public Result<Void> resetPassword(@PathVariable long id,
+                                      @Valid @RequestBody AdminUserPasswordResetRequest request) {
+        adminUserService.resetPassword(id, request);
+        auditService.record("USER_PASSWORD_RESET", "USER", String.valueOf(id), null);
+        return Result.ok();
     }
 }

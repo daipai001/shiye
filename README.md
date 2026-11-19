@@ -69,15 +69,16 @@ mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/schema.sql
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/seed.sql
 ```
 
-已有数据库升级到混合检索时，额外执行：
+已有数据库升级时，按顺序执行未执行的迁移：
 
 ```bash
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V002__chunk_fulltext.sql
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V003__plugin_default_scope.sql
 ```
 
 - 管理员：`admin@shiye.local`
 - 初始密码：见项目负责人的私密记录；首次登录后修改
-- 迁移：`deploy/sql/migrations/V001__init.sql`
+- 迁移：`deploy/sql/migrations/`
 - Docker 方式：`mvn -f backend/pom.xml package -DskipTests` 后 `docker compose -f deploy/docker-compose.yml up -d --build`
 
 ### 2. 后端
@@ -173,14 +174,15 @@ docker compose -f deploy/docker-compose.yml up -d --build
 - 跨导入按 `(user_id, url_hash)` 去重，已存在 `READY` 资料时条目标记 `SKIPPED / DUPLICATE_URL`
 - 向量写入 Redis：`kb:chunk:{chunkId}` + `kb:user:{userId}:chunks`
 - 资料 API：列表/统计/详情/切片/删除/重新索引；资料库页面支持搜索、状态/标签/文件夹筛选、详情抽屉和切片查看
-- 标签手动编辑、问答取消、回答反馈、用户资料/密码、插件偏好、个人用量 CSV 导出
-- 设置页已接入账户资料、密码修改和插件默认模式/范围/站点黑名单；服务端偏好会应用到悬浮球
+- 标签手动编辑：单篇加/删标签；标签管理支持重命名、改色、删除
+- 问答取消、回答反馈、用户资料/密码、插件偏好、个人用量 CSV 导出
+- 设置页已接入账户资料、密码修改和插件默认模式/范围（指定文件夹或标签）/站点黑名单；服务端偏好会应用到悬浮球
 
 RAG 问答闭环已打通：
 
 - `POST /api/v1/chat/stream`：SSE 事件 `meta / citation / delta / usage / done / error`
 - DeepSeek 流式回答，复用本地 OfferDesk 配置（`shiye.ai.chat`，已 gitignore）
-- 问答范围 ALL / ARTICLE / FOLDER；检索结果按 `user_id` 过滤，单篇最多 3 个切片
+- 问答范围 ALL / ARTICLE / FOLDER / TAG；资料库问答页支持全部、单篇、文件夹、标签选择，检索结果按 `user_id` 过滤，单篇最多 3 个切片
 - 混合检索：BGE-M3 向量召回 + MySQL ngram FULLTEXT 关键词召回 + RRF 融合（`migrations/V002__chunk_fulltext.sql`）
 - BGE-reranker 二次重排：对 RRF 候选池（默认最多 20 条）调用 `BAAI/bge-reranker-v2-m3`，失败或未配置 key 时自动回退 RRF；引用分数为 rerank relevance score
 - 回答引用与 `citations` 落库，包含标题、片段、分数、`charStart/charEnd`
@@ -231,7 +233,7 @@ RAG 问答闭环已打通：
 管理后台已接入：
 
 - 总览：用户/资料/切片数、今日调用/tokens/成本/错误率/P95、7 天趋势、来源拆分、最近失败
-- 用户与配额：搜索、用量排序、调整月度 token/成本配额、禁用/启用（禁用会撤销 refresh token）
+- 用户与配额：搜索、用量排序、调整月度 token/成本配额、重置密码（撤销 refresh token）、禁用/启用（禁用会撤销 refresh token）
 - 用量与成本：按用户/来源/场景/状态筛选、汇总、来源/模型拆分、CSV 导出
 - 书签导入：任务列表、条目详情、暂停/恢复/取消/失败重试
 - 索引任务：逐条状态、失败原因、重试
@@ -251,9 +253,13 @@ RAG 问答闭环已打通：
 - 已做向量 + 关键词 + RRF 混合检索、BGE-reranker 二次重排、资料 AI 摘要/自动标签、插件当前页问答、书签新增/修改/删除自动同步和管理端模型在线配置。
 - 管理端模型和系统设置均已支持在线编辑；预算告警已支持 Webhook，可在管理端测试发送。
 - 邀请码注册已接入；邮箱验证尚未接入。
+- RAG 评测目前计算 recall@5 和检索延迟；引用准确率、答案正确率、LLM-as-judge 和内置 30 条评测集尚未接入。
+- 上传资料索引任务尚未写入 `ingest_tasks`，管理端任务页当前展示书签导入任务。
+- 扫描版 PDF 未接 OCR；本机向量检索仍为应用层余弦。
 - 问答限流（10 次/分钟/用户）和管理端操作限流（60 次/分钟/管理员）已接入。
 
 ## 下一步
 
-1. 邮箱验证（需要 SMTP）
-2. 部署到服务器（可选 SSH CD 已就绪，需要配置 secrets）
+1. RAG 评测质量指标与评测集
+2. 邮箱验证（需要 SMTP）
+3. 部署到服务器（可选 SSH CD 已就绪，需要配置 secrets）

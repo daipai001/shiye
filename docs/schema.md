@@ -270,8 +270,9 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
 | `user_id` | BIGINT UNSIGNED | 否 | — | 用户 |
 | `ball_enabled` | TINYINT(1) | 否 | 1 | 悬浮球开关 |
-| `default_mode` | VARCHAR(16) | 否 | `LIBRARY` | LIBRARY / CURRENT / GENERAL |
+| `default_mode` | VARCHAR(16) | 否 | `LIBRARY` | LIBRARY / CURRENT |
 | `default_scope` | VARCHAR(16) | 否 | `ALL` | ALL / FOLDER / TAG |
+| `default_scope_id` | BIGINT UNSIGNED | 是 | NULL | FOLDER/TAG 对应的文件夹/标签 ID |
 | `shortcut` | VARCHAR(64) | 是 | NULL | 如 `Alt+Shift+S` |
 | `site_blacklist` | JSON | 是 | NULL | 不注入的域名数组 |
 | `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
@@ -901,8 +902,9 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | AI | `ai_usage.scene` | `CHAT` / `EMBEDDING` / `RERANK` / `SUMMARY` |
 | AI | `ai_usage.status` | `SUCCESS` / `FAILED` / `ABORTED` |
 | 反馈 | `message_feedback.rating` | `UP` / `DOWN` |
-| 插件 | `user_plugin_settings.default_mode` | `LIBRARY` / `CURRENT` / `GENERAL` |
+| 插件 | `user_plugin_settings.default_mode` | `LIBRARY` / `CURRENT` |
 | 插件 | `user_plugin_settings.default_scope` | `ALL` / `FOLDER` / `TAG` |
+| 插件 | `user_plugin_settings.default_scope_id` | FOLDER/TAG 时为对应 ID，ALL 时为 NULL |
 | 文件 | `file_assets.status` | `UPLOADING` / `READY` / `FAILED` / `DELETED` |
 
 ---
@@ -952,7 +954,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 ## 8. 迁移策略
 
-- 迁移文件：`deploy/sql/migrations/V001__init.sql`、`V002__xxx.sql`。
+- 迁移文件：`deploy/sql/migrations/V001__init.sql`、`V002__chunk_fulltext.sql`、`V003__plugin_default_scope.sql`。
 - 每个迁移必须幂等/可重复执行；记录到 `schema_migrations`。
 - 不修改已发布的迁移；新增迁移。
 - 大表加字段用 `ALGORITHM=INPLACE` 或分批回填。

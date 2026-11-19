@@ -785,7 +785,7 @@ V1 的限制是：
 - M2b（已完成，2026-11-13）：抓取/解析/切片/embedding worker、失败原因、跨导入去重、资料列表/统计/详情/切片/删除、资料库 UI。
 - M2b 默认使用 `DEV-HASH-1024` 联调向量；本机已通过 `EMBEDDING_PROVIDER=http` 接入真实 BGE-M3 并验证 1024 维与检索效果。切换模型后需 reindex。
 - 本机 Redis 无 RediSearch，向量暂存 Hash（`kb:chunk:{id}` + 用户集合）；RAG 检索阶段先做应用层余弦，部署 Redis Stack 后替换 HNSW。
-- 主文件夹自动同步（`chrome.bookmarks.onCreated/onRemoved`）仍属 P1，未接入。
+- 主文件夹自动同步（`chrome.bookmarks.onCreated/onChanged/onMoved/onRemoved`）已在插件端接入；主文件夹保存在扩展本地，服务端 `is_primary` 字段预留给后续 Web 端统一管理。
 - 大于 50 条的文件夹：插件先创建任务，再用 `importId` 分批追加，服务端按规范化 URL 去重；worker 只消费 `PENDING` 条目，追加中的任务不会被提前处理。
 - 跨导入去重：创建 `articles` 时按 `(user_id, url_hash)` 唯一键判断，已存在 `READY` 资料则把条目置为 `SKIPPED / DUPLICATE_URL`。
 
@@ -1059,7 +1059,7 @@ V1 管理端是独立的 `admin-web` + `shiye-admin-api`，不是 user-web 的 `
 #### 4.9.6 用户与配额（P0 基础版）
 
 - 用户列表：邮箱、角色、状态、注册时间、最后活跃、本月 tokens/成本、配额使用率。
-- 操作：禁用/启用、调整月度配额、重置密码（P1）。
+- 操作：禁用/启用、调整月度配额、重置密码。
 - 不支持多管理员；`SUPER_ADMIN` 账号不可被禁用。
 - 可按用量排序，快速找到消耗最高的用户。
 
@@ -1078,9 +1078,9 @@ V1 管理端是独立的 `admin-web` + `shiye-admin-api`，不是 user-web 的 `
 - **安装引导**：Chrome/Edge 打开扩展管理，开启开发者模式，加载已解压的扩展程序；或从商店安装。
 - **连接状态**：已连接/未连接、账号、浏览器版本、插件版本、最近同步。
 - **悬浮球开关**：同步到插件；关闭后插件不再注入悬浮球，但插件图标仍可打开面板。
-- **默认行为**：默认模式（资料库/当前页面/通用）、默认范围（全部资料/主文件夹/标签）、快捷键。
+- **默认行为**：默认模式（资料库/当前页面）、默认范围（全部资料 / 指定文件夹 / 指定标签）、快捷键。通用模式属 P2。
 - **授权**：生成一次性授权码（5 分钟有效），支持复制、重新授权、断开连接。
-- **站点黑名单**（P1）：对指定域名不注入悬浮球。
+- **站点黑名单**：对指定域名不注入悬浮球。
 
 **验收标准**
 
@@ -1132,7 +1132,7 @@ V1 管理端是独立的 `admin-web` + `shiye-admin-api`，不是 user-web 的 `
   → SSE 推给前端
 ```
 
-> **实现状态（2026-11-19）**：DeepSeek SSE、引用落库、会话/消息、usage/配额检查、真实 BGE-M3、向量 + MySQL FULLTEXT 关键词 + RRF 混合检索、BGE-reranker 二次重排、AI 摘要与自动标签、PDF/Markdown/TXT 上传、标签/文件夹筛选、插件当前页问答、书签自动同步、问答取消/反馈、用户资料/密码/插件偏好、用量导出、邀请码注册、管理端模型/系统设置/RAG 参数在线配置、RAG 评测、审计日志和操作限流已接入；本机向量检索仍用 Redis Hash + 应用层余弦（无 RediSearch）。
+> **实现状态（2026-11-19）**：DeepSeek SSE、引用落库、会话/消息、usage/配额检查、真实 BGE-M3、向量 + MySQL FULLTEXT 关键词 + RRF 混合检索、BGE-reranker 二次重排、AI 摘要与自动标签、PDF/Markdown/TXT 上传、标签/文件夹筛选与标签管理、问答范围 ALL/ARTICLE/FOLDER/TAG、插件当前页问答、书签自动同步、插件默认模式/范围、问答取消/反馈、用户资料/密码、用量导出、邀请码注册、预算 Webhook 告警、管理端模型/系统设置/RAG 参数在线配置、用户密码重置、RAG 评测、审计日志和操作限流已接入；本机向量检索仍用 Redis Hash + 应用层余弦（无 RediSearch）。
 
 ### 5.4 用量记账与配额
 
@@ -1261,7 +1261,7 @@ AI Gateway（统一入口）
 - `POST /bookmark-imports/{id}/pause`
 - `POST /bookmark-imports/{id}/cancel`
 - `GET /bookmark-imports/{id}/items`
-- `PUT /bookmark-imports/{id}/primary`（设为主文件夹，P1）
+- `PATCH /bookmark-folders/{id}`（设置 `isPrimary` / `autoSync`）
 
 > 书签树由插件本地读取，服务端不直接访问浏览器书签 API。
 

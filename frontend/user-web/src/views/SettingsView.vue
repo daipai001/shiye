@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api from '../api/client'
-import type { ApiResult, PluginSettings, UserSummary } from '../api/types'
+import type { ApiResult, BookmarkFolder, PluginSettings, Tag, UserSummary } from '../api/types'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -26,23 +26,34 @@ const plugin = ref<PluginSettings>({
   ballEnabled: true,
   defaultMode: 'LIBRARY',
   defaultScope: 'ALL',
+  defaultScopeId: null,
   shortcut: '',
   siteBlacklist: [],
 })
 const blacklistText = ref('')
+const folders = ref<BookmarkFolder[]>([])
+const tags = ref<Tag[]>([])
+
+function onScopeChange() {
+  plugin.value.defaultScopeId = null
+}
 
 async function load() {
   loading.value = true
   try {
-    const [meResponse, pluginResponse] = await Promise.all([
+    const [meResponse, pluginResponse, folderResponse, tagResponse] = await Promise.all([
       api.get<ApiResult<UserSummary>>('/users/me'),
       api.get<ApiResult<PluginSettings>>('/users/me/plugin-settings'),
+      api.get<ApiResult<{ items: BookmarkFolder[] }>>('/bookmark-folders'),
+      api.get<ApiResult<{ items: Tag[] }>>('/tags'),
     ])
     profile.value = meResponse.data.data
     displayName.value = meResponse.data.data.displayName
     avatarUrl.value = meResponse.data.data.avatarUrl || ''
     plugin.value = pluginResponse.data.data
     blacklistText.value = (pluginResponse.data.data.siteBlacklist || []).join('\n')
+    folders.value = folderResponse.data.data.items
+    tags.value = tagResponse.data.data.items
     auth.updateUser(meResponse.data.data)
   } catch {
     ElMessage.error('读取账户设置失败')
@@ -98,12 +109,18 @@ async function changePassword() {
 }
 
 async function savePlugin() {
+  if (plugin.value.defaultScope !== 'ALL' && !plugin.value.defaultScopeId) {
+    ElMessage.warning('请选择默认范围对应的文件夹或标签')
+    return
+  }
   savingPlugin.value = true
   try {
     const { data } = await api.put<ApiResult<PluginSettings>>('/users/me/plugin-settings', {
       ballEnabled: plugin.value.ballEnabled,
       defaultMode: plugin.value.defaultMode,
       defaultScope: plugin.value.defaultScope,
+      defaultScopeId: plugin.value.defaultScope === 'ALL'
+        ? null : plugin.value.defaultScopeId,
       shortcut: plugin.value.shortcut || null,
       siteBlacklist: blacklistText.value
         .split(/\r?\n/)
@@ -210,10 +227,46 @@ onMounted(load)
           </div>
           <div class="field">
             <label>默认范围</label>
-            <el-select v-model="plugin.defaultScope" style="width: 100%">
+            <el-select
+              v-model="plugin.defaultScope"
+              style="width: 100%"
+              @change="onScopeChange"
+            >
               <el-option label="全部资料" value="ALL" />
               <el-option label="按文件夹" value="FOLDER" />
               <el-option label="按标签" value="TAG" />
+            </el-select>
+          </div>
+          <div v-if="plugin.defaultScope === 'FOLDER'" class="field">
+            <label>默认文件夹</label>
+            <el-select
+              v-model="plugin.defaultScopeId"
+              filterable
+              placeholder="选择书签文件夹"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="folder in folders"
+                :key="folder.id"
+                :label="folder.folderPath"
+                :value="folder.id"
+              />
+            </el-select>
+          </div>
+          <div v-if="plugin.defaultScope === 'TAG'" class="field">
+            <label>默认标签</label>
+            <el-select
+              v-model="plugin.defaultScopeId"
+              filterable
+              placeholder="选择标签"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="tag in tags"
+                :key="tag.id"
+                :label="tag.name"
+                :value="tag.id"
+              />
             </el-select>
           </div>
           <div class="field">

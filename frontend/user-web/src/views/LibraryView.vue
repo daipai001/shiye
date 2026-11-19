@@ -42,6 +42,9 @@ const chunks = ref<ArticleChunk[]>([])
 const detailLoading = ref(false)
 const activeTab = ref('content')
 const newTag = ref('')
+const tagDialog = ref(false)
+const tagDrafts = ref<Array<{ id: string; name: string; color: string; count: number }>>([])
+const savingTagIds = ref<string[]>([])
 
 const statusText: Record<string, string> = {
   PENDING: '排队中',
@@ -233,7 +236,73 @@ async function removeTag(tag: Tag) {
   }
 }
 
-async function deleteArticle(article: ArticleSummary) {  try {
+function openTagManager() {
+  tagDrafts.value = tags.value.map((tag) => ({
+    id: tag.id,
+    name: tag.name,
+    color: tag.color || '#6b7280',
+    count: tag.articleCount || 0,
+  }))
+  tagDialog.value = true
+}
+
+function isSavingTag(tagId: string) {
+  return savingTagIds.value.includes(tagId)
+}
+
+async function saveTag(tag: { id: string; name: string; color: string }) {
+  const name = tag.name.trim()
+  if (!name) {
+    ElMessage.warning('标签名不能为空')
+    return
+  }
+  savingTagIds.value = [...savingTagIds.value, tag.id]
+  try {
+    await api.patch(`/tags/${tag.id}`, { name, color: tag.color })
+    tag.name = name
+    ElMessage.success('标签已更新')
+    await Promise.all([loadTags(), loadArticles()])
+    if (detail.value) {
+      await openArticle(detail.value)
+    }
+  } catch {
+    ElMessage.error('更新标签失败')
+  } finally {
+    savingTagIds.value = savingTagIds.value.filter((id) => id !== tag.id)
+  }
+}
+
+async function deleteTag(tag: { id: string; name: string; count: number }) {
+  try {
+    await ElMessageBox.confirm(
+      `删除标签「${tag.name}」？${tag.count > 0 ? `它会从 ${tag.count} 篇资料上移除。` : ''}`,
+      '删除标签',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  savingTagIds.value = [...savingTagIds.value, tag.id]
+  try {
+    await api.delete(`/tags/${tag.id}`)
+    if (tagFilter.value === tag.id) {
+      tagFilter.value = ''
+    }
+    tagDrafts.value = tagDrafts.value.filter((item) => item.id !== tag.id)
+    ElMessage.success('标签已删除')
+    await Promise.all([loadTags(), loadArticles()])
+    if (detail.value) {
+      await openArticle(detail.value)
+    }
+  } catch {
+    ElMessage.error('删除标签失败')
+  } finally {
+    savingTagIds.value = savingTagIds.value.filter((id) => id !== tag.id)
+  }
+}
+
+async function deleteArticle(article: ArticleSummary) {
+  try {
     await ElMessageBox.confirm(
       `删除《${article.title}》？正文、切片和向量都会清理。`,
       '删除资料',
@@ -263,6 +332,7 @@ onMounted(loadAll)
         <p>收藏的网页会在这里变成可检索的资料：抓正文、切片、向量化。</p>
       </div>
       <div class="page-actions">
+        <el-button text @click="openTagManager">标签管理</el-button>
         <input
           ref="uploadInput"
           type="file"
@@ -481,6 +551,20 @@ onMounted(loadAll)
         </div>
       </div>
     </el-drawer>
+
+    <el-dialog v-model="tagDialog" title="标签管理" width="580px">
+      <p class="tag-manager-hint">重命名、改色或删除标签；删除会同时移除资料上的标签关联。</p>
+      <div v-if="tagDrafts.length === 0" class="empty compact">暂无标签。</div>
+      <div v-else class="tag-manager-list">
+        <div v-for="tag in tagDrafts" :key="tag.id" class="tag-manager-row">
+          <el-color-picker v-model="tag.color" size="small" />
+          <el-input v-model="tag.name" size="small" maxlength="64" />
+          <span class="tag-count">{{ tag.count }} 篇</span>
+          <el-button text :loading="isSavingTag(tag.id)" @click="saveTag(tag)">保存</el-button>
+          <el-button text type="danger" :loading="isSavingTag(tag.id)" @click="deleteTag(tag)">删除</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -495,6 +579,27 @@ onMounted(loadAll)
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.tag-manager-hint {
+  color: var(--faint);
+  font-size: 10px;
+  margin: 0 0 12px;
+}
+.tag-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tag-manager-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 56px auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.tag-count {
+  color: var(--faint);
+  font-size: 10px;
+  white-space: nowrap;
 }
 .file-input {
   display: none;

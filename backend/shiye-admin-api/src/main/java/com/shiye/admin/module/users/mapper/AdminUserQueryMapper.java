@@ -91,6 +91,13 @@ public interface AdminUserQueryMapper {
                     @Param("cost") BigDecimal cost);
 
     @Update("""
+            UPDATE users
+            SET password_hash = #{passwordHash}, updated_at = UTC_TIMESTAMP(3)
+            WHERE id = #{id} AND deleted_at IS NULL
+            """)
+    int updatePassword(@Param("id") long id, @Param("passwordHash") String passwordHash);
+
+    @Update("""
             UPDATE refresh_tokens
             SET revoked_at = UTC_TIMESTAMP(3)
             WHERE subject_type = 'USER' AND subject_id = #{userId} AND revoked_at IS NULL

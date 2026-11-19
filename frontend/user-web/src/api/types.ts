@@ -18,6 +18,7 @@ export interface PluginSettings {
   ballEnabled: boolean
   defaultMode: string
   defaultScope: string
+  defaultScopeId?: string | null
   shortcut?: string | null
   siteBlacklist: string[]
 }

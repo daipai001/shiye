@@ -24,5 +24,7 @@ public interface TagService {
 
     void removeArticleTag(long userId, long articleId, long tagId);
 
+    boolean existsForUser(long userId, long tagId);
+
     List<Long> findArticleIdsByTag(long userId, long tagId);
 }

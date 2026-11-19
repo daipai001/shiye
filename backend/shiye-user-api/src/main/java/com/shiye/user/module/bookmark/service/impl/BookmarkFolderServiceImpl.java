@@ -122,6 +122,11 @@ public class BookmarkFolderServiceImpl implements BookmarkFolderService {
         folderMapper.markSynced(folderId, userId);
     }
 
+    @Override
+    public boolean existsForUser(long userId, long folderId) {
+        return folderMapper.findByIdAndUser(folderId, userId) != null;
+    }
+
     private BookmarkFolderEntity findOwned(long userId, long folderId) {
         BookmarkFolderEntity entity = folderMapper.findByIdAndUser(folderId, userId);
         if (entity == null) {

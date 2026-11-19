@@ -2638,14 +2638,13 @@ function renderWebPlugin() {
         <div class="mode-pills">
           <button class="pill ${mode === 'library' ? 'active' : ''}" data-action="plugin-default-mode" data-mode="library">资料库</button>
           <button class="pill ${mode === 'current' ? 'active' : ''}" data-action="plugin-default-mode" data-mode="current">当前页面</button>
-          <button class="pill ${mode === 'general' ? 'active' : ''}" data-action="plugin-default-mode" data-mode="general">通用</button>
         </div>
       </div>
       <div class="field" style="margin-top:10px"><label>默认范围</label>
         <select class="select" data-action="plugin-default-scope">
           <option value="all" ${state.pluginDefaultScope === 'all' ? 'selected' : ''}>全部资料</option>
-          <option value="folder" ${state.pluginDefaultScope === 'folder' ? 'selected' : ''}>主文件夹：技术文章</option>
-          <option value="rag" ${state.pluginDefaultScope === 'rag' ? 'selected' : ''}>标签：RAG</option>
+          <option value="folder" ${state.pluginDefaultScope === 'folder' ? 'selected' : ''}>指定文件夹：技术文章</option>
+          <option value="rag" ${state.pluginDefaultScope === 'rag' ? 'selected' : ''}>指定标签：RAG</option>
         </select>
       </div>
       <div class="field"><label>快捷键</label><input class="input" value="Alt + Shift + S" readonly></div>
@@ -3054,7 +3053,7 @@ function renderAdminUsers() {
           <td class="muted">${esc(u.joined)}</td>
           <td>
             <button class="btn btn-xs btn-soft" data-action="adjust-quota" data-user="${u.id}">调整配额</button>
-            ${u.role === 'ADMIN' ? '<span class="tiny muted" style="margin-left:5px">不可禁用</span>' : `<button class="btn btn-xs btn-ghost" data-action="toggle-user" data-user="${u.id}">${u.status === 'ACTIVE' ? '禁用' : '启用'}</button>`}
+            ${u.role === 'ADMIN' ? '<span class="tiny muted" style="margin-left:5px">不可禁用</span>' : `<button class="btn btn-xs btn-ghost" data-action="toast" data-message="已重置用户密码（模拟）">重置密码</button><button class="btn btn-xs btn-ghost" data-action="toggle-user" data-user="${u.id}">${u.status === 'ACTIVE' ? '禁用' : '启用'}</button>`}
           </td>
         </tr>`;
       }).join('')}

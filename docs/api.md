@@ -421,8 +421,9 @@ admin-web → POST /admin/api/v1/auth/login
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `ballEnabled` | boolean | 悬浮球开关 |
-| `defaultMode` | string | LIBRARY/CURRENT/GENERAL |
+| `defaultMode` | string | LIBRARY/CURRENT |
 | `defaultScope` | string | ALL/FOLDER/TAG |
+| `defaultScopeId` | string/null | FOLDER/TAG 范围对应的文件夹/标签 ID |
 | `shortcut` | string/null | 快捷键 |
 | `siteBlacklist` | string[] | 不注入的域名 |
 
@@ -433,6 +434,8 @@ admin-web → POST /admin/api/v1/auth/login
 **认证**：用户
 
 **请求**：同响应字段
+
+> `defaultScope=FOLDER/TAG` 时必须提供本人名下的 `defaultScopeId`；`ALL` 时忽略。`GENERAL` 模式属 P2，当前不接受。
 
 **响应**：更新后的设置
 
@@ -1378,6 +1381,24 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
+#### PUT `/users/{id}/password`
+
+**认证**：管理员
+
+**请求**
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `newPassword` | string | 是 | 8~72 位，需同时包含字母和数字 |
+
+**响应**：`null`
+
+> 重置后该用户全部 refresh token 撤销，需要重新登录。操作写入审计日志 `USER_PASSWORD_RESET`。
+
+**错误**：40401、40001
+
+---
+
 ### 4.4 书签导入与索引任务
 
 #### GET `/imports`
@@ -1811,7 +1832,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 06 | 设置 | `GET/PUT /users/me/plugin-settings`、`PATCH /users/me`、`POST /users/me/password` |
 | 07 | 管理后台-总览 | `GET /admin/api/v1/overview` |
 | 08 | 管理后台-用量 | `GET /admin/api/v1/usage`、`GET /admin/api/v1/usage/export` |
-| 09 | 管理后台-用户与配额 | `GET /admin/api/v1/users`、`PUT /admin/api/v1/users/{id}/status`、`PUT /admin/api/v1/users/{id}/quota` |
+| 09 | 管理后台-用户与配额 | `GET /admin/api/v1/users`、`PUT /admin/api/v1/users/{id}/status`、`PUT /admin/api/v1/users/{id}/quota`、`PUT /admin/api/v1/users/{id}/password` |
 | 10 | 管理后台-书签导入 | `GET /admin/api/v1/imports`、`POST /admin/api/v1/imports/{id}/retry` |
 | 11 | 管理后台-索引任务 | `GET /admin/api/v1/tasks`、`POST /admin/api/v1/tasks/{id}/retry` |
 | 12 | 管理后台-模型配置 | `GET/PUT /admin/api/v1/models`、`POST /admin/api/v1/models/test` |

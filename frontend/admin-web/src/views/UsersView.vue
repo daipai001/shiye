@@ -19,7 +19,14 @@ const quotaUser = ref<AdminUser | null>(null)
 const tokenQuota = ref(0)
 const costQuota = ref(0)
 
+const passwordDialog = ref(false)
+const passwordUser = ref<AdminUser | null>(null)
+const newPassword = ref('')
+const confirmPassword = ref('')
+const resettingPassword = ref(false)
+
 const quotaTitle = computed(() => (quotaUser.value ? `调整 ${quotaUser.value.email} 的配额` : '调整配额'))
+const passwordTitle = computed(() => (passwordUser.value ? `重置 ${passwordUser.value.email} 的密码` : '重置用户密码'))
 
 function formatCost(value?: number | null) {
   return `¥${Number(value || 0).toFixed(4)}`
@@ -84,6 +91,42 @@ async function saveQuota() {
     await load()
   } catch {
     ElMessage.error('更新配额失败')
+  }
+}
+
+function openPassword(user: AdminUser) {
+  passwordUser.value = user
+  newPassword.value = ''
+  confirmPassword.value = ''
+  passwordDialog.value = true
+}
+
+async function savePassword() {
+  if (!passwordUser.value) return
+  if (newPassword.value.length < 8) {
+    ElMessage.warning('新密码至少 8 位')
+    return
+  }
+  if (!/[A-Za-z]/.test(newPassword.value) || !/\d/.test(newPassword.value)) {
+    ElMessage.warning('新密码需同时包含字母和数字')
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    ElMessage.warning('两次输入的密码不一致')
+    return
+  }
+  resettingPassword.value = true
+  try {
+    await api.put(`/users/${passwordUser.value.id}/password`, {
+      newPassword: newPassword.value,
+    })
+    ElMessage.success('密码已重置，用户需要重新登录')
+    passwordDialog.value = false
+    await load()
+  } catch {
+    ElMessage.error('重置密码失败')
+  } finally {
+    resettingPassword.value = false
   }
 }
 
@@ -163,6 +206,7 @@ onMounted(load)
         </div>
         <span class="time">{{ formatUtcTime(user.lastLoginAt) }}</span>
         <div class="actions">
+          <el-button text @click="openPassword(user)">重置密码</el-button>
           <el-button text @click="openQuota(user)">配额</el-button>
           <el-button text :type="user.status === 'ACTIVE' ? 'danger' : 'success'" @click="toggleStatus(user)">
             {{ user.status === 'ACTIVE' ? '禁用' : '启用' }}
@@ -195,6 +239,22 @@ onMounted(load)
       <template #footer>
         <el-button @click="quotaDialog = false">取消</el-button>
         <el-button type="primary" @click="saveQuota">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="passwordDialog" :title="passwordTitle" width="420px">
+      <div class="dialog-field">
+        <span>新密码</span>
+        <el-input v-model="newPassword" type="password" show-password maxlength="72" />
+      </div>
+      <div class="dialog-field">
+        <span>确认新密码</span>
+        <el-input v-model="confirmPassword" type="password" show-password maxlength="72" />
+      </div>
+      <p class="dialog-hint">至少 8 位，需同时包含字母和数字；重置后该用户所有 refresh token 会失效。</p>
+      <template #footer>
+        <el-button @click="passwordDialog = false">取消</el-button>
+        <el-button type="primary" :loading="resettingPassword" @click="savePassword">重置密码</el-button>
       </template>
     </el-dialog>
   </div>
@@ -231,7 +291,7 @@ onMounted(load)
 .user-head,
 .user-row {
   display: grid;
-  grid-template-columns: 1.7fr 0.6fr 0.5fr 1.2fr 1.1fr 1fr 0.8fr;
+  grid-template-columns: 1.7fr 0.6fr 0.5fr 1.2fr 1.1fr 1fr 1.4fr;
   gap: 10px;
   align-items: center;
   padding: 10px 14px;

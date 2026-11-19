@@ -316,7 +316,7 @@ function mount() {
                 content: pageContent,
                 question,
               }
-            : { conversationId, scope: { type: 'ALL' }, question },
+            : { conversationId, scope: libraryScope(), question },
         ),
       })
       if (!response.ok || !response.body) {
@@ -446,6 +446,15 @@ function mount() {
       return
     }
     setAskMode(serverSettings.defaultMode === 'CURRENT' ? 'page' : 'library')
+  }
+
+  function libraryScope() {
+    const type = serverSettings?.defaultScope
+    const id = serverSettings?.defaultScopeId
+    if ((type === 'FOLDER' || type === 'TAG') && id) {
+      return { type, id: String(id) }
+    }
+    return { type: 'ALL', id: null }
   }
 
   async function refreshServerSettings() {

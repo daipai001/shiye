@@ -166,6 +166,11 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
+    public boolean existsForUser(long userId, long tagId) {
+        return tagMapper.findByIdAndUser(tagId, userId) != null;
+    }
+
+    @Override
     public List<Long> findArticleIdsByTag(long userId, long tagId) {
         return tagMapper.findArticleIdsByTag(userId, tagId);
     }

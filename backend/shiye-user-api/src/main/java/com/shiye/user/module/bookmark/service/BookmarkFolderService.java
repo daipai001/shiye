@@ -18,5 +18,7 @@ public interface BookmarkFolderService {
 
     BookmarkFolderEntity ensureFolder(long userId, BookmarkBrowser browser, String browserFolderId, String folderPath);
 
+    boolean existsForUser(long userId, long folderId);
+
     void markSynced(long userId, long folderId);
 }

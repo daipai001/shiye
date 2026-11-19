@@ -1,6 +1,7 @@
 package com.shiye.admin.module.users.service.impl;
 
 import com.shiye.admin.module.users.domain.dto.AdminUserQuotaRequest;
+import com.shiye.admin.module.users.domain.dto.AdminUserPasswordResetRequest;
 import com.shiye.admin.module.users.domain.dto.AdminUserStatusRequest;
 import com.shiye.admin.module.users.domain.entity.AdminUserRowEntity;
 import com.shiye.admin.module.users.domain.vo.AdminUserVO;
@@ -9,6 +10,7 @@ import com.shiye.admin.module.users.service.AdminUserService;
 import com.shiye.common.api.ErrorCode;
 import com.shiye.common.api.PageResult;
 import com.shiye.common.exception.BizException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,9 +25,12 @@ public class AdminUserServiceImpl implements AdminUserService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final AdminUserQueryMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
-    public AdminUserServiceImpl(AdminUserQueryMapper userMapper) {
+    public AdminUserServiceImpl(AdminUserQueryMapper userMapper,
+                                PasswordEncoder passwordEncoder) {
         this.userMapper = userMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -71,6 +76,14 @@ public class AdminUserServiceImpl implements AdminUserService {
         findUser(id);
         userMapper.updateQuota(id, request.monthlyTokenQuota(), request.monthlyCostQuota());
         return AdminUserVO.from(findUser(id));
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(long id, AdminUserPasswordResetRequest request) {
+        findUser(id);
+        userMapper.updatePassword(id, passwordEncoder.encode(request.newPassword()));
+        userMapper.revokeUserTokens(id);
     }
 
     private AdminUserRowEntity findUser(long id) {

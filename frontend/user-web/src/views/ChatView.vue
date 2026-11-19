@@ -5,6 +5,7 @@ import api from '../api/client'
 import { streamChat } from '../api/chat'
 import type {
   ApiResult,
+  ArticleSummary,
   BookmarkFolder,
   ChatCitation,
   ChatMessage,
@@ -25,10 +26,12 @@ const quota = ref<Quota | null>(null)
 const messagesBox = ref<HTMLElement | null>(null)
 let abortController: AbortController | null = null
 const activeRequestId = ref<string | null>(null)
-const scopeType = ref<'ALL' | 'FOLDER' | 'TAG'>('ALL')
+const scopeType = ref<'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG'>('ALL')
 const scopeId = ref('')
 const folders = ref<BookmarkFolder[]>([])
 const tags = ref<Tag[]>([])
+const articles = ref<ArticleSummary[]>([])
+const articleLoading = ref(false)
 
 const currentTitle = computed(() => {
   const current = conversations.value.find((item) => item.id === currentId.value)
@@ -84,14 +87,49 @@ async function loadScopes() {
     folders.value = []
     tags.value = []
   }
+  await searchArticles('')
+}
+
+async function searchArticles(query: string) {
+  articleLoading.value = true
+  try {
+    const { data } = await api.get<ApiResult<PageResult<ArticleSummary>>>('/articles', {
+      params: {
+        page: 1,
+        pageSize: 50,
+        status: 'READY',
+        q: query.trim() || undefined,
+      },
+    })
+    articles.value = data.data.items
+  } catch {
+    articles.value = []
+  } finally {
+    articleLoading.value = false
+  }
+}
+
+async function ensureArticleOption(articleId: string) {
+  if (!articleId || articles.value.some((article) => article.id === articleId)) {
+    return
+  }
+  try {
+    const { data } = await api.get<ApiResult<ArticleSummary>>(`/articles/${articleId}`)
+    articles.value = [data.data, ...articles.value]
+  } catch {
+    // 资料被删除时保留空选择，由用户重新选择
+  }
 }
 
 async function selectConversation(conversation: Conversation) {
   if (streaming.value) return
   currentId.value = conversation.id
-  const type = conversation.scopeType as 'ALL' | 'FOLDER' | 'TAG'
-  scopeType.value = ['ALL', 'FOLDER', 'TAG'].includes(type) ? type : 'ALL'
+  const type = conversation.scopeType as 'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG'
+  scopeType.value = ['ALL', 'ARTICLE', 'FOLDER', 'TAG'].includes(type) ? type : 'ALL'
   scopeId.value = conversation.scopeId || ''
+  if (scopeType.value === 'ARTICLE') {
+    await ensureArticleOption(scopeId.value)
+  }
   loadingMessages.value = true
   try {
     const { data } = await api.get<ApiResult<PageResult<ChatMessage>>>(
@@ -348,8 +386,28 @@ onBeforeUnmount(() => {
             @change="scopeId = ''"
           >
             <el-option label="全部资料" value="ALL" />
+            <el-option label="单篇资料" value="ARTICLE" />
             <el-option label="按文件夹" value="FOLDER" />
             <el-option label="按标签" value="TAG" />
+          </el-select>
+          <el-select
+            v-if="scopeType === 'ARTICLE'"
+            v-model="scopeId"
+            size="small"
+            filterable
+            remote
+            :remote-method="searchArticles"
+            :loading="articleLoading"
+            placeholder="搜索资料标题"
+            style="width: 260px"
+            :disabled="streaming"
+          >
+            <el-option
+              v-for="article in articles"
+              :key="article.id"
+              :label="article.title"
+              :value="article.id"
+            />
           </el-select>
           <el-select
             v-if="scopeType === 'FOLDER'"
