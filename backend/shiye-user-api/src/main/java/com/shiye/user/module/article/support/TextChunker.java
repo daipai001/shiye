@@ -1,6 +1,8 @@
 package com.shiye.user.module.article.support;
 
 import com.shiye.common.security.Hashes;
+import com.shiye.common.settings.SystemSettings;
+import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,22 +16,19 @@ import java.util.List;
 @Component
 public class TextChunker {
 
-    private final int targetSize;
+    private final RuntimeSystemSettingsService systemSettingsService;
     private final int maxSize;
     private final int minSize;
-    private final int overlap;
     private final int maxChunks;
 
     public TextChunker(
-            @Value("${shiye.article.chunk-target-size:700}") int targetSize,
+            RuntimeSystemSettingsService systemSettingsService,
             @Value("${shiye.article.chunk-max-size:900}") int maxSize,
             @Value("${shiye.article.chunk-min-size:200}") int minSize,
-            @Value("${shiye.article.chunk-overlap:100}") int overlap,
             @Value("${shiye.article.max-chunks:500}") int maxChunks) {
+        this.systemSettingsService = systemSettingsService;
         this.maxSize = Math.max(300, maxSize);
         this.minSize = Math.max(100, Math.min(minSize, this.maxSize));
-        this.targetSize = Math.max(this.minSize, Math.min(targetSize, this.maxSize));
-        this.overlap = Math.max(0, Math.min(overlap, this.maxSize / 3));
         this.maxChunks = Math.max(1, maxChunks);
     }
 
@@ -37,6 +36,9 @@ public class TextChunker {
         if (text == null || text.isBlank()) {
             return List.of();
         }
+        SystemSettings settings = systemSettingsService.current();
+        int targetSize = Math.max(minSize, Math.min(settings.ragChunkTargetSize(), maxSize));
+        int overlap = Math.max(0, Math.min(settings.ragChunkOverlap(), maxSize / 3));
         List<TextChunk> chunks = new ArrayList<>();
         int length = text.length();
         int start = 0;
@@ -49,9 +51,15 @@ public class TextChunker {
             }
 
             int hardEnd = Math.min(length, start + maxSize);
-            int end = hardEnd;
-            if (hardEnd < length) {
-                end = findBreakBefore(text, start + targetSize, hardEnd);
+            int end;
+            if (length - start <= maxSize) {
+                end = length;
+            } else {
+                int center = start + targetSize;
+                int lower = Math.max(start + minSize, center - targetSize / 2);
+                int upper = Math.min(hardEnd, center + targetSize / 2);
+                int near = findBreakNear(text, center, lower, upper);
+                end = near > start ? near : findBreakBefore(text, center, hardEnd);
             }
 
             int contentStart = start;
@@ -86,6 +94,44 @@ public class TextChunker {
         }
 
         return chunks;
+    }
+
+    private int findBreakNear(String text, int center, int lower, int upper) {
+        int from = Math.max(lower, Math.min(center, upper - 1));
+        for (int i = from; i < upper; i++) {
+            char c = text.charAt(i);
+            if (c == '\n') {
+                return i + 1;
+            }
+            if (isSentenceEnd(c)) {
+                int end = i + 1;
+                while (end < text.length() && isClosingQuote(text.charAt(end))) {
+                    end++;
+                }
+                return end;
+            }
+            if (c == '，' || c == ',' || c == '、' || c == ' ') {
+                return i + 1;
+            }
+        }
+        int backwardEnd = Math.min(center - 1, upper - 1);
+        for (int i = backwardEnd; i >= lower; i--) {
+            char c = text.charAt(i);
+            if (c == '\n') {
+                return i + 1;
+            }
+            if (isSentenceEnd(c)) {
+                int end = i + 1;
+                while (end < text.length() && isClosingQuote(text.charAt(end))) {
+                    end++;
+                }
+                return end;
+            }
+            if (c == '，' || c == ',' || c == '、' || c == ' ') {
+                return i + 1;
+            }
+        }
+        return -1;
     }
 
     private int findBreakBefore(String text, int min, int max) {

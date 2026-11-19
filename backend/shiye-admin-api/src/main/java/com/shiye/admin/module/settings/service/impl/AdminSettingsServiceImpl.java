@@ -35,7 +35,13 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
             @Value("${shiye.usage.global-monthly-cost:20.00}") BigDecimal globalMonthlyCost,
             @Value("${shiye.usage.alert-threshold:0.8}") double alertThreshold,
             @Value("${shiye.chat.rate-limit-per-minute:10}") int chatRateLimitPerMinute,
-            @Value("${shiye.usage.daily-token-limit:0}") long dailyTokenLimit) {
+            @Value("${shiye.usage.daily-token-limit:0}") long dailyTokenLimit,
+            @Value("${shiye.article.chunk-target-size:700}") int ragChunkTargetSize,
+            @Value("${shiye.article.chunk-overlap:100}") int ragChunkOverlap,
+            @Value("${shiye.ai.retrieval.top-k:8}") int ragTopK,
+            @Value("${shiye.ai.retrieval.hybrid-enabled:true}") boolean ragHybridEnabled,
+            @Value("${shiye.ai.retrieval.rerank-enabled:true}") boolean ragRerankEnabled,
+            @Value("${shiye.ai.citation-required:true}") boolean ragCitationRequired) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
         this.defaults = new SystemSettings(
@@ -46,7 +52,13 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 globalMonthlyCost == null ? BigDecimal.ZERO : globalMonthlyCost,
                 alertThreshold,
                 chatRateLimitPerMinute,
-                dailyTokenLimit
+                dailyTokenLimit,
+                ragChunkTargetSize,
+                ragChunkOverlap,
+                ragTopK,
+                ragHybridEnabled,
+                ragRerankEnabled,
+                ragCitationRequired
         );
     }
 
@@ -66,7 +78,13 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 request.globalMonthlyCost(),
                 request.alertThreshold(),
                 request.chatRateLimitPerMinute(),
-                request.dailyTokenLimit()
+                request.dailyTokenLimit(),
+                request.ragChunkTargetSize(),
+                request.ragChunkOverlap(),
+                request.ragTopK(),
+                request.ragHybridEnabled(),
+                request.ragRerankEnabled(),
+                request.ragCitationRequired()
         );
         SystemSettings saved = save(next, adminId);
         return toVO(saved, "DATABASE");
@@ -84,7 +102,13 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 request.globalMonthlyCost(),
                 request.alertThreshold(),
                 current.chatRateLimitPerMinute(),
-                current.dailyTokenLimit()
+                current.dailyTokenLimit(),
+                current.ragChunkTargetSize(),
+                current.ragChunkOverlap(),
+                current.ragTopK(),
+                current.ragHybridEnabled(),
+                current.ragRerankEnabled(),
+                current.ragCitationRequired()
         );
         SystemSettings saved = save(next, adminId);
         return toVO(saved, "DATABASE");
@@ -135,6 +159,12 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 settings.alertThreshold(),
                 settings.chatRateLimitPerMinute(),
                 settings.dailyTokenLimit(),
+                settings.ragChunkTargetSize(),
+                settings.ragChunkOverlap(),
+                settings.ragTopK(),
+                Boolean.TRUE.equals(settings.ragHybridEnabled()),
+                Boolean.TRUE.equals(settings.ragRerankEnabled()),
+                Boolean.TRUE.equals(settings.ragCitationRequired()),
                 source
         );
     }

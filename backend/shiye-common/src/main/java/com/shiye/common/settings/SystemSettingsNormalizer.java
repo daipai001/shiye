@@ -18,8 +18,37 @@ public final class SystemSettingsNormalizer {
                 money(source.globalMonthlyCost(), fallback.globalMonthlyCost()),
                 clamp(source.alertThreshold(), 0, 1),
                 (int) clamp(source.chatRateLimitPerMinute(), 1, 1000),
-                nonNegative(source.dailyTokenLimit(), fallback.dailyTokenLimit())
+                nonNegative(source.dailyTokenLimit(), fallback.dailyTokenLimit()),
+                intOrFallback(source.ragChunkTargetSize(), fallback.ragChunkTargetSize(), 200, 2000),
+                overlapOrFallback(source.ragChunkOverlap(), fallback.ragChunkOverlap(), 1000),
+                intOrFallback(source.ragTopK(), fallback.ragTopK(), 1, 20),
+                boolOrFallback(source.ragHybridEnabled(), fallback.ragHybridEnabled()),
+                boolOrFallback(source.ragRerankEnabled(), fallback.ragRerankEnabled()),
+                boolOrFallback(source.ragCitationRequired(), fallback.ragCitationRequired())
         );
+    }
+
+    private static int intOrFallback(Integer value, Integer fallback, int min, int max) {
+        int effective = value == null || value <= 0
+                ? (fallback == null ? min : fallback) : value;
+        return (int) clamp(effective, min, max);
+    }
+
+    private static int overlapOrFallback(Integer value, Integer fallback, int max) {
+        int effective;
+        if (value == null || value < 0) {
+            effective = fallback == null ? 0 : fallback;
+        } else {
+            effective = value;
+        }
+        return (int) clamp(effective, 0, max);
+    }
+
+    private static boolean boolOrFallback(Boolean value, Boolean fallback) {
+        if (value != null) {
+            return value;
+        }
+        return fallback != null && fallback;
     }
 
     private static long nonNegative(long value, long fallback) {

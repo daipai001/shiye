@@ -1,16 +1,29 @@
 package com.shiye.user.module.article.support;
 
+import com.shiye.common.settings.SystemSettings;
+import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class TextChunkerTest {
 
-    private final TextChunker chunker = new TextChunker(200, 300, 100, 30, 100);
+    private final TextChunker chunker = buildChunker();
+
+    private static TextChunker buildChunker() {
+        RuntimeSystemSettingsService settingsService = mock(RuntimeSystemSettingsService.class);
+        when(settingsService.current()).thenReturn(new SystemSettings(
+                true, 200000, new BigDecimal("5.0"), 2000000, new BigDecimal("20.0"),
+                0.8, 10, 0, 200, 30, 8, true, true, true));
+        return new TextChunker(settingsService, 300, 100, 100);
+    }
 
     @Test
     void keepsExactOffsetsAndOverlap() {

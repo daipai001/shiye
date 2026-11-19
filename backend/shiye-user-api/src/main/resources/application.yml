@@ -52,6 +52,7 @@ shiye:
     rate-limit-per-minute: ${CHAT_RATE_LIMIT_PER_MINUTE:10}
   ai:
     enabled: ${AI_ENABLED:false}
+    citation-required: ${AI_CITATION_REQUIRED:true}
     chat:
       base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com/v1}
       api-key: ${DEEPSEEK_API_KEY:}

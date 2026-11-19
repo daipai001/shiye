@@ -1619,6 +1619,12 @@ admin-web → POST /admin/api/v1/auth/login
   "alertThreshold": 0.8,
   "chatRateLimitPerMinute": 10,
   "dailyTokenLimit": 0,
+  "ragChunkTargetSize": 700,
+  "ragChunkOverlap": 100,
+  "ragTopK": 8,
+  "ragHybridEnabled": true,
+  "ragRerankEnabled": true,
+  "ragCitationRequired": true,
   "source": "DATABASE"
 }
 ```
@@ -1643,10 +1649,16 @@ admin-web → POST /admin/api/v1/auth/login
 | `alertThreshold` | number | 0~1，当前只保存展示 |
 | `chatRateLimitPerMinute` | number | 问答限流，1~1000 |
 | `dailyTokenLimit` | number | 每日 token 上限，0=不限制 |
+| `ragChunkTargetSize` | number | 切片目标字数，200~2000 |
+| `ragChunkOverlap` | number | 切片重叠字数，0~1000 |
+| `ragTopK` | number | 检索 topK，1~20 |
+| `ragHybridEnabled` | boolean | 向量 + 关键词混合检索 |
+| `ragRerankEnabled` | boolean | RAG rerank 开关（模型配置中的 rerank 也要开启） |
+| `ragCitationRequired` | boolean | 是否强制模型输出引用编号 |
 
 **响应**：更新后的设置（含 `source`）
 
-> 保存到 `system_settings.system.settings`，user-api 5 秒内生效。注册开关和默认配额只影响之后注册的新用户；全站预算、问答限流和每日上限立即作用于后续 AI 调用。
+> 保存到 `system_settings.system.settings`，user-api 5 秒内生效。注册开关和默认配额只影响之后注册的新用户；全站预算、问答限流、topK、混合检索、rerank、强制引用和每日上限作用于之后的 AI 调用。chunk 字数/重叠只影响之后新入库或重新索引的资料。
 
 **错误**：40001
 

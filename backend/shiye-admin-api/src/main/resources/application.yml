@@ -44,7 +44,10 @@ shiye:
     refresh-expire-seconds: ${REFRESH_EXPIRE_SECONDS:2592000}
   auth:
     rate-limit-per-minute: ${ADMIN_RATE_LIMIT_PER_MINUTE:60}
+  chat:
+    rate-limit-per-minute: ${CHAT_RATE_LIMIT_PER_MINUTE:10}
   ai:
+    citation-required: ${AI_CITATION_REQUIRED:true}
     chat:
       base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com/v1}
       api-key: ${DEEPSEEK_API_KEY:}
@@ -62,6 +65,13 @@ shiye:
       dimension: ${EMBEDDING_DIMENSION:1024}
       batch-size: ${EMBEDDING_BATCH_SIZE:16}
       timeout-ms: ${EMBEDDING_TIMEOUT_MS:30000}
+    retrieval:
+      top-k: ${RETRIEVAL_TOP_K:8}
+      hybrid-enabled: ${RETRIEVAL_HYBRID_ENABLED:true}
+      rerank-enabled: ${RETRIEVAL_RERANK_ENABLED:true}
+  article:
+    chunk-target-size: ${CHUNK_TARGET_SIZE:700}
+    chunk-overlap: ${CHUNK_OVERLAP:100}
   registration:
     enabled: ${REGISTRATION_ENABLED:true}
     default-token-quota: ${REGISTRATION_DEFAULT_TOKEN_QUOTA:200000}

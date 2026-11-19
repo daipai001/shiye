@@ -11,6 +11,12 @@ public record AdminSettingsVO(
         double alertThreshold,
         int chatRateLimitPerMinute,
         long dailyTokenLimit,
+        int ragChunkTargetSize,
+        int ragChunkOverlap,
+        int ragTopK,
+        boolean ragHybridEnabled,
+        boolean ragRerankEnabled,
+        boolean ragCitationRequired,
         String source
 ) {
 }

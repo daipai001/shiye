@@ -2,10 +2,12 @@ package com.shiye.user.module.chat.service;
 
 import com.shiye.common.api.ErrorCode;
 import com.shiye.common.exception.BizException;
+import com.shiye.common.settings.SystemSettings;
 import com.shiye.user.common.ai.embedding.EmbeddingService;
 import com.shiye.user.common.ai.rerank.RerankException;
 import com.shiye.user.common.ai.rerank.RerankResult;
 import com.shiye.user.common.ai.rerank.RerankService;
+import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import com.shiye.user.module.article.domain.entity.ArticleChunkSearchRow;
 import com.shiye.user.module.article.domain.entity.ArticleEntity;
 import com.shiye.user.module.article.mapper.ArticleChunkMapper;
@@ -50,15 +52,13 @@ public class ChunkRetrievalService {
     private final ArticleFolderMapper folderMapper;
     private final ArticleChunkMapper chunkMapper;
     private final RerankService rerankService;
-    private final int defaultTopK;
+    private final RuntimeSystemSettingsService systemSettingsService;
     private final int maxPerArticle;
     private final double minScore;
     private final int maxScanChunks;
     private final int vectorCandidates;
     private final int keywordCandidates;
     private final int rrfK;
-    private final boolean hybridEnabled;
-    private final boolean rerankEnabled;
     private final int rerankCandidates;
 
     public ChunkRetrievalService(
@@ -68,15 +68,13 @@ public class ChunkRetrievalService {
             ArticleFolderMapper folderMapper,
             ArticleChunkMapper chunkMapper,
             RerankService rerankService,
-            @Value("${shiye.ai.retrieval.top-k:8}") int defaultTopK,
+            RuntimeSystemSettingsService systemSettingsService,
             @Value("${shiye.ai.retrieval.max-per-article:3}") int maxPerArticle,
             @Value("${shiye.ai.retrieval.min-score:0.2}") double minScore,
             @Value("${shiye.ai.retrieval.max-scan-chunks:5000}") int maxScanChunks,
             @Value("${shiye.ai.retrieval.vector-candidates:30}") int vectorCandidates,
             @Value("${shiye.ai.retrieval.keyword-candidates:20}") int keywordCandidates,
             @Value("${shiye.ai.retrieval.rrf-k:60}") int rrfK,
-            @Value("${shiye.ai.retrieval.hybrid-enabled:true}") boolean hybridEnabled,
-            @Value("${shiye.ai.retrieval.rerank-enabled:true}") boolean rerankEnabled,
             @Value("${shiye.ai.retrieval.rerank-candidates:20}") int rerankCandidates) {
         this.embeddingService = embeddingService;
         this.redisTemplate = redisTemplate;
@@ -84,15 +82,13 @@ public class ChunkRetrievalService {
         this.folderMapper = folderMapper;
         this.chunkMapper = chunkMapper;
         this.rerankService = rerankService;
-        this.defaultTopK = Math.max(1, Math.min(defaultTopK, 20));
+        this.systemSettingsService = systemSettingsService;
         this.maxPerArticle = Math.max(1, maxPerArticle);
         this.minScore = minScore;
         this.maxScanChunks = Math.max(100, maxScanChunks);
         this.vectorCandidates = Math.max(1, Math.min(vectorCandidates, 100));
         this.keywordCandidates = Math.max(1, Math.min(keywordCandidates, 100));
         this.rrfK = Math.max(1, rrfK);
-        this.hybridEnabled = hybridEnabled;
-        this.rerankEnabled = rerankEnabled;
         this.rerankCandidates = Math.max(1, Math.min(rerankCandidates, 50));
     }
 
@@ -105,6 +101,10 @@ public class ChunkRetrievalService {
         if (allowedArticleIds != null && allowedArticleIds.isEmpty()) {
             return RetrievalResult.withoutRerank(List.of());
         }
+        SystemSettings settings = systemSettingsService.current();
+        int defaultTopK = settings.ragTopK();
+        boolean hybridEnabled = Boolean.TRUE.equals(settings.ragHybridEnabled());
+        boolean rerankEnabled = Boolean.TRUE.equals(settings.ragRerankEnabled());
 
         List<Candidate> vectorResults = vectorCandidates(userId, query, allowedArticleIds);
         List<Candidate> keywordResults = hybridEnabled
@@ -120,8 +120,8 @@ public class ChunkRetrievalService {
             rerankResult = tryRerank(query, pool);
         }
         List<Candidate> selected = rerankResult == null
-                ? fallbackSelect(vectorResults, keywordResults, requestedTopK)
-                : selectReranked(pool, rerankResult, requestedTopK);
+                ? fallbackSelect(vectorResults, keywordResults, requestedTopK, defaultTopK)
+                : selectReranked(pool, rerankResult, requestedTopK, defaultTopK);
         if (selected.isEmpty()) {
             return RetrievalResult.withoutRerank(List.of());
         }
@@ -285,7 +285,7 @@ public class ChunkRetrievalService {
     }
 
     private List<Candidate> selectReranked(List<Candidate> pool, RerankResult rerankResult,
-                                           Integer requestedTopK) {
+                                           Integer requestedTopK, int defaultTopK) {
         Map<Integer, Double> scoreByIndex = new HashMap<>();
         for (RerankResult.Item item : rerankResult.items()) {
             scoreByIndex.put(item.index(), item.score());
@@ -303,21 +303,22 @@ public class ChunkRetrievalService {
         ordered.sort(Comparator
                 .comparingDouble(Candidate::rerankScore).reversed()
                 .thenComparing(Comparator.comparingDouble(Candidate::displayScore).reversed()));
-        return limitPerArticle(ordered, resolveTopK(requestedTopK));
+        return limitPerArticle(ordered, resolveTopK(requestedTopK, defaultTopK));
     }
 
     private List<Candidate> fallbackSelect(List<Candidate> vectorResults,
                                            List<Candidate> keywordResults,
-                                           Integer requestedTopK) {
+                                           Integer requestedTopK, int defaultTopK) {
         if (keywordResults.isEmpty()) {
-            return selectTop(vectorResults, requestedTopK,
+            return selectTop(vectorResults, requestedTopK, defaultTopK,
                     Comparator.comparingDouble(Candidate::vectorScore).reversed());
         }
         if (vectorResults.isEmpty()) {
-            return selectTop(keywordResults, requestedTopK,
+            return selectTop(keywordResults, requestedTopK, defaultTopK,
                     Comparator.comparingDouble(Candidate::keywordScore).reversed());
         }
-        return limitPerArticle(fuse(vectorResults, keywordResults), resolveTopK(requestedTopK));
+        return limitPerArticle(fuse(vectorResults, keywordResults),
+                resolveTopK(requestedTopK, defaultTopK));
     }
 
     private List<Candidate> fuse(List<Candidate> vectorResults,
@@ -355,13 +356,13 @@ public class ChunkRetrievalService {
     }
 
     private List<Candidate> selectTop(List<Candidate> candidates, Integer requestedTopK,
-                                      Comparator<Candidate> comparator) {
+                                      int defaultTopK, Comparator<Candidate> comparator) {
         List<Candidate> ordered = new ArrayList<>(candidates);
         ordered.sort(comparator);
-        return limitPerArticle(ordered, resolveTopK(requestedTopK));
+        return limitPerArticle(ordered, resolveTopK(requestedTopK, defaultTopK));
     }
 
-    private int resolveTopK(Integer requestedTopK) {
+    private int resolveTopK(Integer requestedTopK, int defaultTopK) {
         return requestedTopK == null ? defaultTopK : Math.max(1, Math.min(requestedTopK, 20));
     }
 

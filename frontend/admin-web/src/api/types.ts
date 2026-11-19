@@ -241,6 +241,12 @@ export interface AdminSettings {
   alertThreshold: number
   chatRateLimitPerMinute: number
   dailyTokenLimit: number
+  ragChunkTargetSize: number
+  ragChunkOverlap: number
+  ragTopK: number
+  ragHybridEnabled: boolean
+  ragRerankEnabled: boolean
+  ragCitationRequired: boolean
   source: string
 }
 

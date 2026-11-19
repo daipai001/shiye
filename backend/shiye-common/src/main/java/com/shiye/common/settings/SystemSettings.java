@@ -13,6 +13,12 @@ public record SystemSettings(
         BigDecimal globalMonthlyCost,
         double alertThreshold,
         int chatRateLimitPerMinute,
-        long dailyTokenLimit
+        long dailyTokenLimit,
+        Integer ragChunkTargetSize,
+        Integer ragChunkOverlap,
+        Integer ragTopK,
+        Boolean ragHybridEnabled,
+        Boolean ragRerankEnabled,
+        Boolean ragCitationRequired
 ) {
 }

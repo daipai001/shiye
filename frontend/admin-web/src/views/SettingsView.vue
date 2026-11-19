@@ -23,6 +23,12 @@ function defaults(): AdminSettingsUpdatePayload {
     alertThreshold: 0.8,
     chatRateLimitPerMinute: 10,
     dailyTokenLimit: 0,
+    ragChunkTargetSize: 700,
+    ragChunkOverlap: 100,
+    ragTopK: 8,
+    ragHybridEnabled: true,
+    ragRerankEnabled: true,
+    ragCitationRequired: true,
   }
 }
 
@@ -36,6 +42,12 @@ function fillForm(settings: AdminSettings) {
     alertThreshold: settings.alertThreshold,
     chatRateLimitPerMinute: settings.chatRateLimitPerMinute,
     dailyTokenLimit: settings.dailyTokenLimit,
+    ragChunkTargetSize: settings.ragChunkTargetSize,
+    ragChunkOverlap: settings.ragChunkOverlap,
+    ragTopK: settings.ragTopK,
+    ragHybridEnabled: settings.ragHybridEnabled,
+    ragRerankEnabled: settings.ragRerankEnabled,
+    ragCitationRequired: settings.ragCitationRequired,
   }
 }
 
@@ -182,6 +194,49 @@ onMounted(load)
           </el-form-item>
         </div>
         <p class="hint">每日上限按 UTC 日期统计；填 0 表示不限制。</p>
+
+        <div class="section-title">RAG 检索</div>
+        <div class="form-grid">
+          <el-form-item label="切片目标字数">
+            <el-input-number
+              v-model="form.ragChunkTargetSize"
+              :min="200"
+              :max="2000"
+              :step="50"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="切片重叠字数">
+            <el-input-number
+              v-model="form.ragChunkOverlap"
+              :min="0"
+              :max="1000"
+              :step="10"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="检索 topK">
+            <el-input-number
+              v-model="form.ragTopK"
+              :min="1"
+              :max="20"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="混合检索">
+            <el-switch v-model="form.ragHybridEnabled" />
+          </el-form-item>
+          <el-form-item label="Rerank 重排">
+            <el-switch v-model="form.ragRerankEnabled" />
+          </el-form-item>
+          <el-form-item label="强制引用">
+            <el-switch v-model="form.ragCitationRequired" />
+          </el-form-item>
+        </div>
+        <p class="hint">
+          切片字数/重叠只影响之后新入库或重新索引的资料；topK、混合检索、rerank 和强制引用作用于之后的问题。
+          Rerank 还需要在「模型配置」中启用且配置 Key。
+        </p>
 
         <div class="actions">
           <el-button @click="reset">恢复当前值</el-button>
