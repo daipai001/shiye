@@ -122,4 +122,12 @@ public interface AiUsageMapper {
             """)
     List<UsageDailyRow> summaryDaily(@Param("userId") long userId,
                                      @Param("from") LocalDateTime from);
+
+    @Select("""
+            SELECT COALESCE(SUM(total_tokens), 0)
+            FROM ai_usage
+            WHERE user_id = #{userId} AND created_at >= #{from} AND status = 'SUCCESS'
+            """)
+    long sumTokensSince(@Param("userId") long userId,
+                        @Param("from") LocalDateTime from);
 }

@@ -7,7 +7,9 @@ import com.shiye.admin.module.models.domain.vo.AdminModelConfigVO;
 import com.shiye.admin.module.models.domain.vo.ModelTestVO;
 import com.shiye.admin.module.models.service.AdminModelService;
 import com.shiye.admin.module.models.service.AdminModelSettingsService;
+import com.shiye.admin.module.settings.service.AdminSettingsService;
 import com.shiye.common.ai.ModelConfig;
+import com.shiye.common.settings.SystemSettings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -26,26 +28,16 @@ public class AdminModelServiceImpl implements AdminModelService {
 
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
-    private final AdminModelSettingsService settingsService;
-
-    private final long globalMonthlyTokens;
-    private final BigDecimal globalMonthlyCost;
-    private final long defaultUserTokens;
-    private final BigDecimal defaultUserCost;
+    private final AdminModelSettingsService modelSettingsService;
+    private final AdminSettingsService systemSettingsService;
 
     public AdminModelServiceImpl(
             ObjectMapper objectMapper,
-            AdminModelSettingsService settingsService,
-            @Value("${shiye.usage.global-monthly-tokens:2000000}") long globalMonthlyTokens,
-            @Value("${shiye.usage.global-monthly-cost:20.00}") BigDecimal globalMonthlyCost,
-            @Value("${shiye.registration.default-token-quota:200000}") long defaultUserTokens,
-            @Value("${shiye.registration.default-cost-quota:5.000000}") BigDecimal defaultUserCost) {
+            AdminModelSettingsService modelSettingsService,
+            AdminSettingsService systemSettingsService) {
         this.objectMapper = objectMapper;
-        this.settingsService = settingsService;
-        this.globalMonthlyTokens = globalMonthlyTokens;
-        this.globalMonthlyCost = globalMonthlyCost;
-        this.defaultUserTokens = defaultUserTokens;
-        this.defaultUserCost = defaultUserCost;
+        this.modelSettingsService = modelSettingsService;
+        this.systemSettingsService = systemSettingsService;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -53,10 +45,11 @@ public class AdminModelServiceImpl implements AdminModelService {
 
     @Override
     public AdminModelConfigVO config() {
-        ModelConfig config = settingsService.current();
+        ModelConfig config = modelSettingsService.current();
         ModelConfig.Chat chat = config.chat();
         ModelConfig.Embedding embedding = config.embedding();
         ModelConfig.Rerank rerank = config.rerank();
+        SystemSettings system = systemSettingsService.current();
         return new AdminModelConfigVO(
                 new AdminModelConfigVO.ChatModelVO(
                         "DeepSeek",
@@ -89,18 +82,18 @@ public class AdminModelServiceImpl implements AdminModelService {
                         rerank.enabled() && !rerank.apiKey().isEmpty()
                 ),
                 new AdminModelConfigVO.BudgetVO(
-                        globalMonthlyTokens,
-                        globalMonthlyCost,
-                        defaultUserTokens,
-                        defaultUserCost
+                        system.globalMonthlyTokens(),
+                        system.globalMonthlyCost(),
+                        system.defaultMonthlyTokens(),
+                        system.defaultMonthlyCost()
                 ),
-                settingsService.fromDatabase() ? "DATABASE" : "ENV"
+                modelSettingsService.fromDatabase() ? "DATABASE" : "ENV"
         );
     }
 
     @Override
     public AdminModelConfigVO update(AdminModelUpdateRequest request, long adminId) {
-        ModelConfig current = settingsService.current();
+        ModelConfig current = modelSettingsService.current();
         String chatKey = keepKey(request.chat().apiKey(), current.chat().apiKey());
         String embeddingKey = keepKey(request.embedding().apiKey(), current.embedding().apiKey());
         String rerankKey = keepKey(request.rerank().apiKey(), current.rerank().apiKey());
@@ -132,13 +125,13 @@ public class AdminModelServiceImpl implements AdminModelService {
                         rerankModel
                 )
         );
-        settingsService.save(next, adminId);
+        modelSettingsService.save(next, adminId);
         return config();
     }
 
     @Override
     public ModelTestVO test(String type) {
-        ModelConfig config = settingsService.current();
+        ModelConfig config = modelSettingsService.current();
         long started = System.currentTimeMillis();
         try {
             if ("CHAT".equalsIgnoreCase(type)) {

@@ -5,6 +5,8 @@ import com.shiye.common.exception.BizException;
 import com.shiye.common.security.Hashes;
 import com.shiye.common.security.JwtTokenService;
 import com.shiye.common.security.SecureCodes;
+import com.shiye.common.settings.SystemSettings;
+import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import com.shiye.user.module.auth.domain.dto.LoginRequest;
 import com.shiye.user.module.auth.domain.dto.RegisterRequest;
 import com.shiye.user.module.auth.domain.entity.ExtensionAuthCodeEntity;
@@ -39,12 +41,7 @@ public class AuthServiceImpl implements AuthService {
     private final ExtensionAuthCodeMapper extensionAuthCodeMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
-
-    @Value("${shiye.registration.default-token-quota:200000}")
-    private long defaultTokenQuota;
-
-    @Value("${shiye.registration.default-cost-quota:5.000000}")
-    private BigDecimal defaultCostQuota;
+    private final RuntimeSystemSettingsService systemSettingsService;
 
     @Value("${shiye.jwt.refresh-expire-seconds:2592000}")
     private long refreshExpireSeconds;
@@ -53,17 +50,23 @@ public class AuthServiceImpl implements AuthService {
                            RefreshTokenMapper refreshTokenMapper,
                            ExtensionAuthCodeMapper extensionAuthCodeMapper,
                            PasswordEncoder passwordEncoder,
-                           JwtTokenService jwtTokenService) {
+                           JwtTokenService jwtTokenService,
+                           RuntimeSystemSettingsService systemSettingsService) {
         this.userMapper = userMapper;
         this.refreshTokenMapper = refreshTokenMapper;
         this.extensionAuthCodeMapper = extensionAuthCodeMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenService = jwtTokenService;
+        this.systemSettingsService = systemSettingsService;
     }
 
     @Override
     @Transactional
     public TokenResponse register(RegisterRequest request, String userAgent, String ip) {
+        SystemSettings settings = systemSettingsService.current();
+        if (!settings.registrationEnabled()) {
+            throw new BizException(ErrorCode.FORBIDDEN, "注册已关闭");
+        }
         String email = normalizeEmail(request.email());
         if (userMapper.findByEmail(email) != null) {
             throw new BizException(ErrorCode.CONFLICT, "邮箱已注册");
@@ -74,8 +77,8 @@ public class AuthServiceImpl implements AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setDisplayName(resolveDisplayName(request.displayName(), email));
         user.setStatus("ACTIVE");
-        user.setMonthlyTokenQuota(defaultTokenQuota);
-        user.setMonthlyCostQuota(defaultCostQuota);
+        user.setMonthlyTokenQuota(settings.defaultMonthlyTokens());
+        user.setMonthlyCostQuota(settings.defaultMonthlyCost());
         user.setQuotaSource("NEW_USER");
         userMapper.insert(user);
 

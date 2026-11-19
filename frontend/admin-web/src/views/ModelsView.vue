@@ -219,7 +219,7 @@ onMounted(load)
       <p class="config-note">
         配置来源：{{ config.source === 'DATABASE' ? '数据库覆盖值' : '服务端环境变量' }}，数据库优先。
         保存后 user-api 最多 5 秒生效；Embedding provider 由启动配置决定，切换 dev/http 需要重启。
-        修改 Embedding 模型或维度后，已有切片需要重新索引。
+        修改 Embedding 模型或维度后，已有切片需要重新索引。默认配额和全站预算可在「系统设置」中修改。
       </p>
     </template>
 

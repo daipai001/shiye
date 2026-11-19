@@ -232,6 +232,20 @@ export interface AdminModelUpdatePayload {
   }
 }
 
+export interface AdminSettings {
+  registrationEnabled: boolean
+  defaultMonthlyTokens: number
+  defaultMonthlyCost: number
+  globalMonthlyTokens: number
+  globalMonthlyCost: number
+  alertThreshold: number
+  chatRateLimitPerMinute: number
+  dailyTokenLimit: number
+  source: string
+}
+
+export type AdminSettingsUpdatePayload = Omit<AdminSettings, 'source'>
+
 export interface ModelTestResult {
   ok: boolean
   latencyMs: number

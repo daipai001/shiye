@@ -62,6 +62,12 @@ shiye:
       dimension: ${EMBEDDING_DIMENSION:1024}
       batch-size: ${EMBEDDING_BATCH_SIZE:16}
       timeout-ms: ${EMBEDDING_TIMEOUT_MS:30000}
+  registration:
+    enabled: ${REGISTRATION_ENABLED:true}
+    default-token-quota: ${REGISTRATION_DEFAULT_TOKEN_QUOTA:200000}
+    default-cost-quota: ${REGISTRATION_DEFAULT_COST_QUOTA:5.000000}
   usage:
     global-monthly-tokens: ${GLOBAL_MONTHLY_TOKENS:2000000}
     global-monthly-cost: ${GLOBAL_MONTHLY_COST:20.00}
+    alert-threshold: ${USAGE_ALERT_THRESHOLD:0.8}
+    daily-token-limit: ${USAGE_DAILY_TOKEN_LIMIT:0}

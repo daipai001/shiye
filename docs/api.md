@@ -1231,8 +1231,8 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 4.2 总览与用量
 
-> **当前实现**：总览、用量列表/汇总/CSV 导出、用户列表与配额/状态、导入任务与条目、索引任务、模型在线配置（Chat / Embedding / Rerank）与连接测试已接入。
-> `/settings`、`/budget` 在线编辑和用量趋势聚合仍在后续阶段。
+> **当前实现**：总览、用量列表/汇总/CSV 导出、用户列表与配额/状态、导入任务与条目、索引任务、模型在线配置（Chat / Embedding / Rerank）、系统设置/预算在线编辑和连接测试已接入。
+> 告警通知和 RAG 参数在线编辑仍在后续阶段。
 
 #### GET `/overview`
 
@@ -1617,16 +1617,13 @@ admin-web → POST /admin/api/v1/auth/login
   "globalMonthlyTokens": 2000000,
   "globalMonthlyCost": "20.000000",
   "alertThreshold": 0.8,
-  "rateLimitPerMinute": 10,
-  "dailyTokenLimit": 50000,
-  "ragChunkSize": 600,
-  "ragChunkOverlap": 80,
-  "ragTopK": 8,
-  "ragHybridEnabled": false,
-  "ragRerankEnabled": false,
-  "ragCitationRequired": true
+  "chatRateLimitPerMinute": 10,
+  "dailyTokenLimit": 0,
+  "source": "DATABASE"
 }
 ```
+
+> `source=DATABASE` 表示存在 `system_settings.system.settings` 覆盖值；`ENV` 表示使用服务端环境变量。
 
 ---
 
@@ -1634,9 +1631,22 @@ admin-web → POST /admin/api/v1/auth/login
 
 **认证**：管理员
 
-**请求**：同响应字段（均可选，包含 RAG 参数）
+**请求**：完整设置对象（去掉 `source`）
 
-**响应**：更新后的设置
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `registrationEnabled` | boolean | 是否开放新用户注册 |
+| `defaultMonthlyTokens` | number | 新用户默认月 token 配额 |
+| `defaultMonthlyCost` | string | 新用户默认月成本配额 |
+| `globalMonthlyTokens` | number | 全站月 token 预算 |
+| `globalMonthlyCost` | string | 全站月成本预算 |
+| `alertThreshold` | number | 0~1，当前只保存展示 |
+| `chatRateLimitPerMinute` | number | 问答限流，1~1000 |
+| `dailyTokenLimit` | number | 每日 token 上限，0=不限制 |
+
+**响应**：更新后的设置（含 `source`）
+
+> 保存到 `system_settings.system.settings`，user-api 5 秒内生效。注册开关和默认配额只影响之后注册的新用户；全站预算、问答限流和每日上限立即作用于后续 AI 调用。
 
 **错误**：40001
 
@@ -1654,7 +1664,9 @@ admin-web → POST /admin/api/v1/auth/login
 | `globalMonthlyCost` | string | 是 | |
 | `alertThreshold` | number | 否 | 0~1 |
 
-**响应**：预算对象
+**响应**：更新后的完整系统设置
+
+**错误**：40001
 
 ---
 

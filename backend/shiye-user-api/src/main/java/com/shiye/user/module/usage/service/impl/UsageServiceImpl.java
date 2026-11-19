@@ -3,6 +3,8 @@ package com.shiye.user.module.usage.service.impl;
 import com.shiye.common.api.ErrorCode;
 import com.shiye.common.api.PageResult;
 import com.shiye.common.exception.BizException;
+import com.shiye.common.settings.SystemSettings;
+import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import com.shiye.user.module.auth.domain.vo.UserQuotaVO;
 import com.shiye.user.module.auth.service.AuthService;
 import com.shiye.user.module.usage.domain.entity.AiUsageEntity;
@@ -20,7 +22,6 @@ import com.shiye.user.module.usage.domain.vo.UsageTotals;
 import com.shiye.user.module.usage.mapper.AiUsageMapper;
 import com.shiye.user.module.usage.mapper.UserUsageMonthlyMapper;
 import com.shiye.user.module.usage.service.UsageService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,20 +44,17 @@ public class UsageServiceImpl implements UsageService {
     private final AuthService authService;
     private final AiUsageMapper aiUsageMapper;
     private final UserUsageMonthlyMapper monthlyMapper;
-    private final BigDecimal globalMonthlyTokens;
-    private final BigDecimal globalMonthlyCost;
+    private final RuntimeSystemSettingsService systemSettingsService;
 
     public UsageServiceImpl(
             AuthService authService,
             AiUsageMapper aiUsageMapper,
             UserUsageMonthlyMapper monthlyMapper,
-            @Value("${shiye.usage.global-monthly-tokens:2000000}") long globalMonthlyTokens,
-            @Value("${shiye.usage.global-monthly-cost:20.00}") BigDecimal globalMonthlyCost) {
+            RuntimeSystemSettingsService systemSettingsService) {
         this.authService = authService;
         this.aiUsageMapper = aiUsageMapper;
         this.monthlyMapper = monthlyMapper;
-        this.globalMonthlyTokens = BigDecimal.valueOf(globalMonthlyTokens);
-        this.globalMonthlyCost = globalMonthlyCost;
+        this.systemSettingsService = systemSettingsService;
     }
 
     @Override
@@ -90,6 +88,7 @@ public class UsageServiceImpl implements UsageService {
 
     @Override
     public void assertCanChat(long userId) {
+        SystemSettings settings = systemSettingsService.current();
         QuotaVO quota = quota(userId);
         if (quota.tokenRemaining() <= 0) {
             throw new BizException(ErrorCode.USER_QUOTA_EXCEEDED, "本月 token 配额已用完");
@@ -97,13 +96,21 @@ public class UsageServiceImpl implements UsageService {
         if (quota.costRemaining().signum() <= 0) {
             throw new BizException(ErrorCode.USER_QUOTA_EXCEEDED, "本月成本配额已用完");
         }
+        if (settings.dailyTokenLimit() > 0) {
+            LocalDateTime todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay();
+            long todayTokens = aiUsageMapper.sumTokensSince(userId, todayStart);
+            if (todayTokens >= settings.dailyTokenLimit()) {
+                throw new BizException(ErrorCode.DAILY_TOKEN_LIMIT, "今日 token 已用完");
+            }
+        }
 
         UsageTotals totals = monthlyMapper.sumByMonth(currentMonth());
         if (totals != null
-                && BigDecimal.valueOf(totals.tokens()).compareTo(globalMonthlyTokens) >= 0) {
+                && BigDecimal.valueOf(totals.tokens())
+                .compareTo(BigDecimal.valueOf(settings.globalMonthlyTokens())) >= 0) {
             throw new BizException(ErrorCode.GLOBAL_BUDGET_EXCEEDED, "全站 token 预算已用完");
         }
-        if (totals != null && totals.cost().compareTo(globalMonthlyCost) >= 0) {
+        if (totals != null && totals.cost().compareTo(settings.globalMonthlyCost()) >= 0) {
             throw new BizException(ErrorCode.GLOBAL_BUDGET_EXCEEDED, "全站成本预算已用完");
         }
     }

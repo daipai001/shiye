@@ -46,6 +46,7 @@ async function logout() {
         <router-link to="/imports">书签导入</router-link>
         <router-link to="/tasks">索引任务</router-link>
         <router-link to="/models">模型配置</router-link>
+        <router-link to="/settings">系统设置</router-link>
       </nav>
     </aside>
 

@@ -7,6 +7,7 @@ import UsersView from '../views/UsersView.vue'
 import ImportsView from '../views/ImportsView.vue'
 import TasksView from '../views/TasksView.vue'
 import ModelsView from '../views/ModelsView.vue'
+import SettingsView from '../views/SettingsView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -23,6 +24,7 @@ const router = createRouter({
         { path: 'imports', component: ImportsView },
         { path: 'tasks', component: TasksView },
         { path: 'models', component: ModelsView },
+        { path: 'settings', component: SettingsView },
       ],
     },
   ],
