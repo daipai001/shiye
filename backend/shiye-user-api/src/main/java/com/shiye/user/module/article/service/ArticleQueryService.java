@@ -9,7 +9,8 @@ import com.shiye.user.module.article.domain.vo.ArticleSummaryVO;
 public interface ArticleQueryService {
 
     PageResult<ArticleSummaryVO> list(long userId, int page, int pageSize,
-                                      String q, String status, String sourceType, Long tagId);
+                                      String q, String status, String sourceType,
+                                      Long tagId, Long folderId);
 
     ArticleDetailVO detail(long userId, long articleId);
 

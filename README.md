@@ -171,7 +171,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 - SSRF 校验（协议/内网 IP/DNS）、超时、重定向上限、页面大小和正文长度限制
 - 跨导入按 `(user_id, url_hash)` 去重，已存在 `READY` 资料时条目标记 `SKIPPED / DUPLICATE_URL`
 - 向量写入 Redis：`kb:chunk:{chunkId}` + `kb:user:{userId}:chunks`
-- 资料 API：列表/统计/详情/切片/删除/重新索引；资料库页面支持搜索、状态筛选、标签筛选、详情抽屉和切片查看
+- 资料 API：列表/统计/详情/切片/删除/重新索引；资料库页面支持搜索、状态/标签/文件夹筛选、详情抽屉和切片查看
 
 RAG 问答闭环已打通：
 
@@ -250,5 +250,5 @@ RAG 问答闭环已打通：
 ## 下一步
 
 1. 告警通知
-2. 文件夹高级筛选、AI 摘要向量化
+2. AI 摘要向量化
 3. 部署到服务器（可选 SSH CD 已就绪，需要配置 secrets）

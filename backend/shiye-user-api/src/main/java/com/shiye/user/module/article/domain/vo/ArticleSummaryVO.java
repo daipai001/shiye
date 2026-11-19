@@ -18,15 +18,17 @@ public record ArticleSummaryVO(
         Integer chunkCount,
         String language,
         List<TagVO> tags,
+        List<ArticleFolderVO> folders,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
 
     public static ArticleSummaryVO from(ArticleEntity entity) {
-        return from(entity, List.of());
+        return from(entity, List.of(), List.of());
     }
 
-    public static ArticleSummaryVO from(ArticleEntity entity, List<TagVO> tags) {
+    public static ArticleSummaryVO from(ArticleEntity entity, List<TagVO> tags,
+                                        List<ArticleFolderVO> folders) {
         return new ArticleSummaryVO(
                 String.valueOf(entity.getId()),
                 entity.getTitle(),
@@ -39,6 +41,7 @@ public record ArticleSummaryVO(
                 entity.getChunkCount() == null ? 0 : entity.getChunkCount(),
                 entity.getLanguage(),
                 tags == null ? List.of() : tags,
+                folders == null ? List.of() : folders,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );

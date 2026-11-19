@@ -7,11 +7,14 @@ import com.shiye.user.common.ai.vector.ChunkVectorStore;
 import com.shiye.user.common.util.UrlNormalizer;
 import com.shiye.user.module.article.domain.entity.ArticleChunkEntity;
 import com.shiye.user.module.article.domain.entity.ArticleEntity;
+import com.shiye.user.module.article.domain.entity.ArticleFolderRow;
 import com.shiye.user.module.article.domain.vo.ArticleChunkVO;
 import com.shiye.user.module.article.domain.vo.ArticleDetailVO;
+import com.shiye.user.module.article.domain.vo.ArticleFolderVO;
 import com.shiye.user.module.article.domain.vo.ArticleStatsVO;
 import com.shiye.user.module.article.domain.vo.ArticleSummaryVO;
 import com.shiye.user.module.article.mapper.ArticleChunkMapper;
+import com.shiye.user.module.article.mapper.ArticleFolderMapper;
 import com.shiye.user.module.article.mapper.ArticleMapper;
 import com.shiye.user.module.article.service.ArticleQueryService;
 import com.shiye.user.module.article.support.ArticleSourceType;
@@ -21,6 +24,7 @@ import com.shiye.user.module.tag.service.TagService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -31,15 +35,18 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
 
     private final ArticleMapper articleMapper;
     private final ArticleChunkMapper chunkMapper;
+    private final ArticleFolderMapper folderMapper;
     private final ChunkVectorStore vectorStore;
     private final TagService tagService;
 
     public ArticleQueryServiceImpl(ArticleMapper articleMapper,
                                    ArticleChunkMapper chunkMapper,
+                                   ArticleFolderMapper folderMapper,
                                    ChunkVectorStore vectorStore,
                                    TagService tagService) {
         this.articleMapper = articleMapper;
         this.chunkMapper = chunkMapper;
+        this.folderMapper = folderMapper;
         this.vectorStore = vectorStore;
         this.tagService = tagService;
     }
@@ -47,7 +54,7 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
     @Override
     public PageResult<ArticleSummaryVO> list(long userId, int page, int pageSize,
                                              String q, String status, String sourceType,
-                                             Long tagId) {
+                                             Long tagId, Long folderId) {
         int safePage = Math.max(1, page);
         int safeSize = safePageSize(pageSize);
         String qFilter = normalizeQuery(q);
@@ -58,19 +65,24 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
                 ? null
                 : ArticleSourceType.parse(sourceType).name();
         Long tagFilter = tagId == null || tagId <= 0 ? null : tagId;
+        Long folderFilter = folderId == null || folderId <= 0 ? null : folderId;
 
-        long total = articleMapper.count(userId, qFilter, statusFilter, sourceFilter, tagFilter);
+        long total = articleMapper.count(userId, qFilter, statusFilter, sourceFilter,
+                tagFilter, folderFilter);
         if (total == 0) {
             return PageResult.empty(safePage, safeSize);
         }
         List<ArticleEntity> entities = articleMapper.findPage(
-                userId, qFilter, statusFilter, sourceFilter, tagFilter,
+                userId, qFilter, statusFilter, sourceFilter, tagFilter, folderFilter,
                 (safePage - 1) * safeSize, safeSize);
         List<Long> articleIds = entities.stream().map(ArticleEntity::getId).toList();
         Map<Long, List<TagVO>> tags = tagService.byArticleIds(userId, articleIds);
+        Map<Long, List<ArticleFolderVO>> folders = foldersByArticleIds(userId, articleIds);
         List<ArticleSummaryVO> items = entities.stream()
                 .map(entity -> ArticleSummaryVO.from(
-                        entity, tags.getOrDefault(entity.getId(), List.of())))
+                        entity,
+                        tags.getOrDefault(entity.getId(), List.of()),
+                        folders.getOrDefault(entity.getId(), List.of())))
                 .toList();
         return PageResult.of(items, total, safePage, safeSize);
     }
@@ -81,7 +93,9 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         article.setChunkCount((int) chunkMapper.countByArticle(articleId, userId));
         List<TagVO> tags = tagService.byArticleIds(userId, List.of(articleId))
                 .getOrDefault(articleId, List.of());
-        return ArticleDetailVO.from(article, tags);
+        List<ArticleFolderVO> folders = foldersByArticleIds(userId, List.of(articleId))
+                .getOrDefault(articleId, List.of());
+        return ArticleDetailVO.from(article, tags, folders);
     }
 
     @Override
@@ -103,9 +117,9 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
 
     @Override
     public ArticleStatsVO stats(long userId) {
-        long total = articleMapper.count(userId, null, null, null, null);
-        long ready = articleMapper.count(userId, null, ArticleStatus.READY.name(), null, null);
-        long failed = articleMapper.count(userId, null, ArticleStatus.FAILED.name(), null, null);
+        long total = articleMapper.count(userId, null, null, null, null, null);
+        long ready = articleMapper.count(userId, null, ArticleStatus.READY.name(), null, null, null);
+        long failed = articleMapper.count(userId, null, ArticleStatus.FAILED.name(), null, null, null);
         long processing = articleMapper.countProcessing(userId);
         return new ArticleStatsVO(total, ready, processing, failed);
     }
@@ -119,6 +133,7 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
             vectorStore.delete(userId, chunk.getId());
         }
         chunkMapper.deleteByArticle(articleId, userId);
+        folderMapper.deleteByArticle(articleId, userId);
         tagService.replaceArticleTags(userId, articleId, List.of());
         articleMapper.softDelete(articleId, userId);
     }
@@ -139,6 +154,19 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         if (article != null) {
             delete(userId, article.getId());
         }
+    }
+
+    private Map<Long, List<ArticleFolderVO>> foldersByArticleIds(long userId,
+                                                                 List<Long> articleIds) {
+        if (articleIds == null || articleIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, List<ArticleFolderVO>> grouped = new HashMap<>();
+        for (ArticleFolderRow row : folderMapper.findByArticleIds(userId, articleIds)) {
+            grouped.computeIfAbsent(row.getArticleId(), key -> new java.util.ArrayList<>())
+                    .add(ArticleFolderVO.fromRow(row));
+        }
+        return grouped;
     }
 
     private ArticleEntity findOwned(long userId, long articleId) {

@@ -61,6 +61,7 @@ export interface ArticleSummary {
   chunkCount: number
   language?: string | null
   tags?: Tag[]
+  folders?: ArticleFolder[]
   createdAt: string
   updatedAt: string
 }
@@ -78,6 +79,21 @@ export interface ArticleDetail extends ArticleSummary {
   contentText?: string | null
   contentTruncated?: boolean
   fetchedAt?: string | null
+}
+
+export interface ArticleFolder {
+  id: string
+  path: string
+}
+
+export interface BookmarkFolder {
+  id: string
+  browser: string
+  folderId: string
+  folderPath: string
+  isPrimary: boolean
+  autoSync: boolean
+  lastSyncedAt?: string | null
 }
 
 export interface ArticleUploadResponse {

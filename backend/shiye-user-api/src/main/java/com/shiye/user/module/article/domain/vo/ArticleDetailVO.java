@@ -22,16 +22,18 @@ public record ArticleDetailVO(
         Integer chunkCount,
         String language,
         List<TagVO> tags,
+        List<ArticleFolderVO> folders,
         LocalDateTime fetchedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
 
     public static ArticleDetailVO from(ArticleEntity entity) {
-        return from(entity, List.of());
+        return from(entity, List.of(), List.of());
     }
 
-    public static ArticleDetailVO from(ArticleEntity entity, List<TagVO> tags) {
+    public static ArticleDetailVO from(ArticleEntity entity, List<TagVO> tags,
+                                       List<ArticleFolderVO> folders) {
         return new ArticleDetailVO(
                 String.valueOf(entity.getId()),
                 entity.getTitle(),
@@ -48,6 +50,7 @@ public record ArticleDetailVO(
                 entity.getChunkCount() == null ? 0 : entity.getChunkCount(),
                 entity.getLanguage(),
                 tags == null ? List.of() : tags,
+                folders == null ? List.of() : folders,
                 entity.getFetchedAt(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()

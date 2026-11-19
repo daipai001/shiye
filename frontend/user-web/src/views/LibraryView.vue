@@ -11,6 +11,7 @@ import type {
   ArticleStats,
   ArticleSummary,
   ArticleUploadResponse,
+  BookmarkFolder,
   BookmarkImportSummary,
   PageResult,
   Tag,
@@ -26,7 +27,9 @@ const page = ref(1)
 const q = ref('')
 const statusFilter = ref('')
 const tagFilter = ref('')
+const folderFilter = ref('')
 const tags = ref<Tag[]>([])
+const folders = ref<BookmarkFolder[]>([])
 const loading = ref(false)
 const uploading = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
@@ -94,6 +97,7 @@ async function loadArticles() {
         q: q.value.trim() || undefined,
         status: statusFilter.value || undefined,
         tagId: tagFilter.value || undefined,
+        folderId: folderFilter.value || undefined,
       },
     })
     articles.value = data.data.items
@@ -125,8 +129,17 @@ async function loadTags() {
   }
 }
 
+async function loadFolders() {
+  try {
+    const { data } = await api.get<ApiResult<{ items: BookmarkFolder[] }>>('/bookmark-folders')
+    folders.value = data.data.items
+  } catch {
+    folders.value = []
+  }
+}
+
 async function loadAll() {
-  await Promise.all([loadStats(), loadArticles(), loadImports(), loadTags()])
+  await Promise.all([loadStats(), loadArticles(), loadImports(), loadTags(), loadFolders()])
 }
 
 function applySearch() {
@@ -278,6 +291,21 @@ onMounted(loadAll)
               :value="tag.id"
             />
           </el-select>
+          <el-select
+            v-model="folderFilter"
+            class="folder-select"
+            placeholder="全部文件夹"
+            clearable
+            filterable
+            @change="applySearch"
+          >
+            <el-option
+              v-for="folder in folders"
+              :key="folder.id"
+              :label="folder.folderPath"
+              :value="folder.id"
+            />
+          </el-select>
           <el-button text :loading="loading" @click="loadAll">刷新</el-button>
         </div>
       </div>
@@ -298,6 +326,11 @@ onMounted(loadAll)
             <div v-if="item.tags?.length" class="tag-line">
               <span v-for="tag in item.tags" :key="tag.id" class="tag-chip" :style="tagStyle(tag)">
                 {{ tag.name }}
+              </span>
+            </div>
+            <div v-if="item.folders?.length" class="folder-line">
+              <span v-for="folder in item.folders" :key="folder.id" class="folder-chip">
+                {{ folder.path }}
               </span>
             </div>
             <div class="meta">
@@ -374,6 +407,11 @@ onMounted(loadAll)
         <div v-if="detail.tags?.length" class="tag-line detail-tags">
           <span v-for="tag in detail.tags" :key="tag.id" class="tag-chip" :style="tagStyle(tag)">
             {{ tag.name }}
+          </span>
+        </div>
+        <div v-if="detail.folders?.length" class="folder-line detail-tags">
+          <span v-for="folder in detail.folders" :key="folder.id" class="folder-chip">
+            {{ folder.path }}
           </span>
         </div>
 
@@ -461,6 +499,9 @@ onMounted(loadAll)
 .status-select {
   width: 120px;
 }
+.folder-select {
+  width: 160px;
+}
 .empty {
   margin: 0;
   border: 1px dashed #d7d4cc;
@@ -537,6 +578,23 @@ onMounted(loadAll)
 }
 .detail-tags {
   margin: 4px 0 14px;
+}
+.folder-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+.folder-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px dashed #d7d4cc;
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 9.5px;
+  line-height: 1.6;
+  color: var(--faint);
+  background: #fbfbf9;
 }
 .meta,
 .import-meta,

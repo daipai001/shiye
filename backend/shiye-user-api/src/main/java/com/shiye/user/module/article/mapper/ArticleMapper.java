@@ -128,6 +128,11 @@ public interface ArticleMapper {
                           WHERE at.article_id = a.id AND at.user_id = a.user_id
                             AND at.tag_id = #{tagId})
             </if>
+            <if test="folderId != null">
+              AND EXISTS (SELECT 1 FROM article_folders af
+                          WHERE af.article_id = a.id AND af.user_id = a.user_id
+                            AND af.bookmark_folder_id = #{folderId})
+            </if>
             ORDER BY a.updated_at DESC, a.id DESC
             LIMIT #{limit} OFFSET #{offset}
             </script>
@@ -137,6 +142,7 @@ public interface ArticleMapper {
                                  @Param("status") String status,
                                  @Param("sourceType") String sourceType,
                                  @Param("tagId") Long tagId,
+                                 @Param("folderId") Long folderId,
                                  @Param("offset") int offset,
                                  @Param("limit") int limit);
 
@@ -155,13 +161,19 @@ public interface ArticleMapper {
                           WHERE at.article_id = a.id AND at.user_id = a.user_id
                             AND at.tag_id = #{tagId})
             </if>
+            <if test="folderId != null">
+              AND EXISTS (SELECT 1 FROM article_folders af
+                          WHERE af.article_id = a.id AND af.user_id = a.user_id
+                            AND af.bookmark_folder_id = #{folderId})
+            </if>
             </script>
             """)
     long count(@Param("userId") long userId,
                @Param("q") String q,
                @Param("status") String status,
                @Param("sourceType") String sourceType,
-               @Param("tagId") Long tagId);
+               @Param("tagId") Long tagId,
+               @Param("folderId") Long folderId);
 
     @Select("""
             SELECT COUNT(*)
