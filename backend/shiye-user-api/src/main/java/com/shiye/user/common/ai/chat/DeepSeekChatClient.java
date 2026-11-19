@@ -2,6 +2,8 @@ package com.shiye.user.common.ai.chat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shiye.common.ai.ModelConfig;
+import com.shiye.user.common.ai.config.RuntimeModelConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,34 +37,16 @@ public class DeepSeekChatClient {
 
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
-    private final String baseUrl;
-    private final String apiKey;
-    private final String model;
+    private final RuntimeModelConfigService modelConfig;
     private final long timeoutMs;
-    private final int maxTokens;
-    private final double temperature;
-    private final BigDecimal inputPrice;
-    private final BigDecimal outputPrice;
 
     public DeepSeekChatClient(
             ObjectMapper objectMapper,
-            @Value("${shiye.ai.chat.base-url:https://api.deepseek.com/v1}") String baseUrl,
-            @Value("${shiye.ai.chat.api-key:}") String apiKey,
-            @Value("${shiye.ai.chat.model:deepseek-chat}") String model,
-            @Value("${shiye.ai.chat.timeout-ms:45000}") long timeoutMs,
-            @Value("${shiye.ai.chat.max-tokens:1600}") int maxTokens,
-            @Value("${shiye.ai.chat.temperature:0.25}") double temperature,
-            @Value("${shiye.ai.chat.input-price:2.0}") BigDecimal inputPrice,
-            @Value("${shiye.ai.chat.output-price:8.0}") BigDecimal outputPrice) {
+            RuntimeModelConfigService modelConfig,
+            @Value("${shiye.ai.chat.timeout-ms:45000}") long timeoutMs) {
         this.objectMapper = objectMapper;
-        this.baseUrl = baseUrl == null ? "" : baseUrl.replaceAll("/+$", "");
-        this.apiKey = apiKey == null ? "" : apiKey.trim();
-        this.model = model;
+        this.modelConfig = modelConfig;
         this.timeoutMs = Math.max(5000, timeoutMs);
-        this.maxTokens = Math.max(128, maxTokens);
-        this.temperature = temperature;
-        this.inputPrice = inputPrice == null ? BigDecimal.ZERO : inputPrice;
-        this.outputPrice = outputPrice == null ? BigDecimal.ZERO : outputPrice;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -71,22 +55,23 @@ public class DeepSeekChatClient {
     public ChatCompletionResult stream(List<ChatMessage> messages,
                                        Consumer<String> onDelta,
                                        BooleanSupplier cancelled) {
-        if (apiKey.isEmpty()) {
+        ModelConfig.Chat config = modelConfig.chat();
+        if (config.apiKey().isEmpty()) {
             throw new ChatException("AI_NOT_CONFIGURED", "DeepSeek API Key 未配置");
         }
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", model);
+        body.put("model", config.model());
         body.put("messages", toPayload(messages));
         body.put("stream", true);
-        body.put("temperature", temperature);
-        body.put("max_tokens", maxTokens);
+        body.put("temperature", config.temperature());
+        body.put("max_tokens", config.maxTokens());
         body.put("stream_options", Map.of("include_usage", true));
 
-        HttpResponse<InputStream> response = send(body);
+        HttpResponse<InputStream> response = send(body, config);
         if (response.statusCode() == 400) {
             body.remove("stream_options");
-            response = send(body);
+            response = send(body, config);
         }
         if (response.statusCode() != 200) {
             throw new ChatException("AI_UNAVAILABLE", "DeepSeek 返回 HTTP " + response.statusCode());
@@ -153,17 +138,17 @@ public class DeepSeekChatClient {
             totalTokens = promptTokens + completionTokens;
         }
         log.debug("deepseek stream finished, model={}, tokens={}, estimated={}",
-                model, totalTokens, estimated);
+                config.model(), totalTokens, estimated);
         return new ChatCompletionResult(promptTokens, completionTokens, totalTokens,
                 estimated, finishReason);
     }
 
     public String model() {
-        return model;
+        return modelConfig.chat().model();
     }
 
     public boolean isConfigured() {
-        return !apiKey.isEmpty();
+        return !modelConfig.chat().apiKey().isEmpty();
     }
 
     /**
@@ -171,12 +156,13 @@ public class DeepSeekChatClient {
      */
     public ChatCompletion complete(List<ChatMessage> messages, int maxCompletionTokens,
                                    boolean jsonMode) {
-        if (apiKey.isEmpty()) {
+        ModelConfig.Chat config = modelConfig.chat();
+        if (config.apiKey().isEmpty()) {
             throw new ChatException("AI_NOT_CONFIGURED", "DeepSeek API Key 未配置");
         }
         int safeMaxTokens = Math.max(64, maxCompletionTokens);
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", model);
+        body.put("model", config.model());
         body.put("messages", toPayload(messages));
         body.put("stream", false);
         body.put("temperature", 0.2);
@@ -185,10 +171,10 @@ public class DeepSeekChatClient {
             body.put("response_format", Map.of("type", "json_object"));
         }
 
-        HttpResponse<String> response = sendJson(body);
+        HttpResponse<String> response = sendJson(body, config);
         if (jsonMode && response.statusCode() == 400) {
             body.remove("response_format");
-            response = sendJson(body);
+            response = sendJson(body, config);
         }
         if (response.statusCode() != 200) {
             throw new ChatException("AI_UNAVAILABLE",
@@ -212,7 +198,7 @@ public class DeepSeekChatClient {
                 totalTokens = promptTokens + completionTokens;
             }
             log.debug("deepseek completion finished, model={}, tokens={}, estimated={}",
-                    model, totalTokens, estimated);
+                    config.model(), totalTokens, estimated);
             return new ChatCompletion(content, promptTokens, completionTokens,
                     totalTokens, estimated, finishReason);
         } catch (ChatException ex) {
@@ -223,19 +209,19 @@ public class DeepSeekChatClient {
     }
 
     public BigDecimal inputPrice() {
-        return inputPrice;
+        return modelConfig.chat().inputPrice();
     }
 
     public BigDecimal outputPrice() {
-        return outputPrice;
+        return modelConfig.chat().outputPrice();
     }
 
-    private HttpResponse<InputStream> send(Map<String, Object> body) {
+    private HttpResponse<InputStream> send(Map<String, Object> body, ModelConfig.Chat config) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/chat/completions"))
+                    .uri(URI.create(config.baseUrl() + "/chat/completions"))
                     .timeout(Duration.ofMillis(timeoutMs))
-                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Authorization", "Bearer " + config.apiKey())
                     .header("Content-Type", "application/json")
                     .header("Accept", "text/event-stream")
                     .POST(HttpRequest.BodyPublishers.ofString(
@@ -253,12 +239,12 @@ public class DeepSeekChatClient {
         }
     }
 
-    private HttpResponse<String> sendJson(Map<String, Object> body) {
+    private HttpResponse<String> sendJson(Map<String, Object> body, ModelConfig.Chat config) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/chat/completions"))
+                    .uri(URI.create(config.baseUrl() + "/chat/completions"))
                     .timeout(Duration.ofMillis(timeoutMs))
-                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Authorization", "Bearer " + config.apiKey())
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(
                             objectMapper.writeValueAsString(body)))

@@ -2,6 +2,8 @@ package com.shiye.user.common.ai.rerank;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shiye.common.ai.ModelConfig;
+import com.shiye.user.common.ai.config.RuntimeModelConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,26 +32,17 @@ public class RerankService {
 
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
-    private final boolean enabled;
-    private final String baseUrl;
-    private final String apiKey;
-    private final String model;
+    private final RuntimeModelConfigService modelConfig;
     private final int topN;
     private final long timeoutMs;
 
     public RerankService(
             ObjectMapper objectMapper,
-            @Value("${shiye.ai.rerank.enabled:false}") boolean enabled,
-            @Value("${shiye.ai.rerank.base-url:https://api.siliconflow.cn/v1}") String baseUrl,
-            @Value("${shiye.ai.rerank.api-key:}") String apiKey,
-            @Value("${shiye.ai.rerank.model:BAAI/bge-reranker-v2-m3}") String model,
+            RuntimeModelConfigService modelConfig,
             @Value("${shiye.ai.rerank.top-n:20}") int topN,
             @Value("${shiye.ai.rerank.timeout-ms:20000}") long timeoutMs) {
         this.objectMapper = objectMapper;
-        this.enabled = enabled;
-        this.baseUrl = baseUrl == null ? "" : baseUrl.replaceAll("/+$", "");
-        this.apiKey = apiKey == null ? "" : apiKey.trim();
-        this.model = model;
+        this.modelConfig = modelConfig;
         this.topN = Math.max(1, Math.min(topN, 100));
         this.timeoutMs = Math.max(1000, timeoutMs);
         this.httpClient = HttpClient.newBuilder()
@@ -58,15 +51,17 @@ public class RerankService {
     }
 
     public boolean isEnabled() {
-        return enabled && !apiKey.isEmpty();
+        ModelConfig.Rerank config = modelConfig.rerank();
+        return config.enabled() && !config.apiKey().isEmpty();
     }
 
     public String model() {
-        return model;
+        return modelConfig.rerank().model();
     }
 
     public RerankResult rerank(String query, List<String> documents) {
-        if (!isEnabled()) {
+        ModelConfig.Rerank config = modelConfig.rerank();
+        if (!config.enabled() || config.apiKey().isEmpty()) {
             throw new RerankException("RERANK_NOT_CONFIGURED", "Rerank 未启用或未配置 API Key");
         }
         if (documents == null || documents.isEmpty()) {
@@ -75,16 +70,16 @@ public class RerankService {
         long started = System.currentTimeMillis();
         try {
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", model);
+            body.put("model", config.model());
             body.put("query", query);
             body.put("documents", documents);
             body.put("top_n", Math.min(topN, documents.size()));
             body.put("return_documents", false);
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/rerank"))
+                    .uri(URI.create(config.baseUrl() + "/rerank"))
                     .timeout(Duration.ofMillis(timeoutMs))
-                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Authorization", "Bearer " + config.apiKey())
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(
                             objectMapper.writeValueAsString(body)))

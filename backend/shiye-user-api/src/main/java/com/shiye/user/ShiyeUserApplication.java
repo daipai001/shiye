@@ -8,7 +8,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableScheduling
 @SpringBootApplication(scanBasePackages = "com.shiye")
-@MapperScan(basePackages = "com.shiye.user.module", annotationClass = Mapper.class)
+@MapperScan(basePackages = {"com.shiye.user.module", "com.shiye.user.common.ai.config"},
+        annotationClass = Mapper.class)
 public class ShiyeUserApplication {
 
     public static void main(String[] args) {

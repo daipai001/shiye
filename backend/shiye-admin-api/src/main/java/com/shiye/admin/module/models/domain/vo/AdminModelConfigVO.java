@@ -5,7 +5,9 @@ import java.math.BigDecimal;
 public record AdminModelConfigVO(
         ChatModelVO chat,
         EmbeddingModelVO embedding,
-        BudgetVO budget
+        RerankModelVO rerank,
+        BudgetVO budget,
+        String source
 ) {
 
     public record ChatModelVO(
@@ -32,6 +34,15 @@ public record AdminModelConfigVO(
             int batchSize,
             BigDecimal inputPrice,
             String currency
+    ) {
+    }
+
+    public record RerankModelVO(
+            boolean enabled,
+            String baseUrl,
+            String model,
+            String apiKeyMasked,
+            boolean configured
     ) {
     }
 

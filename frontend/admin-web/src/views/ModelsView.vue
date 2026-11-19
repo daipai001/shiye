@@ -2,12 +2,47 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '../api/client'
-import type { AdminModelConfig, ApiResult, ModelTestResult } from '../api/types'
+import type {
+  AdminModelConfig,
+  AdminModelUpdatePayload,
+  ApiResult,
+  ModelTestResult,
+} from '../api/types'
 
 const config = ref<AdminModelConfig | null>(null)
 const loading = ref(false)
-const testing = ref<'' | 'CHAT' | 'EMBEDDING'>('')
+const testing = ref<'' | 'CHAT' | 'EMBEDDING' | 'RERANK'>('')
 const testResult = ref<{ type: string; result: ModelTestResult } | null>(null)
+const editVisible = ref(false)
+const saving = ref(false)
+const edit = ref<AdminModelUpdatePayload>(emptyPayload())
+
+function emptyPayload(): AdminModelUpdatePayload {
+  return {
+    chat: {
+      baseUrl: '',
+      model: '',
+      apiKey: '',
+      maxTokens: 1600,
+      temperature: 0.25,
+      inputPrice: 2,
+      outputPrice: 8,
+    },
+    embedding: {
+      baseUrl: '',
+      model: '',
+      apiKey: '',
+      dimension: 1024,
+      batchSize: 16,
+    },
+    rerank: {
+      enabled: false,
+      baseUrl: '',
+      model: '',
+      apiKey: '',
+    },
+  }
+}
 
 function formatCost(value?: number | null) {
   return `¥${Number(value || 0).toFixed(6)}`
@@ -29,7 +64,52 @@ async function load() {
   }
 }
 
-async function test(type: 'CHAT' | 'EMBEDDING') {
+function openEdit() {
+  if (!config.value) {
+    return
+  }
+  edit.value = {
+    chat: {
+      baseUrl: config.value.chat.baseUrl,
+      model: config.value.chat.model,
+      apiKey: '',
+      maxTokens: config.value.chat.maxTokens,
+      temperature: config.value.chat.temperature,
+      inputPrice: config.value.chat.inputPrice,
+      outputPrice: config.value.chat.outputPrice,
+    },
+    embedding: {
+      baseUrl: config.value.embedding.baseUrl,
+      model: config.value.embedding.model,
+      apiKey: '',
+      dimension: config.value.embedding.dimension,
+      batchSize: config.value.embedding.batchSize,
+    },
+    rerank: {
+      enabled: config.value.rerank.enabled,
+      baseUrl: config.value.rerank.baseUrl,
+      model: config.value.rerank.model,
+      apiKey: '',
+    },
+  }
+  editVisible.value = true
+}
+
+async function save() {
+  saving.value = true
+  try {
+    const { data } = await api.put<ApiResult<AdminModelConfig>>('/models', edit.value)
+    config.value = data.data
+    editVisible.value = false
+    ElMessage.success('模型配置已保存，user-api 最多 5 秒生效')
+  } catch {
+    ElMessage.error('保存失败，请检查 Base URL、模型名和参数范围')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function test(type: 'CHAT' | 'EMBEDDING' | 'RERANK') {
   testing.value = type
   testResult.value = null
   try {
@@ -55,9 +135,12 @@ onMounted(load)
     <div class="page-head">
       <div>
         <h1>模型配置</h1>
-        <p>查看当前 Chat / Embedding 配置并测试连接。敏感 key 只显示掩码。</p>
+        <p>在线编辑 Chat / Embedding / Rerank 参数。敏感 key 只显示掩码，留空保存表示保持原值。</p>
       </div>
-      <el-button text :loading="loading" @click="load">刷新</el-button>
+      <div class="head-actions">
+        <el-button type="primary" @click="openEdit">编辑配置</el-button>
+        <el-button text :loading="loading" @click="load">刷新</el-button>
+      </div>
     </div>
 
     <div v-if="!config" class="empty">正在读取模型配置…</div>
@@ -98,6 +181,23 @@ onMounted(load)
         </section>
       </div>
 
+      <section class="panel rerank-panel">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">RERANK</div>
+            <h2>{{ config.rerank.model }}</h2>
+          </div>
+          <span class="pill" :class="{ ok: config.rerank.configured }">{{ config.rerank.configured ? '已启用' : '未启用' }}</span>
+        </div>
+        <div class="rerank-grid">
+          <div class="kv"><span>开关</span><b>{{ config.rerank.enabled ? '开启' : '关闭' }}</b></div>
+          <div class="kv"><span>Base URL</span><b>{{ config.rerank.baseUrl }}</b></div>
+          <div class="kv"><span>模型</span><b>{{ config.rerank.model }}</b></div>
+          <div class="kv"><span>API Key</span><b>{{ keyState(config.rerank.configured, config.rerank.apiKeyMasked) }}</b></div>
+        </div>
+        <el-button class="test-btn" :loading="testing === 'RERANK'" @click="test('RERANK')">测试 Rerank 连接</el-button>
+      </section>
+
       <section class="panel budget-panel">
         <div class="eyebrow">BUDGET</div>
         <h2>默认预算</h2>
@@ -117,10 +217,85 @@ onMounted(load)
       </section>
 
       <p class="config-note">
-        当前版本模型 key / base URL / 价格通过服务端环境变量或 <code>application-local.yml</code> 管理，修改后重启 user-api 生效；
-        管理端在线编辑和写库将在下一阶段接入。
+        配置来源：{{ config.source === 'DATABASE' ? '数据库覆盖值' : '服务端环境变量' }}，数据库优先。
+        保存后 user-api 最多 5 秒生效；Embedding provider 由启动配置决定，切换 dev/http 需要重启。
+        修改 Embedding 模型或维度后，已有切片需要重新索引。
       </p>
     </template>
+
+    <el-dialog v-model="editVisible" title="编辑模型配置" width="760px" class="model-edit-dialog">
+      <el-form label-width="130px">
+        <div class="edit-scroll">
+        <div class="edit-section">Chat</div>
+        <div class="edit-grid">
+          <el-form-item label="Base URL">
+            <el-input v-model="edit.chat.baseUrl" placeholder="https://api.deepseek.com/v1" />
+          </el-form-item>
+          <el-form-item label="模型">
+            <el-input v-model="edit.chat.model" placeholder="deepseek-chat" />
+          </el-form-item>
+          <el-form-item label="API Key">
+            <el-input v-model="edit.chat.apiKey" placeholder="留空保持现有 key" show-password />
+          </el-form-item>
+          <el-form-item label="max tokens">
+            <el-input-number v-model="edit.chat.maxTokens" :min="64" :max="8192" :step="128" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="temperature">
+            <el-input-number v-model="edit.chat.temperature" :min="0" :max="2" :step="0.05" :precision="2" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="输入单价 / 1M">
+            <el-input-number v-model="edit.chat.inputPrice" :min="0" :step="0.1" :precision="4" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="输出单价 / 1M">
+            <el-input-number v-model="edit.chat.outputPrice" :min="0" :step="0.1" :precision="4" style="width: 100%" />
+          </el-form-item>
+        </div>
+
+        <div class="edit-section">Embedding</div>
+        <div class="edit-grid">
+          <el-form-item label="Provider">
+            <el-input :model-value="config?.embedding.provider || '-'" disabled />
+          </el-form-item>
+          <el-form-item label="Base URL">
+            <el-input v-model="edit.embedding.baseUrl" placeholder="https://api.siliconflow.cn/v1" />
+          </el-form-item>
+          <el-form-item label="模型">
+            <el-input v-model="edit.embedding.model" placeholder="BAAI/bge-m3" />
+          </el-form-item>
+          <el-form-item label="API Key">
+            <el-input v-model="edit.embedding.apiKey" placeholder="留空保持现有 key" show-password />
+          </el-form-item>
+          <el-form-item label="维度">
+            <el-input-number v-model="edit.embedding.dimension" :min="8" :max="4096" :step="128" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="batch size">
+            <el-input-number v-model="edit.embedding.batchSize" :min="1" :max="64" style="width: 100%" />
+          </el-form-item>
+        </div>
+
+        <div class="edit-section">Rerank</div>
+        <div class="edit-grid">
+          <el-form-item label="启用">
+            <el-switch v-model="edit.rerank.enabled" />
+          </el-form-item>
+          <el-form-item label="Base URL">
+            <el-input v-model="edit.rerank.baseUrl" placeholder="https://api.siliconflow.cn/v1" />
+          </el-form-item>
+          <el-form-item label="模型">
+            <el-input v-model="edit.rerank.model" placeholder="BAAI/bge-reranker-v2-m3" />
+          </el-form-item>
+          <el-form-item label="API Key">
+            <el-input v-model="edit.rerank.apiKey" placeholder="留空保持现有 key" show-password />
+          </el-form-item>
+        </div>
+        </div>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -130,6 +305,11 @@ onMounted(load)
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 16px;
+}
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .panel {
   background: #fff;
@@ -180,6 +360,14 @@ onMounted(load)
 }
 .test-btn {
   margin-top: 12px;
+}
+.rerank-panel {
+  margin-bottom: 16px;
+}
+.rerank-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 22px;
 }
 .budget-panel {
   margin-bottom: 16px;
@@ -237,6 +425,27 @@ onMounted(load)
 .config-note code {
   font-family: 'Cascadia Mono', Consolas, monospace;
 }
+.edit-scroll {
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.edit-section {
+  font-weight: 800;
+  font-size: 13px;
+  margin: 4px 0 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.edit-section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
 .empty {
   border: 1px dashed #d7d4cc;
   border-radius: 9px;
@@ -248,7 +457,9 @@ onMounted(load)
 }
 @media (max-width: 1000px) {
   .model-grid,
-  .budget-grid {
+  .budget-grid,
+  .rerank-grid,
+  .edit-grid {
     grid-template-columns: 1fr;
   }
 }

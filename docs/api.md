@@ -1231,8 +1231,8 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 4.2 总览与用量
 
-> **当前实现**：总览、用量列表/汇总/CSV 导出、用户列表与配额/状态、导入任务与条目、索引任务、模型只读配置与连接测试已接入。
-> `PUT /models`、`/settings`、`/budget` 和用量趋势聚合仍在后续阶段。
+> **当前实现**：总览、用量列表/汇总/CSV 导出、用户列表与配额/状态、导入任务与条目、索引任务、模型在线配置（Chat / Embedding / Rerank）与连接测试已接入。
+> `/settings`、`/budget` 在线编辑和用量趋势聚合仍在后续阶段。
 
 #### GET `/overview`
 
@@ -1518,24 +1518,33 @@ admin-web → POST /admin/api/v1/auth/login
     "currency": "CNY"
   },
   "embedding": {
-    "provider": "硅基流动",
+    "provider": "http",
     "baseUrl": "https://api.siliconflow.cn/v1",
     "model": "BAAI/bge-m3",
     "dimension": 1024,
     "batchSize": 16,
     "apiKeyMasked": "sk-****",
-    "inputPrice": "0.100000",
+    "inputPrice": "0.000000",
     "currency": "CNY"
+  },
+  "rerank": {
+    "enabled": true,
+    "baseUrl": "https://api.siliconflow.cn/v1",
+    "model": "BAAI/bge-reranker-v2-m3",
+    "apiKeyMasked": "sk-****",
+    "configured": true
   },
   "budget": {
     "globalMonthlyTokens": 2000000,
     "globalMonthlyCost": "20.000000",
     "defaultUserTokens": 200000,
-    "alertThreshold": 0.8,
-    "rateLimitPerMinute": 10
-  }
+    "defaultUserCost": "5.000000"
+  },
+  "source": "DATABASE"
 }
 ```
+
+> `source=DATABASE` 表示存在 `system_settings.ai.model.config` 覆盖值；`ENV` 表示仍使用服务端环境变量。API Key 只返回掩码。
 
 ---
 
@@ -1547,21 +1556,24 @@ admin-web → POST /admin/api/v1/auth/login
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `chat.provider` | string | 是 | |
-| `chat.baseUrl` | string | 是 | |
+| `chat.baseUrl` | string | 是 | http/https |
 | `chat.model` | string | 是 | |
-| `chat.apiKey` | string | 否 | 只写不读；不传=不变 |
-| `chat.maxTokens` | number | 否 | 默认 2048 |
-| `chat.temperature` | number | 否 | 0~1，默认 0.3 |
+| `chat.apiKey` | string | 否 | 只写不读；留空=保持原值 |
+| `chat.maxTokens` | number | 是 | 64~8192 |
+| `chat.temperature` | number | 是 | 0~2 |
 | `chat.inputPrice` | string | 是 | 每 1M |
 | `chat.outputPrice` | string | 是 | 每 1M |
-| `embedding.provider` | string | 是 | |
-| `embedding.baseUrl` | string | 是 | |
+| `embedding.baseUrl` | string | 是 | http/https |
 | `embedding.model` | string | 是 | |
-| `embedding.apiKey` | string | 否 | 只写不读 |
-| `embedding.dimension` | number | 是 | 1024 |
-| `embedding.batchSize` | number | 否 | 默认 16 |
-| `embedding.inputPrice` | string | 是 | 每 1M |
+| `embedding.apiKey` | string | 否 | 只写不读；留空=保持原值 |
+| `embedding.dimension` | number | 是 | 8~4096 |
+| `embedding.batchSize` | number | 是 | 1~64 |
+| `rerank.enabled` | boolean | 是 | |
+| `rerank.baseUrl` | string | 否 | 留空用当前值 |
+| `rerank.model` | string | 否 | 留空用当前值 |
+| `rerank.apiKey` | string | 否 | 只写不读；留空=保持原值 |
+
+> 配置写入 `system_settings.ai.model.config`（JSON，`is_secret=1`）。user-api 缓存 5 秒，保存后最迟 5 秒生效。Embedding provider 仍由启动配置决定，切换 dev/http 需要重启；修改模型或维度后需重建索引。
 
 **响应**：更新后的配置（key 掩码）
 
@@ -1579,7 +1591,7 @@ admin-web → POST /admin/api/v1/auth/login
 { "type": "CHAT" }
 ```
 
-`type`：CHAT/EMBEDDING。
+`type`：CHAT / EMBEDDING / RERANK。
 
 **响应**
 

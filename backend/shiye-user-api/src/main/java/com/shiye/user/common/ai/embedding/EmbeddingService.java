@@ -1,6 +1,6 @@
 package com.shiye.user.common.ai.embedding;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.shiye.user.common.ai.config.RuntimeModelConfigService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -13,18 +13,19 @@ import java.util.List;
 public class EmbeddingService {
 
     private final EmbeddingClient embeddingClient;
-    private final int batchSize;
+    private final RuntimeModelConfigService modelConfig;
 
     public EmbeddingService(EmbeddingClient embeddingClient,
-                            @Value("${shiye.ai.embedding.batch-size:16}") int batchSize) {
+                            RuntimeModelConfigService modelConfig) {
         this.embeddingClient = embeddingClient;
-        this.batchSize = Math.max(1, Math.min(batchSize, 64));
+        this.modelConfig = modelConfig;
     }
 
     public List<float[]> embed(List<String> texts) {
         if (texts == null || texts.isEmpty()) {
             return List.of();
         }
+        int batchSize = modelConfig.embedding().batchSize();
         List<float[]> vectors = new ArrayList<>(texts.size());
         for (int start = 0; start < texts.size(); start += batchSize) {
             List<String> batch = texts.subList(start, Math.min(texts.size(), start + batchSize));

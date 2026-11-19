@@ -753,19 +753,11 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 **关键 key**
 
-- `registration_enabled`
-- `default_monthly_tokens`
-- `default_monthly_cost`
-- `global_monthly_tokens`
-- `global_monthly_cost`
-- `alert_threshold`
-- `rate_limit_per_minute`
-- `daily_token_limit`
-- `chat_model` / `embedding_model` / `chat_base_url` / `embedding_base_url`
-- `chat_api_key` / `embedding_api_key`（`is_secret=1`，加密存储）
-- `chat_max_tokens` / `chat_temperature` / `embedding_batch_size`
-- `rag_chunk_size` / `rag_chunk_overlap` / `rag_top_k`
-- `rag_hybrid_enabled` / `rag_rerank_enabled` / `rag_citation_required`
+- 当前已使用：`ai.model.config`（单个 JSON，包含 Chat / Embedding / Rerank 覆盖值，`is_secret=1`）
+- 预留：`registration_enabled`、`default_monthly_tokens`、`default_monthly_cost`、`global_monthly_tokens`、`global_monthly_cost`、`alert_threshold`、`rate_limit_per_minute`、`daily_token_limit`
+- 预留：`rag_chunk_size` / `rag_chunk_overlap` / `rag_top_k` / `rag_hybrid_enabled` / `rag_rerank_enabled` / `rag_citation_required`
+
+> `ai.model.config` 中 API Key 以 JSON 原文存库，管理端只返回掩码；生产环境应限制数据库访问权限，后续可接 KMS/字段加密。
 
 ---
 
@@ -1023,7 +1015,7 @@ WHERE u.id IS NULL;
 
 - 所有用户表查询带 `user_id`；admin-api 只读用户业务表。
 - 管理员表独立；`SUPER_ADMIN` 不可禁用。
-- API Key 存 `system_settings`，`is_secret=1`，加密存储；API 只写不读。
+- API Key 存 `system_settings.ai.model.config`，`is_secret=1`，管理端只返回掩码；当前 JSON 原文存库，生产需限制 DB 权限，后续可接 KMS/字段加密。
 - `ai_usage` 不存正文；`messages` 存内容，日志不打印完整正文。
 - 软删除 + 定期清理；备份加密。
 - 数据库账号最小权限：user-api 只写业务表，admin-api 只写管理表 + 读用户表。

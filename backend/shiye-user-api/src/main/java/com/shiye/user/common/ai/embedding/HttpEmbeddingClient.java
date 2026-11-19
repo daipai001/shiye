@@ -2,6 +2,8 @@ package com.shiye.user.common.ai.embedding;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shiye.common.ai.ModelConfig;
+import com.shiye.user.common.ai.config.RuntimeModelConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,24 +32,15 @@ public class HttpEmbeddingClient implements EmbeddingClient {
 
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
-    private final String baseUrl;
-    private final String apiKey;
-    private final String model;
-    private final int dimension;
+    private final RuntimeModelConfigService modelConfig;
     private final long timeoutMs;
 
     public HttpEmbeddingClient(
             ObjectMapper objectMapper,
-            @Value("${shiye.ai.embedding.base-url:https://api.siliconflow.cn/v1}") String baseUrl,
-            @Value("${shiye.ai.embedding.api-key:}") String apiKey,
-            @Value("${shiye.ai.embedding.model:BAAI/bge-m3}") String model,
-            @Value("${shiye.ai.embedding.dimension:1024}") int dimension,
+            RuntimeModelConfigService modelConfig,
             @Value("${shiye.ai.embedding.timeout-ms:30000}") long timeoutMs) {
         this.objectMapper = objectMapper;
-        this.baseUrl = baseUrl == null ? "" : baseUrl.replaceAll("/+$", "");
-        this.apiKey = apiKey == null ? "" : apiKey.trim();
-        this.model = model;
-        this.dimension = Math.max(8, dimension);
+        this.modelConfig = modelConfig;
         this.timeoutMs = Math.max(1000, timeoutMs);
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
@@ -56,7 +49,8 @@ public class HttpEmbeddingClient implements EmbeddingClient {
 
     @Override
     public List<float[]> embed(List<String> texts) {
-        if (apiKey.isEmpty()) {
+        ModelConfig.Embedding config = modelConfig.embedding();
+        if (config.apiKey().isEmpty()) {
             throw new EmbeddingException("EMBEDDING_NOT_CONFIGURED", "Embedding API Key 未配置");
         }
         if (texts.isEmpty()) {
@@ -64,14 +58,14 @@ public class HttpEmbeddingClient implements EmbeddingClient {
         }
         try {
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", model);
+            body.put("model", config.model());
             body.put("input", texts);
             body.put("encoding_format", "float");
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/embeddings"))
+                    .uri(URI.create(config.baseUrl() + "/embeddings"))
                     .timeout(Duration.ofMillis(timeoutMs))
-                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Authorization", "Bearer " + config.apiKey())
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                     .build();
@@ -91,12 +85,12 @@ public class HttpEmbeddingClient implements EmbeddingClient {
             List<float[]> vectors = new ArrayList<>(data.size());
             for (JsonNode item : data) {
                 JsonNode embedding = item.path("embedding");
-                if (!embedding.isArray() || embedding.size() != dimension) {
+                if (!embedding.isArray() || embedding.size() != config.dimension()) {
                     throw new EmbeddingException("EMBEDDING_BAD_DIMENSION",
-                            "Embedding 维度不是配置的 " + dimension);
+                            "Embedding 维度不是配置的 " + config.dimension());
                 }
-                float[] vector = new float[dimension];
-                for (int i = 0; i < dimension; i++) {
+                float[] vector = new float[config.dimension()];
+                for (int i = 0; i < config.dimension(); i++) {
                     vector[i] = (float) embedding.get(i).asDouble();
                 }
                 vectors.add(vector);
@@ -115,11 +109,11 @@ public class HttpEmbeddingClient implements EmbeddingClient {
 
     @Override
     public String model() {
-        return model;
+        return modelConfig.embedding().model();
     }
 
     @Override
     public int dimension() {
-        return dimension;
+        return modelConfig.embedding().dimension();
     }
 }

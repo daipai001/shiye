@@ -2,9 +2,12 @@ package com.shiye.admin.module.models.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shiye.admin.module.models.domain.dto.AdminModelUpdateRequest;
 import com.shiye.admin.module.models.domain.vo.AdminModelConfigVO;
 import com.shiye.admin.module.models.domain.vo.ModelTestVO;
 import com.shiye.admin.module.models.service.AdminModelService;
+import com.shiye.admin.module.models.service.AdminModelSettingsService;
+import com.shiye.common.ai.ModelConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +19,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -24,21 +26,7 @@ public class AdminModelServiceImpl implements AdminModelService {
 
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
-
-    private final String chatBaseUrl;
-    private final String chatApiKey;
-    private final String chatModel;
-    private final int chatMaxTokens;
-    private final double chatTemperature;
-    private final BigDecimal chatInputPrice;
-    private final BigDecimal chatOutputPrice;
-
-    private final String embeddingProvider;
-    private final String embeddingBaseUrl;
-    private final String embeddingApiKey;
-    private final String embeddingModel;
-    private final int embeddingDimension;
-    private final int embeddingBatchSize;
+    private final AdminModelSettingsService settingsService;
 
     private final long globalMonthlyTokens;
     private final BigDecimal globalMonthlyCost;
@@ -47,37 +35,13 @@ public class AdminModelServiceImpl implements AdminModelService {
 
     public AdminModelServiceImpl(
             ObjectMapper objectMapper,
-            @Value("${shiye.ai.chat.base-url:https://api.deepseek.com/v1}") String chatBaseUrl,
-            @Value("${shiye.ai.chat.api-key:}") String chatApiKey,
-            @Value("${shiye.ai.chat.model:deepseek-chat}") String chatModel,
-            @Value("${shiye.ai.chat.max-tokens:1600}") int chatMaxTokens,
-            @Value("${shiye.ai.chat.temperature:0.25}") double chatTemperature,
-            @Value("${shiye.ai.chat.input-price:2.0}") BigDecimal chatInputPrice,
-            @Value("${shiye.ai.chat.output-price:8.0}") BigDecimal chatOutputPrice,
-            @Value("${shiye.ai.embedding.provider:dev}") String embeddingProvider,
-            @Value("${shiye.ai.embedding.base-url:https://api.siliconflow.cn/v1}") String embeddingBaseUrl,
-            @Value("${shiye.ai.embedding.api-key:}") String embeddingApiKey,
-            @Value("${shiye.ai.embedding.model:BAAI/bge-m3}") String embeddingModel,
-            @Value("${shiye.ai.embedding.dimension:1024}") int embeddingDimension,
-            @Value("${shiye.ai.embedding.batch-size:16}") int embeddingBatchSize,
+            AdminModelSettingsService settingsService,
             @Value("${shiye.usage.global-monthly-tokens:2000000}") long globalMonthlyTokens,
             @Value("${shiye.usage.global-monthly-cost:20.00}") BigDecimal globalMonthlyCost,
             @Value("${shiye.registration.default-token-quota:200000}") long defaultUserTokens,
             @Value("${shiye.registration.default-cost-quota:5.000000}") BigDecimal defaultUserCost) {
         this.objectMapper = objectMapper;
-        this.chatBaseUrl = trimSlash(chatBaseUrl);
-        this.chatApiKey = safe(chatApiKey);
-        this.chatModel = chatModel;
-        this.chatMaxTokens = chatMaxTokens;
-        this.chatTemperature = chatTemperature;
-        this.chatInputPrice = chatInputPrice == null ? BigDecimal.ZERO : chatInputPrice;
-        this.chatOutputPrice = chatOutputPrice == null ? BigDecimal.ZERO : chatOutputPrice;
-        this.embeddingProvider = embeddingProvider == null ? "dev" : embeddingProvider;
-        this.embeddingBaseUrl = trimSlash(embeddingBaseUrl);
-        this.embeddingApiKey = safe(embeddingApiKey);
-        this.embeddingModel = embeddingModel;
-        this.embeddingDimension = embeddingDimension;
-        this.embeddingBatchSize = embeddingBatchSize;
+        this.settingsService = settingsService;
         this.globalMonthlyTokens = globalMonthlyTokens;
         this.globalMonthlyCost = globalMonthlyCost;
         this.defaultUserTokens = defaultUserTokens;
@@ -89,100 +53,103 @@ public class AdminModelServiceImpl implements AdminModelService {
 
     @Override
     public AdminModelConfigVO config() {
+        ModelConfig config = settingsService.current();
+        ModelConfig.Chat chat = config.chat();
+        ModelConfig.Embedding embedding = config.embedding();
+        ModelConfig.Rerank rerank = config.rerank();
         return new AdminModelConfigVO(
                 new AdminModelConfigVO.ChatModelVO(
                         "DeepSeek",
-                        chatBaseUrl,
-                        chatModel,
-                        mask(chatApiKey),
-                        !chatApiKey.isEmpty(),
-                        chatMaxTokens,
-                        chatTemperature,
-                        chatInputPrice,
-                        chatOutputPrice,
+                        chat.baseUrl(),
+                        chat.model(),
+                        mask(chat.apiKey()),
+                        !chat.apiKey().isEmpty(),
+                        chat.maxTokens(),
+                        chat.temperature(),
+                        chat.inputPrice(),
+                        chat.outputPrice(),
                         "CNY"
                 ),
                 new AdminModelConfigVO.EmbeddingModelVO(
-                        embeddingProvider,
-                        embeddingBaseUrl,
-                        embeddingModel,
-                        mask(embeddingApiKey),
-                        "dev".equalsIgnoreCase(embeddingProvider) || !embeddingApiKey.isEmpty(),
-                        embeddingDimension,
-                        embeddingBatchSize,
+                        embedding.provider(),
+                        embedding.baseUrl(),
+                        embedding.model(),
+                        mask(embedding.apiKey()),
+                        "dev".equalsIgnoreCase(embedding.provider()) || !embedding.apiKey().isEmpty(),
+                        embedding.dimension(),
+                        embedding.batchSize(),
                         BigDecimal.ZERO,
                         "CNY"
+                ),
+                new AdminModelConfigVO.RerankModelVO(
+                        rerank.enabled(),
+                        rerank.baseUrl(),
+                        rerank.model(),
+                        mask(rerank.apiKey()),
+                        rerank.enabled() && !rerank.apiKey().isEmpty()
                 ),
                 new AdminModelConfigVO.BudgetVO(
                         globalMonthlyTokens,
                         globalMonthlyCost,
                         defaultUserTokens,
                         defaultUserCost
-                )
+                ),
+                settingsService.fromDatabase() ? "DATABASE" : "ENV"
         );
     }
 
     @Override
+    public AdminModelConfigVO update(AdminModelUpdateRequest request, long adminId) {
+        ModelConfig current = settingsService.current();
+        String chatKey = keepKey(request.chat().apiKey(), current.chat().apiKey());
+        String embeddingKey = keepKey(request.embedding().apiKey(), current.embedding().apiKey());
+        String rerankKey = keepKey(request.rerank().apiKey(), current.rerank().apiKey());
+        String rerankBaseUrl = text(request.rerank().baseUrl(), current.rerank().baseUrl());
+        String rerankModel = text(request.rerank().model(), current.rerank().model());
+
+        ModelConfig next = new ModelConfig(
+                new ModelConfig.Chat(
+                        request.chat().baseUrl().trim(),
+                        chatKey,
+                        request.chat().model().trim(),
+                        request.chat().maxTokens(),
+                        request.chat().temperature(),
+                        request.chat().inputPrice(),
+                        request.chat().outputPrice()
+                ),
+                new ModelConfig.Embedding(
+                        current.embedding().provider(),
+                        request.embedding().baseUrl().trim(),
+                        embeddingKey,
+                        request.embedding().model().trim(),
+                        request.embedding().dimension(),
+                        request.embedding().batchSize()
+                ),
+                new ModelConfig.Rerank(
+                        request.rerank().enabled(),
+                        rerankBaseUrl,
+                        rerankKey,
+                        rerankModel
+                )
+        );
+        settingsService.save(next, adminId);
+        return config();
+    }
+
+    @Override
     public ModelTestVO test(String type) {
+        ModelConfig config = settingsService.current();
         long started = System.currentTimeMillis();
         try {
             if ("CHAT".equalsIgnoreCase(type)) {
-                if (chatApiKey.isEmpty()) {
-                    return new ModelTestVO(false, 0, chatModel, "未配置 DeepSeek API Key");
-                }
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(chatBaseUrl + "/models"))
-                        .timeout(Duration.ofSeconds(20))
-                        .header("Authorization", "Bearer " + chatApiKey)
-                        .GET()
-                        .build();
-                HttpResponse<String> response = httpClient.send(request,
-                        HttpResponse.BodyHandlers.ofString());
-                int latency = (int) (System.currentTimeMillis() - started);
-                if (response.statusCode() != 200) {
-                    return new ModelTestVO(false, latency, chatModel,
-                            "DeepSeek 返回 HTTP " + response.statusCode());
-                }
-                return new ModelTestVO(true, latency, chatModel, "连接成功");
+                return testChat(config.chat(), started);
             }
-
             if ("EMBEDDING".equalsIgnoreCase(type)) {
-                if ("dev".equalsIgnoreCase(embeddingProvider)) {
-                    return new ModelTestVO(true, 0, embeddingModel,
-                            "当前为 dev 联调向量，不是真实 BGE-M3；切换 provider=http 后测试真实连接");
-                }
-                if (embeddingApiKey.isEmpty()) {
-                    return new ModelTestVO(false, 0, embeddingModel, "未配置 Embedding API Key");
-                }
-                Map<String, Object> body = new LinkedHashMap<>();
-                body.put("model", embeddingModel);
-                body.put("input", List.of("拾页连接测试"));
-                body.put("encoding_format", "float");
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(embeddingBaseUrl + "/embeddings"))
-                        .timeout(Duration.ofSeconds(30))
-                        .header("Authorization", "Bearer " + embeddingApiKey)
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(
-                                objectMapper.writeValueAsString(body)))
-                        .build();
-                HttpResponse<String> response = httpClient.send(request,
-                        HttpResponse.BodyHandlers.ofString());
-                int latency = (int) (System.currentTimeMillis() - started);
-                if (response.statusCode() != 200) {
-                    return new ModelTestVO(false, latency, embeddingModel,
-                            "Embedding 返回 HTTP " + response.statusCode());
-                }
-                JsonNode root = objectMapper.readTree(response.body());
-                JsonNode embedding = root.path("data").path(0).path("embedding");
-                if (!embedding.isArray() || embedding.size() != embeddingDimension) {
-                    return new ModelTestVO(false, latency, embeddingModel,
-                            "返回维度不是 " + embeddingDimension);
-                }
-                return new ModelTestVO(true, latency, embeddingModel,
-                        "连接成功，维度 " + embedding.size());
+                return testEmbedding(config.embedding(), started);
             }
-
+            if ("RERANK".equalsIgnoreCase(type)) {
+                return testRerank(config.rerank(), started);
+            }
             return new ModelTestVO(false, 0, null, "不支持的测试类型");
         } catch (Exception ex) {
             int latency = (int) (System.currentTimeMillis() - started);
@@ -190,12 +157,108 @@ public class AdminModelServiceImpl implements AdminModelService {
         }
     }
 
-    private String trimSlash(String value) {
-        return value == null ? "" : value.replaceAll("/+$", "");
+    private ModelTestVO testChat(ModelConfig.Chat config, long started) throws Exception {
+        if (config.apiKey().isEmpty()) {
+            return new ModelTestVO(false, 0, config.model(), "未配置 DeepSeek API Key");
+        }
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(trimSlash(config.baseUrl()) + "/models"))
+                .timeout(Duration.ofSeconds(20))
+                .header("Authorization", "Bearer " + config.apiKey())
+                .GET()
+                .build();
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString());
+        int latency = (int) (System.currentTimeMillis() - started);
+        if (response.statusCode() != 200) {
+            return new ModelTestVO(false, latency, config.model(),
+                    "DeepSeek 返回 HTTP " + response.statusCode());
+        }
+        return new ModelTestVO(true, latency, config.model(), "连接成功");
     }
 
-    private String safe(String value) {
-        return value == null ? "" : value.trim();
+    private ModelTestVO testEmbedding(ModelConfig.Embedding config, long started) throws Exception {
+        if ("dev".equalsIgnoreCase(config.provider())) {
+            return new ModelTestVO(true, 0, config.model(),
+                    "当前为 dev 联调向量，不是真实 BGE-M3；切换 provider=http 后测试真实连接");
+        }
+        if (config.apiKey().isEmpty()) {
+            return new ModelTestVO(false, 0, config.model(), "未配置 Embedding API Key");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", config.model());
+        body.put("input", List.of("拾页连接测试"));
+        body.put("encoding_format", "float");
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(trimSlash(config.baseUrl()) + "/embeddings"))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Bearer " + config.apiKey())
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        objectMapper.writeValueAsString(body)))
+                .build();
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString());
+        int latency = (int) (System.currentTimeMillis() - started);
+        if (response.statusCode() != 200) {
+            return new ModelTestVO(false, latency, config.model(),
+                    "Embedding 返回 HTTP " + response.statusCode());
+        }
+        JsonNode root = objectMapper.readTree(response.body());
+        JsonNode embedding = root.path("data").path(0).path("embedding");
+        if (!embedding.isArray() || embedding.size() != config.dimension()) {
+            return new ModelTestVO(false, latency, config.model(),
+                    "返回维度不是 " + config.dimension());
+        }
+        return new ModelTestVO(true, latency, config.model(),
+                "连接成功，维度 " + embedding.size());
+    }
+
+    private ModelTestVO testRerank(ModelConfig.Rerank config, long started) throws Exception {
+        if (!config.enabled()) {
+            return new ModelTestVO(false, 0, config.model(), "Rerank 当前未启用");
+        }
+        if (config.apiKey().isEmpty()) {
+            return new ModelTestVO(false, 0, config.model(), "未配置 Rerank API Key");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", config.model());
+        body.put("query", "RAG 切片重叠比例");
+        body.put("documents", List.of("RAG 切片建议保留 10% 到 15% 重叠。", "这段文本无关。"));
+        body.put("top_n", 2);
+        body.put("return_documents", false);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(trimSlash(config.baseUrl()) + "/rerank"))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Bearer " + config.apiKey())
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        objectMapper.writeValueAsString(body)))
+                .build();
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString());
+        int latency = (int) (System.currentTimeMillis() - started);
+        if (response.statusCode() != 200) {
+            return new ModelTestVO(false, latency, config.model(),
+                    "Rerank 返回 HTTP " + response.statusCode());
+        }
+        JsonNode results = objectMapper.readTree(response.body()).path("results");
+        if (!results.isArray() || results.isEmpty()) {
+            return new ModelTestVO(false, latency, config.model(), "Rerank 返回结果为空");
+        }
+        return new ModelTestVO(true, latency, config.model(), "连接成功");
+    }
+
+    private String keepKey(String input, String current) {
+        return input == null || input.isBlank() ? current : input.trim();
+    }
+
+    private String text(String input, String fallback) {
+        return input == null || input.isBlank() ? fallback : input.trim();
+    }
+
+    private String trimSlash(String value) {
+        return value == null ? "" : value.replaceAll("/+$", "");
     }
 
     private String mask(String key) {

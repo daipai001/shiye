@@ -191,11 +191,44 @@ export interface AdminModelConfig {
     inputPrice: number
     currency: string
   }
+  rerank: {
+    enabled: boolean
+    baseUrl: string
+    model: string
+    apiKeyMasked?: string | null
+    configured: boolean
+  }
   budget: {
     globalMonthlyTokens: number
     globalMonthlyCost: number
     defaultUserTokens: number
     defaultUserCost: number
+  }
+  source: string
+}
+
+export interface AdminModelUpdatePayload {
+  chat: {
+    baseUrl: string
+    model: string
+    apiKey: string
+    maxTokens: number
+    temperature: number
+    inputPrice: number
+    outputPrice: number
+  }
+  embedding: {
+    baseUrl: string
+    model: string
+    apiKey: string
+    dimension: number
+    batchSize: number
+  }
+  rerank: {
+    enabled: boolean
+    baseUrl: string
+    model: string
+    apiKey: string
   }
 }
 
