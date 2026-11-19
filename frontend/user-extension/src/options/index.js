@@ -20,6 +20,7 @@ const els = {
   selectedFolder: document.getElementById('selectedFolder'),
   selectedFolderMeta: document.getElementById('selectedFolderMeta'),
   recursive: document.getElementById('recursive'),
+  autoSync: document.getElementById('autoSync'),
   startImport: document.getElementById('startImport'),
   importHint: document.getElementById('importHint'),
   importProgress: document.getElementById('importProgress'),
@@ -57,6 +58,8 @@ async function getSettings() {
   return chrome.storage.local.get({
     apiBaseUrl: DEFAULT_API,
     ballEnabled: true,
+    autoSyncEnabled: false,
+    autoSyncFolder: null,
     shiyeAccessToken: '',
     shiyeRefreshToken: '',
     shiyeUser: null,
@@ -129,6 +132,7 @@ function isConnected() {
 async function init() {
   const settings = await getSettings()
   els.ballEnabled.checked = settings.ballEnabled
+  els.autoSync.checked = Boolean(settings.autoSyncEnabled)
   els.apiBaseUrl.value = settings.apiBaseUrl
   state.user = settings.shiyeUser
   renderAuth(settings.shiyeUser)
@@ -155,6 +159,7 @@ function renderAuth(user) {
   els.authDisconnected.hidden = connected
   els.loadBookmarks.disabled = !connected
   els.startImport.disabled = !connected || !state.selected
+  els.autoSync.disabled = !connected
   els.bookmarkHint.textContent = connected
     ? '点击「读取书签」选择要导入的文件夹。'
     : '连接账号后读取书签。'
@@ -245,6 +250,8 @@ async function disconnectAccount() {
   state.folders = []
   state.resumableImportId = null
   state.resumableFolderKey = null
+  els.autoSync.checked = false
+  await chrome.storage.local.set({ autoSyncEnabled: false, autoSyncFolder: null })
   renderAuth(null)
   els.folderPanel.hidden = true
   els.folderList.textContent = ''
@@ -315,6 +322,9 @@ async function loadBookmarks() {
     els.folderPanel.hidden = false
     renderFolders()
     els.bookmarkHint.textContent = `共 ${state.folders.length} 个文件夹。`
+    if (els.autoSync.checked) {
+      await persistAutoSync()
+    }
   } catch (error) {
     showBookmarkError(`读取书签失败：${error.message}`)
   } finally {
@@ -350,6 +360,9 @@ function renderFolders() {
       state.selected = folder
       renderFolders()
       updateSelectedFolder()
+      if (els.autoSync.checked) {
+        void persistAutoSync()
+      }
     })
     els.folderList.appendChild(row)
   }
@@ -423,6 +436,27 @@ function collectLinks(folder, recursive) {
 
 function detectBrowser() {
   return navigator.userAgent.includes('Edg/') ? 'EDGE' : 'CHROME'
+}
+
+async function persistAutoSync() {
+  const enabled = els.autoSync.checked
+  if (enabled && !state.selected) {
+    els.autoSync.checked = false
+    els.bookmarkHint.textContent = '先选择文件夹，再开启自动同步。'
+    await chrome.storage.local.set({ autoSyncEnabled: false, autoSyncFolder: null })
+    return
+  }
+  await chrome.storage.local.set({
+    autoSyncEnabled: enabled,
+    autoSyncFolder: enabled && state.selected
+      ? {
+          browser: detectBrowser(),
+          folderId: state.selected.id,
+          folderPath: state.selected.path,
+          recursive: els.recursive.checked,
+        }
+      : null,
+  })
 }
 
 function showProgress(message, isError = false) {
@@ -703,7 +737,15 @@ els.authCode.addEventListener('keydown', (event) => {
 els.disconnect.addEventListener('click', disconnectAccount)
 els.loadBookmarks.addEventListener('click', loadBookmarks)
 els.startImport.addEventListener('click', startImport)
-els.recursive.addEventListener('change', updateSelectedFolder)
+els.recursive.addEventListener('change', () => {
+  updateSelectedFolder()
+  if (els.autoSync.checked) {
+    void persistAutoSync()
+  }
+})
+els.autoSync.addEventListener('change', () => {
+  void persistAutoSync()
+})
 els.refreshImports.addEventListener('click', loadRecentImports)
 els.ballEnabled.addEventListener('change', () => {
   chrome.storage.local.set({ ballEnabled: els.ballEnabled.checked })
