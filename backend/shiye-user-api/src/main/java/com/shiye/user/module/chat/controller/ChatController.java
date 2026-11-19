@@ -2,6 +2,7 @@ package com.shiye.user.module.chat.controller;
 
 import com.shiye.user.common.security.UserContext;
 import com.shiye.user.module.chat.domain.dto.ChatStreamRequest;
+import com.shiye.user.module.chat.domain.dto.PageChatRequest;
 import com.shiye.user.module.chat.service.ChatService;
 import com.shiye.user.module.usage.service.UsageService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -24,6 +25,19 @@ public class ChatController {
     public ChatController(ChatService chatService, UsageService usageService) {
         this.chatService = chatService;
         this.usageService = usageService;
+    }
+
+    @PostMapping(value = "/page-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter pageStream(@Valid @RequestBody PageChatRequest request,
+                                 @RequestHeader(value = "X-Client", required = false) String client,
+                                 HttpServletResponse response) {
+        long userId = UserContext.requireUserId();
+        usageService.assertCanChat(userId);
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("X-Accel-Buffering", "no");
+        SseEmitter emitter = new SseEmitter(180_000L);
+        chatService.streamPage(userId, client, request, emitter);
+        return emitter;
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

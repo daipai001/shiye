@@ -17,10 +17,10 @@ public interface UsageService {
                              int promptTokens, int completionTokens,
                              BigDecimal inputPrice, BigDecimal outputPrice,
                              int latencyMs, Integer firstTokenMs,
-                             boolean estimated, long conversationId);
+                             boolean estimated, Long conversationId);
 
     void recordFailedChat(long userId, String requestId, String source, String model,
-                          String errorCode, int latencyMs, long conversationId);
+                          String errorCode, int latencyMs, Long conversationId);
 
     void recordRerank(long userId, String requestId, String source, String model,
                       int tokens, int latencyMs, long conversationId);

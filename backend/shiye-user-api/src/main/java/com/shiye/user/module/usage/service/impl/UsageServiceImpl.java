@@ -105,7 +105,7 @@ public class UsageServiceImpl implements UsageService {
                                     int promptTokens, int completionTokens,
                                     BigDecimal inputPrice, BigDecimal outputPrice,
                                     int latencyMs, Integer firstTokenMs,
-                                    boolean estimated, long conversationId) {
+                                    boolean estimated, Long conversationId) {
         int totalTokens = promptTokens + completionTokens;
         BigDecimal safeInput = inputPrice == null ? BigDecimal.ZERO : inputPrice;
         BigDecimal safeOutput = outputPrice == null ? BigDecimal.ZERO : outputPrice;
@@ -144,7 +144,7 @@ public class UsageServiceImpl implements UsageService {
     @Override
     @Transactional
     public void recordFailedChat(long userId, String requestId, String source, String model,
-                                 String errorCode, int latencyMs, long conversationId) {
+                                 String errorCode, int latencyMs, Long conversationId) {
         AiUsageEntity entity = new AiUsageEntity();
         entity.setRequestId(requestId);
         entity.setUserId(userId);

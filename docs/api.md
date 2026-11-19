@@ -895,8 +895,8 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 3.4 问答
 
-> **当前实现**：`POST /chat/stream` 已接入 DeepSeek SSE，支持 `ALL / ARTICLE / FOLDER` 范围；`TAG / CURRENT` 后续接入。
-> 引用、usage、会话/消息持久化已接通。默认使用联调 embedding，真实语义检索需配置 BGE-M3。
+> **当前实现**：`POST /chat/stream` 已接入 DeepSeek SSE、混合检索和 rerank，支持 `ALL / ARTICLE / FOLDER` 范围；`POST /chat/page-stream` 支持插件当前页临时问答；`TAG / CURRENT` 资料库范围后续接入。
+> 引用、usage、会话/消息持久化已接通；默认使用联调 embedding，真实语义检索需配置 BGE-M3。
 
 #### POST `/chat/stream`
 
@@ -924,6 +924,40 @@ admin-web → POST /admin/api/v1/auth/login
 | `model` | string/null | 否 | 不传用默认 |
 
 **响应**：SSE，事件见 1.9。
+
+**错误（流开始前）**：40001、40101、40302、42902、42903、42904
+
+**错误（流开始后）**：`error` 事件，`retryable` 表示是否可重试。
+
+---
+
+#### POST `/chat/page-stream`
+
+**认证**：用户
+
+**Content-Type**：`application/json`
+
+**说明**：插件当前页面问答。正文只作为本次请求的临时上下文，不写入会话、消息、引用或资料库；usage 记 `scene=CHAT`、`conversation_id=NULL`。
+
+**请求**
+
+```json
+{
+  "url": "https://example.com/article",
+  "title": "页面标题",
+  "content": "当前页正文，最多 200000 字符",
+  "question": "这个页面主要讲了什么？"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `url` | string/null | 否 | ≤2048 |
+| `title` | string/null | 否 | ≤512 |
+| `content` | string | 是 | 1~200000 字符，服务端截取前 15000 字符送入模型 |
+| `question` | string | 是 | 1~4000 字 |
+
+**响应**：SSE，事件见 1.9；`meta.conversationId` / `meta.messageId` 为 `null`，无 `citation` 事件。
 
 **错误（流开始前）**：40001、40101、40302、42902、42903、42904
 
@@ -1670,7 +1704,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 10 | 管理后台-书签导入 | `GET /admin/api/v1/imports`、`POST /admin/api/v1/imports/{id}/retry` |
 | 11 | 管理后台-索引任务 | `GET /admin/api/v1/tasks`、`POST /admin/api/v1/tasks/{id}/retry` |
 | 12 | 管理后台-模型配置 | `GET/PUT /admin/api/v1/models`、`POST /admin/api/v1/models/test`、`PUT /admin/api/v1/budget` |
-| 13 | 插件-悬浮球 | `POST /chat/stream`、`POST /articles/collect`、`GET/PUT /users/me/plugin-settings` |
+| 13 | 插件-悬浮球 | `POST /chat/stream`、`POST /chat/page-stream`、`POST /articles/collect`、`GET/PUT /users/me/plugin-settings` |
 | 14 | 插件-书签导入 | `POST /bookmark-imports`、`GET /bookmark-imports/{id}/items` |
 | 15 | 插件-登录授权 | `POST /auth/extension-code`、`POST /auth/extension-token` |
 | 16 | Web-插件管理 | `GET/PUT /users/me/plugin-settings`、`POST /auth/extension-code` |

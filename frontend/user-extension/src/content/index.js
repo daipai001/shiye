@@ -76,6 +76,13 @@ function mount() {
       }
       .tabs button.active { background: #fff; border-color: #e6e4df; color: #1c1c1a; font-weight: 600; }
       .pane { padding: 10px 12px 12px; display: flex; flex-direction: column; min-height: 0; }
+      .mode-switch { display: flex; gap: 5px; margin-bottom: 7px; flex: none; }
+      .mode-switch button {
+        border: 1px solid #e6e4df; background: #fff; color: #9a9a94;
+        border-radius: 999px; padding: 2px 9px; font: inherit; font-size: 10px;
+        line-height: 1.6; cursor: pointer;
+      }
+      .mode-switch button.active { background: #1c1c1a; border-color: #1c1c1a; color: #fff; }
       .messages { flex: 1; overflow-y: auto; max-height: 320px; min-height: 80px; padding: 2px 0; }
       .msg { margin-bottom: 9px; }
       .msg .role { color: #9a9a94; font-size: 9px; margin-bottom: 3px; }
@@ -122,12 +129,16 @@ function mount() {
           <button data-tab="save">收藏此页</button>
         </div>
         <div class="pane ask-pane">
+          <div class="mode-switch">
+            <button type="button" data-ask-mode="library" class="active">资料库</button>
+            <button type="button" data-ask-mode="page">当前页</button>
+          </div>
           <div class="messages"></div>
           <form class="composer">
             <textarea placeholder="问我收藏的资料…" maxlength="4000"></textarea>
             <button type="submit" class="btn primary">发送</button>
           </form>
-          <p class="hint">回答基于你的资料库，并附原文引用。</p>
+          <p class="hint ask-hint">回答基于你的资料库，并附原文引用。</p>
         </div>
         <div class="pane save-pane hidden">
           <p class="save-title"></p>
@@ -152,6 +163,8 @@ function mount() {
   const composer = shadow.querySelector('.composer')
   const textarea = shadow.querySelector('textarea')
   const sendButton = shadow.querySelector('.composer .btn')
+  const modeButtons = [...shadow.querySelectorAll('[data-ask-mode]')]
+  const askHint = shadow.querySelector('.ask-hint')
   const saveTitle = shadow.querySelector('.save-title')
   const saveMeta = shadow.querySelector('.save-meta')
   const saveButton = shadow.querySelector('.save-btn')
@@ -159,6 +172,7 @@ function mount() {
   const openOptions = shadow.querySelector('[data-action="open-options"]')
 
   const auth = { apiBaseUrl: DEFAULTS.apiBaseUrl, token: '', refresh: '', user: null }
+  let askMode = 'library'
 
   function renderAuth() {
     const connected = Boolean(auth.user && auth.user.email && auth.token)
@@ -273,6 +287,12 @@ function mount() {
 
   async function ask(question) {
     if (streaming) return
+    const pageMode = askMode === 'page'
+    const pageContent = pageMode ? extractPageContent().slice(0, 150000) : ''
+    if (pageMode && pageContent.length < 50) {
+      addMessage('assistant', '当前页面没有提取到有效正文，无法提问。')
+      return
+    }
     streaming = true
     textarea.disabled = true
     sendButton.disabled = true
@@ -284,10 +304,19 @@ function mount() {
     let failed = false
 
     try {
-      const response = await apiFetch('/chat/stream', {
+      const response = await apiFetch(pageMode ? '/chat/page-stream' : '/chat/stream', {
         method: 'POST',
         headers: { Accept: 'text/event-stream' },
-        body: JSON.stringify({ conversationId, scope: { type: 'ALL' }, question }),
+        body: JSON.stringify(
+          pageMode
+            ? {
+                url: location.href,
+                title: document.title || location.hostname,
+                content: pageContent,
+                question,
+              }
+            : { conversationId, scope: { type: 'ALL' }, question },
+        ),
       })
       if (!response.ok || !response.body) {
         const payload = await response.json().catch(() => null)
@@ -308,7 +337,9 @@ function mount() {
           boundary = buffer.indexOf('\n\n')
           if (!parsed) continue
           if (parsed.event === 'meta') {
-            conversationId = parsed.data.conversationId
+            if (!pageMode && parsed.data.conversationId) {
+              conversationId = parsed.data.conversationId
+            }
           } else if (parsed.event === 'delta') {
             answer += parsed.data.text
             assistant.bubble.textContent = answer
@@ -387,6 +418,17 @@ function mount() {
     }
   }
 
+  function setAskMode(mode) {
+    askMode = mode === 'page' ? 'page' : 'library'
+    for (const button of modeButtons) {
+      button.classList.toggle('active', button.dataset.askMode === askMode)
+    }
+    textarea.placeholder = askMode === 'page' ? '问当前页面的内容…' : '问我收藏的资料…'
+    askHint.textContent = askMode === 'page'
+      ? '回答只基于当前页面，不会写入资料库。'
+      : '回答基于你的资料库，并附原文引用。'
+  }
+
   ball.addEventListener('click', async () => {
     panel.classList.toggle('hidden')
     if (!panel.classList.contains('hidden')) {
@@ -403,6 +445,10 @@ function mount() {
   for (const button of tabs) {
     button.addEventListener('click', () => switchTab(button.dataset.tab))
   }
+  for (const button of modeButtons) {
+    button.addEventListener('click', () => setAskMode(button.dataset.askMode))
+  }
+  setAskMode('library')
   composer.addEventListener('submit', async (event) => {
     event.preventDefault()
     const question = textarea.value.trim()
