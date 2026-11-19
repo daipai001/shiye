@@ -43,6 +43,8 @@ public class RuntimeSystemSettingsService {
             @Value("${shiye.ai.retrieval.hybrid-enabled:true}") boolean ragHybridEnabled,
             @Value("${shiye.ai.retrieval.rerank-enabled:true}") boolean ragRerankEnabled,
             @Value("${shiye.ai.citation-required:true}") boolean ragCitationRequired,
+            @Value("${shiye.registration.invitation-required:false}") boolean invitationRequired,
+            @Value("${shiye.registration.invitation-code:}") String invitationCode,
             @Value("${shiye.settings.refresh-ms:5000}") long refreshMs) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
@@ -61,7 +63,9 @@ public class RuntimeSystemSettingsService {
                 ragTopK,
                 ragHybridEnabled,
                 ragRerankEnabled,
-                ragCitationRequired
+                ragCitationRequired,
+                invitationRequired,
+                invitationCode
         );
         this.cached = defaults;
     }

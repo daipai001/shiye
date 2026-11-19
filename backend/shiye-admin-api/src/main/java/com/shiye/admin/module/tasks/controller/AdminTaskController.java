@@ -1,5 +1,6 @@
 package com.shiye.admin.module.tasks.controller;
 
+import com.shiye.admin.module.audit.service.AdminAuditService;
 import com.shiye.admin.module.tasks.domain.vo.AdminTaskVO;
 import com.shiye.admin.module.tasks.service.AdminTaskService;
 import com.shiye.common.api.PageResult;
@@ -16,9 +17,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminTaskController {
 
     private final AdminTaskService taskService;
+    private final AdminAuditService auditService;
 
-    public AdminTaskController(AdminTaskService taskService) {
+    public AdminTaskController(AdminTaskService taskService,
+                               AdminAuditService auditService) {
         this.taskService = taskService;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -37,6 +41,8 @@ public class AdminTaskController {
 
     @PostMapping("/{id}/retry")
     public Result<AdminTaskVO> retry(@PathVariable long id) {
-        return Result.ok(taskService.retry(id));
+        AdminTaskVO task = taskService.retry(id);
+        auditService.record("TASK_RETRY", "INGEST_TASK", String.valueOf(id), null);
+        return Result.ok(task);
     }
 }

@@ -1,6 +1,7 @@
 package com.shiye.admin.module.models.controller;
 
 import com.shiye.admin.common.security.AdminContext;
+import com.shiye.admin.module.audit.service.AdminAuditService;
 import com.shiye.admin.module.models.domain.dto.AdminModelUpdateRequest;
 import com.shiye.admin.module.models.domain.dto.ModelTestRequest;
 import com.shiye.admin.module.models.domain.vo.AdminModelConfigVO;
@@ -20,9 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminModelController {
 
     private final AdminModelService modelService;
+    private final AdminAuditService auditService;
 
-    public AdminModelController(AdminModelService modelService) {
+    public AdminModelController(AdminModelService modelService,
+                                AdminAuditService auditService) {
         this.modelService = modelService;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -33,7 +37,13 @@ public class AdminModelController {
     @PutMapping
     public Result<AdminModelConfigVO> update(
             @Valid @RequestBody AdminModelUpdateRequest request) {
-        return Result.ok(modelService.update(request, AdminContext.requireAdminId()));
+        AdminModelConfigVO updated = modelService.update(request, AdminContext.requireAdminId());
+        auditService.record("MODEL_UPDATE", "MODEL_CONFIG", null,
+                java.util.Map.of("source", updated.source(),
+                        "chatModel", updated.chat().model(),
+                        "embeddingModel", updated.embedding().model(),
+                        "rerankEnabled", updated.rerank().enabled()));
+        return Result.ok(updated);
     }
 
     @PostMapping("/test")

@@ -30,6 +30,8 @@ public enum ErrorCode {
     CONVERSATION_NOT_FOUND(40403, "会话不存在", 404),
     TASK_NOT_FOUND(40404, "任务不存在", 404),
 
+    METHOD_NOT_ALLOWED(40501, "请求方法不支持", 405),
+
     CONFLICT(40901, "资源冲突或重复", 409),
     IDEMPOTENCY_CONFLICT(40902, "幂等键冲突", 409),
     IMPORT_ALREADY_RUNNING(40903, "导入任务正在运行", 409),

@@ -29,6 +29,8 @@ function defaults(): AdminSettingsUpdatePayload {
     ragHybridEnabled: true,
     ragRerankEnabled: true,
     ragCitationRequired: true,
+    registrationInvitationRequired: false,
+    registrationInvitationCode: '',
   }
 }
 
@@ -48,6 +50,8 @@ function fillForm(settings: AdminSettings) {
     ragHybridEnabled: settings.ragHybridEnabled,
     ragRerankEnabled: settings.ragRerankEnabled,
     ragCitationRequired: settings.ragCitationRequired,
+    registrationInvitationRequired: settings.registrationInvitationRequired,
+    registrationInvitationCode: settings.registrationInvitationCode || '',
   }
 }
 
@@ -116,6 +120,16 @@ onMounted(load)
         <div class="form-grid">
           <el-form-item label="开放新用户注册">
             <el-switch v-model="form.registrationEnabled" />
+          </el-form-item>
+          <el-form-item label="需要邀请码">
+            <el-switch v-model="form.registrationInvitationRequired" />
+          </el-form-item>
+          <el-form-item label="邀请码">
+            <el-input
+              v-model="form.registrationInvitationCode"
+              maxlength="64"
+              placeholder="需要邀请码时填写"
+            />
           </el-form-item>
         </div>
         <p class="hint">关闭后只影响新注册；已登录用户不受影响。注册仍受 IP 限流保护。</p>

@@ -74,6 +74,8 @@ shiye:
     chunk-overlap: ${CHUNK_OVERLAP:100}
   registration:
     enabled: ${REGISTRATION_ENABLED:true}
+    invitation-required: ${REGISTRATION_INVITATION_REQUIRED:false}
+    invitation-code: ${REGISTRATION_INVITATION_CODE:}
     default-token-quota: ${REGISTRATION_DEFAULT_TOKEN_QUOTA:200000}
     default-cost-quota: ${REGISTRATION_DEFAULT_COST_QUOTA:5.000000}
   usage:

@@ -247,6 +247,8 @@ export interface AdminSettings {
   ragHybridEnabled: boolean
   ragRerankEnabled: boolean
   ragCitationRequired: boolean
+  registrationInvitationRequired: boolean
+  registrationInvitationCode?: string | null
   source: string
 }
 
@@ -257,4 +259,61 @@ export interface ModelTestResult {
   latencyMs: number
   model?: string | null
   message: string
+}
+
+export interface AdminAuditLog {
+  id: string
+  adminId: string
+  adminEmail?: string | null
+  action: string
+  resourceType: string
+  resourceId?: string | null
+  detail?: unknown
+  ip?: string | null
+  userAgent?: string | null
+  createdAt: string
+}
+
+export interface EvalCase {
+  id: string
+  userId: string
+  userEmail?: string | null
+  question: string
+  expectedArticleIds: number[]
+  expectedChunkIds: number[]
+  goldAnswer?: string | null
+  tags: string[]
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EvalResult {
+  id: string
+  caseId: string
+  question?: string | null
+  retrievedChunkIds: number[]
+  recallAt5?: number | null
+  citationAccuracy?: number | null
+  answerCorrectness?: number | null
+  latencyMs?: number | null
+  cost?: number | null
+  createdAt: string
+}
+
+export interface EvalRun {
+  id: string
+  userId: string
+  userName?: string | null
+  name: string
+  model?: string | null
+  embeddingModel?: string | null
+  topK?: number | null
+  rerank: boolean
+  status: string
+  metrics?: Record<string, unknown> | null
+  startedAt?: string | null
+  finishedAt?: string | null
+  createdAt: string
+  results?: EvalResult[]
 }

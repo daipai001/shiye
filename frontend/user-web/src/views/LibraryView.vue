@@ -41,6 +41,7 @@ const detail = ref<ArticleDetail | null>(null)
 const chunks = ref<ArticleChunk[]>([])
 const detailLoading = ref(false)
 const activeTab = ref('content')
+const newTag = ref('')
 
 const statusText: Record<string, string> = {
   PENDING: '排队中',
@@ -203,8 +204,36 @@ async function openArticle(article: ArticleSummary) {
   }
 }
 
-async function deleteArticle(article: ArticleSummary) {
+async function addTag() {
+  if (!detail.value) {
+    return
+  }
+  const name = newTag.value.trim()
+  if (!name) {
+    return
+  }
   try {
+    await api.post(`/articles/${detail.value.id}/tags`, { name })
+    newTag.value = ''
+    await Promise.all([openArticle(detail.value), loadTags(), loadArticles()])
+  } catch {
+    ElMessage.error('添加标签失败')
+  }
+}
+
+async function removeTag(tag: Tag) {
+  if (!detail.value) {
+    return
+  }
+  try {
+    await api.delete(`/articles/${detail.value.id}/tags/${tag.id}`)
+    await Promise.all([openArticle(detail.value), loadTags(), loadArticles()])
+  } catch {
+    ElMessage.error('移除标签失败')
+  }
+}
+
+async function deleteArticle(article: ArticleSummary) {  try {
     await ElMessageBox.confirm(
       `删除《${article.title}》？正文、切片和向量都会清理。`,
       '删除资料',
@@ -405,9 +434,25 @@ onMounted(loadAll)
         </div>
         <p class="detail-summary">{{ detail.summary || '暂无摘要' }}</p>
         <div v-if="detail.tags?.length" class="tag-line detail-tags">
-          <span v-for="tag in detail.tags" :key="tag.id" class="tag-chip" :style="tagStyle(tag)">
-            {{ tag.name }}
+          <span
+            v-for="tag in detail.tags"
+            :key="tag.id"
+            class="tag-chip removable"
+            :style="tagStyle(tag)"
+            @click="removeTag(tag)"
+          >
+            {{ tag.name }} <b>×</b>
           </span>
+        </div>
+        <div class="tag-editor">
+          <el-input
+            v-model="newTag"
+            size="small"
+            maxlength="64"
+            placeholder="添加标签，例如 RAG"
+            @keyup.enter="addTag"
+          />
+          <el-button size="small" @click="addTag">添加</el-button>
         </div>
         <div v-if="detail.folders?.length" class="folder-line detail-tags">
           <span v-for="folder in detail.folders" :key="folder.id" class="folder-chip">
@@ -575,6 +620,20 @@ onMounted(loadAll)
   line-height: 1.6;
   color: var(--muted);
   background: #faf9f6;
+}
+.tag-chip.removable {
+  cursor: pointer;
+}
+.tag-chip.removable b {
+  margin-left: 4px;
+  font-weight: 700;
+  opacity: 0.55;
+}
+.tag-editor {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 14px;
+  max-width: 360px;
 }
 .detail-tags {
   margin: 4px 0 14px;

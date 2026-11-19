@@ -4,6 +4,7 @@ import com.shiye.common.api.ErrorCode;
 import com.shiye.common.api.PageResult;
 import com.shiye.common.exception.BizException;
 import com.shiye.common.settings.SystemSettings;
+import com.shiye.common.util.Csv;
 import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import com.shiye.user.module.auth.domain.vo.UserQuotaVO;
 import com.shiye.user.module.auth.service.AuthService;
@@ -249,6 +250,33 @@ public class UsageServiceImpl implements UsageService {
     }
 
     @Override
+    @Transactional
+    public void recordEmbedding(long userId, String requestId, String source, String model,
+                                int tokens, int latencyMs, long articleId) {
+        int safeTokens = Math.max(0, tokens);
+        AiUsageEntity entity = new AiUsageEntity();
+        entity.setRequestId(requestId);
+        entity.setUserId(userId);
+        entity.setSource(source);
+        entity.setScene("EMBEDDING");
+        entity.setModel(model);
+        entity.setPromptTokens(safeTokens);
+        entity.setCompletionTokens(0);
+        entity.setTotalTokens(safeTokens);
+        entity.setCachedTokens(0);
+        entity.setInputPrice(BigDecimal.ZERO);
+        entity.setOutputPrice(BigDecimal.ZERO);
+        entity.setCost(BigDecimal.ZERO);
+        entity.setCurrency("CNY");
+        entity.setLatencyMs(latencyMs);
+        entity.setStatus("SUCCESS");
+        entity.setEstimated(true);
+        entity.setArticleId(articleId);
+        aiUsageMapper.insert(entity);
+        monthlyMapper.increment(userId, currentMonth(), safeTokens, BigDecimal.ZERO);
+    }
+
+    @Override
     public PageResult<UsageRecordVO> records(long userId, int page, int pageSize,
                                              String source, String scene, String model, String status) {
         int safePage = Math.max(1, page);
@@ -323,6 +351,37 @@ public class UsageServiceImpl implements UsageService {
                 sources,
                 daily
         );
+    }
+
+    @Override
+    public String exportCsv(long userId, String source, String scene, String model, String status) {
+        List<AiUsageEntity> rows = aiUsageMapper.findForExport(
+                userId, blankToNull(source), blankToNull(scene), blankToNull(model),
+                blankToNull(status));
+        StringBuilder csv = new StringBuilder("\uFEFF");
+        csv.append("createdAt,source,scene,model,promptTokens,completionTokens,totalTokens,"
+                + "cost,currency,latencyMs,firstTokenMs,status,errorCode\n");
+        for (AiUsageEntity row : rows) {
+            csv.append(Csv.escape(row.getCreatedAt()))
+                    .append(',').append(Csv.escape(row.getSource()))
+                    .append(',').append(Csv.escape(row.getScene()))
+                    .append(',').append(Csv.escape(row.getModel()))
+                    .append(',').append(row.getPromptTokens() == null ? 0 : row.getPromptTokens())
+                    .append(',').append(row.getCompletionTokens() == null ? 0 : row.getCompletionTokens())
+                    .append(',').append(row.getTotalTokens() == null ? 0 : row.getTotalTokens())
+                    .append(',').append(row.getCost() == null ? BigDecimal.ZERO : row.getCost())
+                    .append(',').append(Csv.escape(row.getCurrency()))
+                    .append(',').append(row.getLatencyMs() == null ? 0 : row.getLatencyMs())
+                    .append(',').append(row.getFirstTokenMs() == null ? "" : row.getFirstTokenMs())
+                    .append(',').append(Csv.escape(row.getStatus()))
+                    .append(',').append(Csv.escape(row.getErrorCode()))
+                    .append('\n');
+        }
+        return csv.toString();
+    }
+
+    private String csvValue(Object value) {
+        return Csv.escape(value);
     }
 
     private long longValue(Long value) {

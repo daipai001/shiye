@@ -22,6 +22,8 @@ public record AdminSettingsUpdateRequest(
         @Min(1) @Max(20) int ragTopK,
         boolean ragHybridEnabled,
         boolean ragRerankEnabled,
-        boolean ragCitationRequired
+        boolean ragCitationRequired,
+        boolean registrationInvitationRequired,
+        String registrationInvitationCode
 ) {
 }

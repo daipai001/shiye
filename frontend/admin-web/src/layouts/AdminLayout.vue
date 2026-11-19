@@ -47,6 +47,8 @@ async function logout() {
         <router-link to="/tasks">索引任务</router-link>
         <router-link to="/models">模型配置</router-link>
         <router-link to="/settings">系统设置</router-link>
+        <router-link to="/eval">RAG 评测</router-link>
+        <router-link to="/audit">审计日志</router-link>
       </nav>
     </aside>
 

@@ -29,6 +29,7 @@ import com.shiye.user.module.article.support.TextStats;
 import com.shiye.user.module.article.support.UploadTextExtractor;
 import com.shiye.user.module.file.domain.entity.FileAssetEntity;
 import com.shiye.user.module.file.service.FileAssetService;
+import com.shiye.user.module.usage.service.UsageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -60,6 +61,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
     private final FileAssetService fileAssetService;
     private final UploadTextExtractor uploadTextExtractor;
     private final ArticleUploadRateLimitService uploadRateLimitService;
+    private final UsageService usageService;
     private final Executor ingestExecutor;
     private final int maxTextChars;
     private final int maxUploadBytes;
@@ -76,6 +78,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                                     FileAssetService fileAssetService,
                                     UploadTextExtractor uploadTextExtractor,
                                     ArticleUploadRateLimitService uploadRateLimitService,
+                                    UsageService usageService,
                                     @Qualifier("ingestExecutor") Executor ingestExecutor,
                                     @Value("${shiye.article.max-text-chars:500000}") int maxTextChars,
                                     @Value("${shiye.article.max-upload-bytes:20971520}") int maxUploadBytes) {
@@ -91,6 +94,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         this.fileAssetService = fileAssetService;
         this.uploadTextExtractor = uploadTextExtractor;
         this.uploadRateLimitService = uploadRateLimitService;
+        this.usageService = usageService;
         this.ingestExecutor = ingestExecutor;
         this.maxTextChars = Math.max(10000, maxTextChars);
         this.maxUploadBytes = Math.max(1024, maxUploadBytes);
@@ -336,10 +340,27 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         List<ArticleChunkEntity> stored = insertChunks(userId, articleId, chunks);
         articleMapper.updateStatus(articleId, userId, ArticleStatus.EMBEDDING.name());
 
+        long embeddingStarted = System.currentTimeMillis();
         List<float[]> vectors = embeddingService.embed(
                 stored.stream().map(ArticleChunkEntity::getContent).toList());
         if (vectors.size() != stored.size()) {
             throw new IngestException("EMBEDDING_BAD_RESPONSE", "Embedding 返回数量不匹配");
+        }
+        try {
+            int embeddingTokens = stored.stream()
+                    .mapToInt(chunk -> chunk.getTokenCount() == null ? 0 : chunk.getTokenCount())
+                    .sum();
+            usageService.recordEmbedding(
+                    userId,
+                    "embed_" + UUID.randomUUID().toString().replace("-", "").substring(0, 24),
+                    "WEB",
+                    embeddingService.model(),
+                    embeddingTokens,
+                    (int) (System.currentTimeMillis() - embeddingStarted),
+                    articleId
+            );
+        } catch (RuntimeException ex) {
+            log.warn("record embedding usage failed: {}", ex.getMessage());
         }
 
         for (int i = 0; i < stored.size(); i++) {

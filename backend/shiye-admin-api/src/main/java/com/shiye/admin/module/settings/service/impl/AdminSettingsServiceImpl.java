@@ -41,7 +41,9 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
             @Value("${shiye.ai.retrieval.top-k:8}") int ragTopK,
             @Value("${shiye.ai.retrieval.hybrid-enabled:true}") boolean ragHybridEnabled,
             @Value("${shiye.ai.retrieval.rerank-enabled:true}") boolean ragRerankEnabled,
-            @Value("${shiye.ai.citation-required:true}") boolean ragCitationRequired) {
+            @Value("${shiye.ai.citation-required:true}") boolean ragCitationRequired,
+            @Value("${shiye.registration.invitation-required:false}") boolean invitationRequired,
+            @Value("${shiye.registration.invitation-code:}") String invitationCode) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
         this.defaults = new SystemSettings(
@@ -58,7 +60,9 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 ragTopK,
                 ragHybridEnabled,
                 ragRerankEnabled,
-                ragCitationRequired
+                ragCitationRequired,
+                invitationRequired,
+                invitationCode
         );
     }
 
@@ -84,7 +88,9 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 request.ragTopK(),
                 request.ragHybridEnabled(),
                 request.ragRerankEnabled(),
-                request.ragCitationRequired()
+                request.ragCitationRequired(),
+                request.registrationInvitationRequired(),
+                request.registrationInvitationCode()
         );
         SystemSettings saved = save(next, adminId);
         return toVO(saved, "DATABASE");
@@ -108,7 +114,9 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 current.ragTopK(),
                 current.ragHybridEnabled(),
                 current.ragRerankEnabled(),
-                current.ragCitationRequired()
+                current.ragCitationRequired(),
+                current.registrationInvitationRequired(),
+                current.registrationInvitationCode()
         );
         SystemSettings saved = save(next, adminId);
         return toVO(saved, "DATABASE");
@@ -165,6 +173,8 @@ public class AdminSettingsServiceImpl implements AdminSettingsService {
                 Boolean.TRUE.equals(settings.ragHybridEnabled()),
                 Boolean.TRUE.equals(settings.ragRerankEnabled()),
                 Boolean.TRUE.equals(settings.ragCitationRequired()),
+                Boolean.TRUE.equals(settings.registrationInvitationRequired()),
+                settings.registrationInvitationCode(),
                 source
         );
     }

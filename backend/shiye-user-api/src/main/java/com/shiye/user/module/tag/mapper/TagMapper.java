@@ -8,11 +8,20 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
 @Mapper
 public interface TagMapper {
+
+    @Select("""
+            SELECT id, user_id, name, normalized_name, color, created_at, updated_at
+            FROM tags
+            WHERE id = #{id} AND user_id = #{userId}
+            LIMIT 1
+            """)
+    TagEntity findByIdAndUser(@Param("id") long id, @Param("userId") long userId);
 
     @Select("""
             SELECT id, user_id, name, normalized_name, color, created_at, updated_at
@@ -29,6 +38,32 @@ public interface TagMapper {
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(TagEntity tag);
+
+    @Update("""
+            UPDATE tags
+            SET name = #{name}, normalized_name = #{normalizedName}, color = #{color},
+                updated_at = UTC_TIMESTAMP(3)
+            WHERE id = #{id} AND user_id = #{userId}
+            """)
+    int update(@Param("id") long id,
+               @Param("userId") long userId,
+               @Param("name") String name,
+               @Param("normalizedName") String normalizedName,
+               @Param("color") String color);
+
+    @Delete("DELETE FROM article_tags WHERE tag_id = #{tagId} AND user_id = #{userId}")
+    int deleteTagRelations(@Param("tagId") long tagId, @Param("userId") long userId);
+
+    @Delete("DELETE FROM tags WHERE id = #{id} AND user_id = #{userId}")
+    int deleteTag(@Param("id") long id, @Param("userId") long userId);
+
+    @Delete("""
+            DELETE FROM article_tags
+            WHERE article_id = #{articleId} AND tag_id = #{tagId} AND user_id = #{userId}
+            """)
+    int deleteArticleTag(@Param("articleId") long articleId,
+                         @Param("tagId") long tagId,
+                         @Param("userId") long userId);
 
     @Delete("DELETE FROM article_tags WHERE article_id = #{articleId} AND user_id = #{userId}")
     int deleteArticleTags(@Param("articleId") long articleId, @Param("userId") long userId);
@@ -52,6 +87,14 @@ public interface TagMapper {
             ORDER BY article_count DESC, t.id DESC
             """)
     List<TagRow> listWithCounts(@Param("userId") long userId);
+
+    @Select("""
+            SELECT article_id
+            FROM article_tags
+            WHERE user_id = #{userId} AND tag_id = #{tagId}
+            """)
+    List<Long> findArticleIdsByTag(@Param("userId") long userId,
+                                   @Param("tagId") long tagId);
 
     @Select("""
             <script>

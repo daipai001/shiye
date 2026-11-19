@@ -94,6 +94,20 @@ async function loadAll() {
   await Promise.all([loadQuota(), loadSummary(), loadRecords()])
 }
 
+async function exportCsv() {
+  try {
+    const { data } = await api.get<Blob>('/usage/export', { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'shiye-usage.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    ElMessage.error('导出用量失败')
+  }
+}
+
 onMounted(loadAll)
 </script>
 
@@ -104,7 +118,10 @@ onMounted(loadAll)
         <h1>用量</h1>
         <p>本月配额和每次 AI 调用的 token、成本、耗时。</p>
       </div>
-      <el-button text :loading="loading" @click="loadAll">刷新</el-button>
+      <div class="head-actions">
+        <el-button :loading="loading" @click="exportCsv">导出 CSV</el-button>
+        <el-button text :loading="loading" @click="loadAll">刷新</el-button>
+      </div>
     </div>
 
     <div class="usage-cards">
@@ -238,6 +255,11 @@ onMounted(loadAll)
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   margin-bottom: 16px;
+}
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .usage-card {
   background: #fff;

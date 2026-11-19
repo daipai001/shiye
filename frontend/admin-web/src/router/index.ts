@@ -8,6 +8,8 @@ import ImportsView from '../views/ImportsView.vue'
 import TasksView from '../views/TasksView.vue'
 import ModelsView from '../views/ModelsView.vue'
 import SettingsView from '../views/SettingsView.vue'
+import AuditView from '../views/AuditView.vue'
+import EvalView from '../views/EvalView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -25,6 +27,8 @@ const router = createRouter({
         { path: 'tasks', component: TasksView },
         { path: 'models', component: ModelsView },
         { path: 'settings', component: SettingsView },
+        { path: 'eval', component: EvalView },
+        { path: 'audit', component: AuditView },
       ],
     },
   ],

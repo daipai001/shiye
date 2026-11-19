@@ -173,6 +173,7 @@ function mount() {
 
   const auth = { apiBaseUrl: DEFAULTS.apiBaseUrl, token: '', refresh: '', user: null }
   let askMode = 'library'
+  let serverSettings = null
 
   function renderAuth() {
     const connected = Boolean(auth.user && auth.user.email && auth.token)
@@ -429,10 +430,59 @@ function mount() {
       : '回答基于你的资料库，并附原文引用。'
   }
 
+  function isBlacklisted(settings) {
+    if (!settings || !Array.isArray(settings.siteBlacklist)) return false
+    const host = location.hostname.toLowerCase()
+    return settings.siteBlacklist.some((entry) => {
+      const value = String(entry || '').toLowerCase().trim()
+      return value && (host === value || host.endsWith(`.${value}`))
+    })
+  }
+
+  function applyServerSettings() {
+    if (!serverSettings) return
+    if (!serverSettings.ballEnabled || isBlacklisted(serverSettings)) {
+      host.remove()
+      return
+    }
+    setAskMode(serverSettings.defaultMode === 'CURRENT' ? 'page' : 'library')
+  }
+
+  async function refreshServerSettings() {
+    if (!auth.token) {
+      serverSettings = null
+      return
+    }
+    try {
+      const response = await apiFetch('/users/me/plugin-settings')
+      if (!response.ok) return
+      const payload = await response.json()
+      if (payload && payload.code === 0 && payload.data) {
+        serverSettings = payload.data
+        applyServerSettings()
+      }
+    } catch {
+      // 服务端偏好不可用时使用本地设置
+    }
+  }
+
+  function matchesShortcut(event, shortcut) {
+    if (!shortcut) return false
+    const parts = String(shortcut).toLowerCase().split('+').map((part) => part.trim())
+    const key = parts.pop()
+    if (!key || event.key.toLowerCase() !== key) return false
+    if (parts.includes('ctrl') !== event.ctrlKey) return false
+    if (parts.includes('shift') !== event.shiftKey) return false
+    if (parts.includes('alt') !== event.altKey) return false
+    if (parts.includes('meta') !== event.metaKey) return false
+    return true
+  }
+
   ball.addEventListener('click', async () => {
     panel.classList.toggle('hidden')
     if (!panel.classList.contains('hidden')) {
       await syncAuth()
+      await refreshServerSettings()
       switchTab('ask')
     }
   })
@@ -464,14 +514,21 @@ function mount() {
   })
   saveButton.addEventListener('click', savePage)
 
+  document.addEventListener('keydown', (event) => {
+    if (matchesShortcut(event, serverSettings?.shortcut)) {
+      event.preventDefault()
+      ball.click()
+    }
+  })
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && (changes.shiyeAccessToken || changes.shiyeRefreshToken || changes.shiyeUser || changes.apiBaseUrl)) {
-      void syncAuth()
+      void syncAuth().then(refreshServerSettings)
     }
   })
 
   document.documentElement.appendChild(host)
-  void syncAuth()
+  void syncAuth().then(refreshServerSettings)
 }
 
 async function syncVisibility() {

@@ -16,10 +16,12 @@ public record MessageVO(
         Integer firstTokenMs,
         Integer latencyMs,
         List<CitationVO> citations,
+        String feedback,
         LocalDateTime createdAt
 ) {
 
-    public static MessageVO from(MessageEntity entity, List<CitationVO> citations) {
+    public static MessageVO from(MessageEntity entity, List<CitationVO> citations,
+                                 String feedback) {
         return new MessageVO(
                 String.valueOf(entity.getId()),
                 entity.getRole(),
@@ -31,6 +33,7 @@ public record MessageVO(
                 entity.getFirstTokenMs(),
                 entity.getLatencyMs(),
                 citations,
+                feedback,
                 entity.getCreatedAt()
         );
     }

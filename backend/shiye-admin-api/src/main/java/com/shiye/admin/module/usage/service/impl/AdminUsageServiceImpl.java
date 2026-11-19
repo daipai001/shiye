@@ -8,6 +8,7 @@ import com.shiye.admin.module.usage.domain.vo.AdminUsageResponse;
 import com.shiye.admin.module.usage.domain.vo.AdminUsageSummaryVO;
 import com.shiye.admin.module.usage.mapper.AdminUsageMapper;
 import com.shiye.admin.module.usage.service.AdminUsageService;
+import com.shiye.common.util.Csv;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -110,14 +111,7 @@ public class AdminUsageServiceImpl implements AdminUsageService {
     }
 
     private String csv(Object value) {
-        if (value == null) {
-            return "";
-        }
-        String text = String.valueOf(value);
-        if (text.contains(",") || text.contains("\"") || text.contains("\n")) {
-            return "\"" + text.replace("\"", "\"\"") + "\"";
-        }
-        return text;
+        return Csv.escape(value);
     }
 
     private LocalDateTime parseFrom(String value) {

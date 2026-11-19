@@ -11,6 +11,7 @@ public record RegisterRequest(
         @Size(min = 8, max = 72)
         @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).{8,72}$", message = "密码需同时包含字母和数字")
         String password,
-        @Size(max = 64) String displayName
+        @Size(max = 64) String displayName,
+        @Size(max = 64) String invitationCode
 ) {
 }

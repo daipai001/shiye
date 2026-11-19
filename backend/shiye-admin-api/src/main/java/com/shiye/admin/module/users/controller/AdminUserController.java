@@ -1,5 +1,6 @@
 package com.shiye.admin.module.users.controller;
 
+import com.shiye.admin.module.audit.service.AdminAuditService;
 import com.shiye.admin.module.users.domain.dto.AdminUserQuotaRequest;
 import com.shiye.admin.module.users.domain.dto.AdminUserStatusRequest;
 import com.shiye.admin.module.users.domain.vo.AdminUserVO;
@@ -20,9 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminUserController {
 
     private final AdminUserService adminUserService;
+    private final AdminAuditService auditService;
 
-    public AdminUserController(AdminUserService adminUserService) {
+    public AdminUserController(AdminUserService adminUserService,
+                               AdminAuditService auditService) {
         this.adminUserService = adminUserService;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -43,12 +47,19 @@ public class AdminUserController {
     @PutMapping("/{id}/status")
     public Result<AdminUserVO> status(@PathVariable long id,
                                       @Valid @RequestBody AdminUserStatusRequest request) {
-        return Result.ok(adminUserService.updateStatus(id, request));
+        AdminUserVO updated = adminUserService.updateStatus(id, request);
+        auditService.record("USER_STATUS_UPDATE", "USER", String.valueOf(id),
+                java.util.Map.of("status", request.status()));
+        return Result.ok(updated);
     }
 
     @PutMapping("/{id}/quota")
     public Result<AdminUserVO> quota(@PathVariable long id,
                                      @Valid @RequestBody AdminUserQuotaRequest request) {
-        return Result.ok(adminUserService.updateQuota(id, request));
+        AdminUserVO updated = adminUserService.updateQuota(id, request);
+        auditService.record("USER_QUOTA_UPDATE", "USER", String.valueOf(id),
+                java.util.Map.of("monthlyTokenQuota", request.monthlyTokenQuota(),
+                        "monthlyCostQuota", request.monthlyCostQuota()));
+        return Result.ok(updated);
     }
 }

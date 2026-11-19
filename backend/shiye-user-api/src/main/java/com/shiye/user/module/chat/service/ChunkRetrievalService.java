@@ -15,6 +15,7 @@ import com.shiye.user.module.article.mapper.ArticleFolderMapper;
 import com.shiye.user.module.article.mapper.ArticleMapper;
 import com.shiye.user.module.chat.support.RetrievalResult;
 import com.shiye.user.module.chat.support.RetrievedChunk;
+import com.shiye.user.module.tag.service.TagService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,6 +54,7 @@ public class ChunkRetrievalService {
     private final ArticleChunkMapper chunkMapper;
     private final RerankService rerankService;
     private final RuntimeSystemSettingsService systemSettingsService;
+    private final TagService tagService;
     private final int maxPerArticle;
     private final double minScore;
     private final int maxScanChunks;
@@ -69,6 +71,7 @@ public class ChunkRetrievalService {
             ArticleChunkMapper chunkMapper,
             RerankService rerankService,
             RuntimeSystemSettingsService systemSettingsService,
+            TagService tagService,
             @Value("${shiye.ai.retrieval.max-per-article:3}") int maxPerArticle,
             @Value("${shiye.ai.retrieval.min-score:0.2}") double minScore,
             @Value("${shiye.ai.retrieval.max-scan-chunks:5000}") int maxScanChunks,
@@ -83,6 +86,7 @@ public class ChunkRetrievalService {
         this.chunkMapper = chunkMapper;
         this.rerankService = rerankService;
         this.systemSettingsService = systemSettingsService;
+        this.tagService = tagService;
         this.maxPerArticle = Math.max(1, maxPerArticle);
         this.minScore = minScore;
         this.maxScanChunks = Math.max(100, maxScanChunks);
@@ -220,7 +224,7 @@ public class ChunkRetrievalService {
                                               Long scopeId, Set<Long> allowedArticleIds) {
         try {
             Long articleId = "ARTICLE".equals(scope) ? scopeId : null;
-            List<Long> articleIds = "FOLDER".equals(scope) && allowedArticleIds != null
+            List<Long> articleIds = allowedArticleIds != null
                     ? new ArrayList<>(allowedArticleIds)
                     : null;
             List<ArticleChunkSearchRow> rows = chunkMapper.searchKeyword(
@@ -401,7 +405,10 @@ public class ChunkRetrievalService {
         if ("FOLDER".equals(scope)) {
             return new HashSet<>(folderMapper.findArticleIdsByFolder(userId, scopeId));
         }
-        throw new BizException(ErrorCode.VALIDATION_ERROR, "当前仅支持 ALL / ARTICLE / FOLDER 范围");
+        if ("TAG".equals(scope)) {
+            return new HashSet<>(tagService.findArticleIdsByTag(userId, scopeId));
+        }
+        throw new BizException(ErrorCode.VALIDATION_ERROR, "当前仅支持 ALL / ARTICLE / FOLDER / TAG 范围");
     }
 
     private String userKey(long userId) {

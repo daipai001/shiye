@@ -5,11 +5,13 @@ import api from '../api/client'
 import { streamChat } from '../api/chat'
 import type {
   ApiResult,
+  BookmarkFolder,
   ChatCitation,
   ChatMessage,
   Conversation,
   PageResult,
   Quota,
+  Tag,
 } from '../api/types'
 
 const conversations = ref<Conversation[]>([])
@@ -22,6 +24,11 @@ const streaming = ref(false)
 const quota = ref<Quota | null>(null)
 const messagesBox = ref<HTMLElement | null>(null)
 let abortController: AbortController | null = null
+const activeRequestId = ref<string | null>(null)
+const scopeType = ref<'ALL' | 'FOLDER' | 'TAG'>('ALL')
+const scopeId = ref('')
+const folders = ref<BookmarkFolder[]>([])
+const tags = ref<Tag[]>([])
 
 const currentTitle = computed(() => {
   const current = conversations.value.find((item) => item.id === currentId.value)
@@ -65,9 +72,26 @@ async function loadConversations() {
   }
 }
 
+async function loadScopes() {
+  try {
+    const [folderResponse, tagResponse] = await Promise.all([
+      api.get<ApiResult<{ items: BookmarkFolder[] }>>('/bookmark-folders'),
+      api.get<ApiResult<{ items: Tag[] }>>('/tags'),
+    ])
+    folders.value = folderResponse.data.data.items
+    tags.value = tagResponse.data.data.items
+  } catch {
+    folders.value = []
+    tags.value = []
+  }
+}
+
 async function selectConversation(conversation: Conversation) {
   if (streaming.value) return
   currentId.value = conversation.id
+  const type = conversation.scopeType as 'ALL' | 'FOLDER' | 'TAG'
+  scopeType.value = ['ALL', 'FOLDER', 'TAG'].includes(type) ? type : 'ALL'
+  scopeId.value = conversation.scopeId || ''
   loadingMessages.value = true
   try {
     const { data } = await api.get<ApiResult<PageResult<ChatMessage>>>(
@@ -133,6 +157,10 @@ async function send() {
     ElMessage.warning('问题最多 4000 字')
     return
   }
+  if (scopeType.value !== 'ALL' && !scopeId.value) {
+    ElMessage.warning('请选择问答范围')
+    return
+  }
 
   draft.value = ''
   const userMessage: ChatMessage = {
@@ -162,11 +190,15 @@ async function send() {
   await streamChat(
     {
       conversationId: currentId.value,
-      scope: { type: 'ALL' },
+      scope: {
+        type: scopeType.value,
+        id: scopeType.value === 'ALL' ? null : scopeId.value,
+      },
       question,
     },
     {
       onMeta: (meta) => {
+        activeRequestId.value = meta.requestId
         currentId.value = meta.conversationId
         assistant.id = meta.messageId
         void scrollToBottom()
@@ -211,13 +243,41 @@ async function send() {
 
   assistant.streaming = false
   streaming.value = false
+  activeRequestId.value = null
   abortController = null
   await Promise.all([loadConversations(), loadQuota()])
   await scrollToBottom()
 }
 
+async function stopStreaming() {
+  const requestId = activeRequestId.value
+  if (requestId) {
+    try {
+      await api.post(`/chat/${requestId}/cancel`)
+    } catch {
+      // 本地中断仍然生效
+    }
+  }
+  abortController?.abort()
+  activeRequestId.value = null
+  streaming.value = false
+}
+
+async function submitFeedback(message: ChatMessage, rating: 'UP' | 'DOWN') {
+  if (!message.id || message.id.startsWith('local-') || message.streaming) {
+    return
+  }
+  try {
+    await api.post(`/messages/${message.id}/feedback`, { rating })
+    message.feedback = rating
+    ElMessage.success('感谢反馈')
+  } catch {
+    ElMessage.error('提交反馈失败')
+  }
+}
+
 onMounted(async () => {
-  await Promise.all([loadConversations(), loadQuota()])
+  await Promise.all([loadConversations(), loadQuota(), loadScopes()])
 })
 
 onBeforeUnmount(() => {
@@ -278,6 +338,53 @@ onBeforeUnmount(() => {
           </div>
         </header>
 
+        <div class="scope-bar">
+          <span class="scope-label">问答范围</span>
+          <el-select
+            v-model="scopeType"
+            size="small"
+            style="width: 120px"
+            :disabled="streaming"
+            @change="scopeId = ''"
+          >
+            <el-option label="全部资料" value="ALL" />
+            <el-option label="按文件夹" value="FOLDER" />
+            <el-option label="按标签" value="TAG" />
+          </el-select>
+          <el-select
+            v-if="scopeType === 'FOLDER'"
+            v-model="scopeId"
+            size="small"
+            filterable
+            placeholder="选择文件夹"
+            style="width: 220px"
+            :disabled="streaming"
+          >
+            <el-option
+              v-for="folder in folders"
+              :key="folder.id"
+              :label="folder.folderPath"
+              :value="folder.id"
+            />
+          </el-select>
+          <el-select
+            v-if="scopeType === 'TAG'"
+            v-model="scopeId"
+            size="small"
+            filterable
+            placeholder="选择标签"
+            style="width: 180px"
+            :disabled="streaming"
+          >
+            <el-option
+              v-for="tag in tags"
+              :key="tag.id"
+              :label="tag.name"
+              :value="tag.id"
+            />
+          </el-select>
+        </div>
+
         <div ref="messagesBox" class="messages">
           <div v-if="loadingMessages" class="chat-empty">正在加载消息…</div>
           <div v-else-if="messages.length === 0" class="chat-empty">
@@ -324,6 +431,28 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
               </div>
+
+              <div
+                v-if="message.role === 'ASSISTANT' && !message.streaming && message.content && !message.id.startsWith('local-')"
+                class="feedback"
+              >
+                <button
+                  type="button"
+                  :class="{ active: message.feedback === 'UP' }"
+                  title="有帮助"
+                  @click="submitFeedback(message, 'UP')"
+                >
+                  👍
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: message.feedback === 'DOWN' }"
+                  title="没帮助"
+                  @click="submitFeedback(message, 'DOWN')"
+                >
+                  👎
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -338,6 +467,14 @@ onBeforeUnmount(() => {
             :disabled="streaming"
             @keydown.enter.exact.prevent="send"
           />
+          <button
+            v-if="streaming"
+            type="button"
+            class="stop-button"
+            @click="stopStreaming"
+          >
+            停止
+          </button>
           <button type="button" class="send-button" :disabled="streaming || !draft.trim()" @click="send">
             {{ streaming ? '回答中…' : '发送' }}
           </button>
@@ -436,6 +573,19 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+.scope-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+.scope-label {
+  color: var(--faint);
+  font-size: 9.5px;
+  letter-spacing: 0.5px;
 }
 .chat-top {
   display: flex;
@@ -634,6 +784,37 @@ onBeforeUnmount(() => {
   margin-top: 3px;
   color: var(--faint);
   font-size: 9px;
+}
+.feedback {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.feedback button {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.feedback button.active {
+  border-color: var(--primary);
+  background: #f7f7fe;
+  opacity: 1;
+}
+.stop-button {
+  float: right;
+  margin: 7px 6px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  padding: 7px 14px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
 }
 .composer {
   border-top: 1px solid var(--line);

@@ -73,6 +73,28 @@ public interface AiUsageMapper {
                @Param("status") String status);
 
     @Select("""
+            <script>
+            SELECT id, request_id, user_id, source, scene, model, prompt_tokens, completion_tokens,
+                   total_tokens, cached_tokens, input_price, output_price, cost, currency,
+                   latency_ms, first_token_ms, status, error_code, estimated, conversation_id,
+                   article_id, client_version, created_at
+            FROM ai_usage
+            WHERE user_id = #{userId}
+            <if test="source != null"> AND source = #{source}</if>
+            <if test="scene != null"> AND scene = #{scene}</if>
+            <if test="model != null"> AND model = #{model}</if>
+            <if test="status != null"> AND status = #{status}</if>
+            ORDER BY created_at DESC, id DESC
+            LIMIT 10000
+            </script>
+            """)
+    List<AiUsageEntity> findForExport(@Param("userId") long userId,
+                                      @Param("source") String source,
+                                      @Param("scene") String scene,
+                                      @Param("model") String model,
+                                      @Param("status") String status);
+
+    @Select("""
             SELECT COUNT(*) AS calls,
                    COALESCE(SUM(total_tokens), 0) AS tokens,
                    COALESCE(SUM(cost), 0) AS cost,

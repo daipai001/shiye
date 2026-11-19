@@ -3,6 +3,7 @@ package com.shiye.user.module.auth.controller;
 import com.shiye.common.api.ErrorCode;
 import com.shiye.common.api.Result;
 import com.shiye.common.exception.BizException;
+import com.shiye.user.common.ratelimit.MinuteRateLimiter;
 import com.shiye.user.common.security.UserContext;
 import com.shiye.user.module.auth.domain.dto.ExtensionTokenRequest;
 import com.shiye.user.module.auth.domain.dto.LoginRequest;
@@ -86,7 +87,7 @@ public class AuthController {
     }
 
     private void applyRateLimit(HttpServletResponse response, String ip) {
-        AuthRateLimitService.RateLimitResult result = rateLimitService.hit(ip);
+        MinuteRateLimiter.RateLimitResult result = rateLimitService.hit(ip);
         if (result == null) {
             return;
         }

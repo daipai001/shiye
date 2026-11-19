@@ -1,5 +1,6 @@
 package com.shiye.user.module.tag.domain.vo;
 
+import com.shiye.user.module.tag.domain.entity.TagEntity;
 import com.shiye.user.module.tag.domain.entity.TagRow;
 
 public record TagVO(
@@ -8,6 +9,15 @@ public record TagVO(
         String color,
         long articleCount
 ) {
+
+    public static TagVO fromEntity(TagEntity entity) {
+        return new TagVO(
+                String.valueOf(entity.getId()),
+                entity.getName(),
+                entity.getColor(),
+                0
+        );
+    }
 
     public static TagVO fromRow(TagRow row) {
         return new TagVO(

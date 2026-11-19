@@ -9,10 +9,14 @@ import com.shiye.user.common.ai.chat.ChatMessage;
 import com.shiye.user.common.ai.chat.DeepSeekChatClient;
 import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import com.shiye.user.module.chat.domain.dto.ChatStreamRequest;
+import com.shiye.user.module.chat.domain.dto.MessageFeedbackRequest;
 import com.shiye.user.module.chat.domain.dto.PageChatRequest;
 import com.shiye.user.module.chat.domain.entity.CitationEntity;
 import com.shiye.user.module.chat.domain.entity.ConversationEntity;
 import com.shiye.user.module.chat.domain.entity.MessageEntity;
+import com.shiye.user.module.chat.domain.entity.MessageFeedbackEntity;
+import com.shiye.user.module.chat.domain.entity.MessageFeedbackRow;
+import com.shiye.user.module.chat.domain.vo.ChatCancelVO;
 import com.shiye.user.module.chat.domain.vo.ChatSseCitation;
 import com.shiye.user.module.chat.domain.vo.ChatSseDelta;
 import com.shiye.user.module.chat.domain.vo.ChatSseDone;
@@ -25,8 +29,10 @@ import com.shiye.user.module.chat.domain.vo.ConversationVO;
 import com.shiye.user.module.chat.domain.vo.MessageVO;
 import com.shiye.user.module.chat.mapper.CitationMapper;
 import com.shiye.user.module.chat.mapper.ConversationMapper;
+import com.shiye.user.module.chat.mapper.MessageFeedbackMapper;
 import com.shiye.user.module.chat.mapper.MessageMapper;
 import com.shiye.user.module.chat.service.ChatService;
+import com.shiye.user.module.chat.service.ChatStreamRegistry;
 import com.shiye.user.module.chat.service.ChunkRetrievalService;
 import com.shiye.user.module.chat.support.RetrievalResult;
 import com.shiye.user.module.chat.support.RetrievedChunk;
@@ -67,27 +73,33 @@ public class ChatServiceImpl implements ChatService {
     private final ConversationMapper conversationMapper;
     private final MessageMapper messageMapper;
     private final CitationMapper citationMapper;
+    private final MessageFeedbackMapper feedbackMapper;
     private final ChunkRetrievalService retrievalService;
     private final DeepSeekChatClient chatClient;
     private final UsageService usageService;
     private final RuntimeSystemSettingsService systemSettingsService;
+    private final ChatStreamRegistry streamRegistry;
     private final Executor chatExecutor;
 
     public ChatServiceImpl(ConversationMapper conversationMapper,
                            MessageMapper messageMapper,
                            CitationMapper citationMapper,
+                           MessageFeedbackMapper feedbackMapper,
                            ChunkRetrievalService retrievalService,
                            DeepSeekChatClient chatClient,
                            UsageService usageService,
                            RuntimeSystemSettingsService systemSettingsService,
+                           ChatStreamRegistry streamRegistry,
                            @Qualifier("chatExecutor") Executor chatExecutor) {
         this.conversationMapper = conversationMapper;
         this.messageMapper = messageMapper;
         this.citationMapper = citationMapper;
+        this.feedbackMapper = feedbackMapper;
         this.retrievalService = retrievalService;
         this.chatClient = chatClient;
         this.usageService = usageService;
         this.systemSettingsService = systemSettingsService;
+        this.streamRegistry = streamRegistry;
         this.chatExecutor = chatExecutor;
     }
 
@@ -160,10 +172,12 @@ public class ChatServiceImpl implements ChatService {
                 .map(MessageEntity::getId)
                 .toList();
         Map<Long, List<CitationVO>> citations = loadCitations(userId, assistantIds);
+        Map<Long, String> feedback = loadFeedback(userId, assistantIds);
         List<MessageVO> items = entities.stream()
                 .map(message -> MessageVO.from(
                         message,
-                        citations.getOrDefault(message.getId(), List.of())))
+                        citations.getOrDefault(message.getId(), List.of()),
+                        feedback.get(message.getId())))
                 .toList();
         return PageResult.of(items, total, safePage, safeSize);
     }
@@ -193,6 +207,7 @@ public class ChatServiceImpl implements ChatService {
         long started = System.currentTimeMillis();
         String requestId = "req_" + UUID.randomUUID().toString().replace("-", "")
                 .substring(0, 24);
+        streamRegistry.register(requestId, userId, cancelled);
         ConversationEntity conversation = null;
         MessageEntity assistant = null;
         StringBuilder answer = new StringBuilder();
@@ -301,6 +316,7 @@ public class ChatServiceImpl implements ChatService {
                     started, firstTokenMs, "AI_UNAVAILABLE", "问答服务暂不可用",
                     emitter, cancelled, ex);
         } finally {
+            streamRegistry.unregister(requestId);
             safeComplete(emitter);
         }
     }
@@ -310,6 +326,7 @@ public class ChatServiceImpl implements ChatService {
         long started = System.currentTimeMillis();
         String requestId = "req_" + UUID.randomUUID().toString().replace("-", "")
                 .substring(0, 24);
+        streamRegistry.register(requestId, userId, cancelled);
         StringBuilder answer = new StringBuilder();
         AtomicInteger firstTokenMs = new AtomicInteger(-1);
 
@@ -362,6 +379,7 @@ public class ChatServiceImpl implements ChatService {
             handlePageFailure(userId, source, requestId, started, "AI_UNAVAILABLE",
                     "问答服务暂不可用", emitter, cancelled, ex);
         } finally {
+            streamRegistry.unregister(requestId);
             safeComplete(emitter);
         }
     }
@@ -433,6 +451,28 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    @Override
+    public ChatCancelVO cancel(long userId, String requestId) {
+        return new ChatCancelVO(streamRegistry.cancel(userId, requestId));
+    }
+
+    @Override
+    public void feedback(long userId, long messageId, MessageFeedbackRequest request) {
+        MessageEntity message = messageMapper.findByIdAndUser(messageId, userId);
+        if (message == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "消息不存在");
+        }
+        if (!"ASSISTANT".equals(message.getRole())) {
+            throw new BizException(ErrorCode.VALIDATION_ERROR, "只能对助手回答反馈");
+        }
+        MessageFeedbackEntity entity = new MessageFeedbackEntity();
+        entity.setMessageId(messageId);
+        entity.setUserId(userId);
+        entity.setRating(request.rating());
+        entity.setComment(truncate(request.comment(), 500));
+        feedbackMapper.upsert(entity);
+    }
+
     private void recordRerankUsage(long userId, String source, ConversationEntity conversation,
                                    String requestId, RetrievalResult retrieval) {
         if (!retrieval.reranked()) {
@@ -475,9 +515,9 @@ public class ChatServiceImpl implements ChatService {
             return scope;
         }
         String type = request.scope().type().trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("ALL", "ARTICLE", "FOLDER").contains(type)) {
+        if (!Set.of("ALL", "ARTICLE", "FOLDER", "TAG").contains(type)) {
             throw new BizException(ErrorCode.VALIDATION_ERROR,
-                    "当前仅支持 ALL / ARTICLE / FOLDER 范围");
+                    "当前仅支持 ALL / ARTICLE / FOLDER / TAG 范围");
         }
         Long id = request.scope().id() == null ? null : Long.parseLong(request.scope().id());
         if (!"ALL".equals(type) && id == null) {
@@ -583,6 +623,17 @@ public class ChatServiceImpl implements ChatService {
                     .add(CitationVO.from(citation));
         }
         return grouped;
+    }
+
+    private Map<Long, String> loadFeedback(long userId, List<Long> messageIds) {
+        if (messageIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, String> result = new HashMap<>();
+        for (MessageFeedbackRow row : feedbackMapper.findByMessageIds(userId, messageIds)) {
+            result.put(row.getMessageId(), row.getRating());
+        }
+        return result;
     }
 
     private ConversationEntity findConversation(long userId, long conversationId) {

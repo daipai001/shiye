@@ -41,4 +41,23 @@ public interface UserMapper {
 
     @Update("UPDATE users SET last_login_at = UTC_TIMESTAMP(3) WHERE id = #{id}")
     int updateLastLogin(@Param("id") Long id);
+
+    @Update("""
+            UPDATE users
+            SET display_name = #{displayName},
+                avatar_url = #{avatarUrl},
+                updated_at = UTC_TIMESTAMP(3)
+            WHERE id = #{id} AND deleted_at IS NULL
+            """)
+    int updateProfile(@Param("id") long id,
+                      @Param("displayName") String displayName,
+                      @Param("avatarUrl") String avatarUrl);
+
+    @Update("""
+            UPDATE users
+            SET password_hash = #{passwordHash}, updated_at = UTC_TIMESTAMP(3)
+            WHERE id = #{id} AND deleted_at IS NULL
+            """)
+    int updatePassword(@Param("id") long id,
+                       @Param("passwordHash") String passwordHash);
 }

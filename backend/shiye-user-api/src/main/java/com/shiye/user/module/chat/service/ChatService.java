@@ -2,7 +2,9 @@ package com.shiye.user.module.chat.service;
 
 import com.shiye.common.api.PageResult;
 import com.shiye.user.module.chat.domain.dto.ChatStreamRequest;
+import com.shiye.user.module.chat.domain.dto.MessageFeedbackRequest;
 import com.shiye.user.module.chat.domain.dto.PageChatRequest;
+import com.shiye.user.module.chat.domain.vo.ChatCancelVO;
 import com.shiye.user.module.chat.domain.vo.ConversationDetailVO;
 import com.shiye.user.module.chat.domain.vo.ConversationVO;
 import com.shiye.user.module.chat.domain.vo.MessageVO;
@@ -24,4 +26,8 @@ public interface ChatService {
     ConversationVO rename(long userId, long conversationId, String title);
 
     void delete(long userId, long conversationId);
+
+    ChatCancelVO cancel(long userId, String requestId);
+
+    void feedback(long userId, long messageId, MessageFeedbackRequest request);
 }

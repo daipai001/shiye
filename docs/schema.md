@@ -124,20 +124,20 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 知识库 | `article_folders` | 资料-文件夹关系 | P0 |
 | 知识库 | `tags` | 标签 | P0 |
 | 知识库 | `article_tags` | 资料-标签关系 | P0 |
-| 知识库 | `ingest_tasks` | 异步解析/索引任务 | P0 |
+| 知识库 | `ingest_tasks` | 异步解析/索引任务（预留，当前任务页基于 `bookmark_items`） | 预留 |
 | 问答 | `conversations` | 会话 | P0 |
 | 问答 | `messages` | 消息 | P0 |
 | 问答 | `citations` | 引用 | P0 |
-| 问答 | `message_feedback` | 回答反馈 | P1 |
+| 问答 | `message_feedback` | 回答反馈 | 已启用 |
 | AI | `ai_usage` | 每次 AI 调用明细 | P0 |
-| AI | `ai_usage_daily` | 日汇总 | P0 |
+| AI | `ai_usage_daily` | 日汇总（预留，当前直接聚合 `ai_usage`） | 预留 |
 | AI | `user_usage_monthly` | 用户月用量（配额） | P0 |
-| AI | `model_prices` | 模型价格 | P0 |
+| AI | `model_prices` | 模型价格（预留，当前单价来自 `system_settings` 并快照到 `ai_usage`） | 预留 |
 | 配置 | `system_settings` | 全局配置 | P0 |
-| 运维 | `admin_audit_logs` | 管理员审计 | P2 |
-| 评测 | `rag_eval_cases` | RAG 评测问题 | P1 |
-| 评测 | `rag_eval_runs` | 评测运行 | P1 |
-| 评测 | `rag_eval_results` | 评测结果 | P1 |
+| 运维 | `admin_audit_logs` | 管理员审计 | 已启用 |
+| 评测 | `rag_eval_cases` | RAG 评测问题 | 已启用 |
+| 评测 | `rag_eval_runs` | 评测运行 | 已启用 |
+| 评测 | `rag_eval_results` | 评测结果 | 已启用 |
 | 幂等 | `idempotency_keys` | POST 幂等键 | P0 |
 
 ---

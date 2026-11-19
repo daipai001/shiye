@@ -17,6 +17,8 @@ public record AdminSettingsVO(
         boolean ragHybridEnabled,
         boolean ragRerankEnabled,
         boolean ragCitationRequired,
+        boolean registrationInvitationRequired,
+        String registrationInvitationCode,
         String source
 ) {
 }

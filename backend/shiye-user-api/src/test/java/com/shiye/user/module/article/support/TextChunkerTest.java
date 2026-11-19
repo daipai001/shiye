@@ -21,7 +21,7 @@ class TextChunkerTest {
         RuntimeSystemSettingsService settingsService = mock(RuntimeSystemSettingsService.class);
         when(settingsService.current()).thenReturn(new SystemSettings(
                 true, 200000, new BigDecimal("5.0"), 2000000, new BigDecimal("20.0"),
-                0.8, 10, 0, 200, 30, 8, true, true, true));
+                0.8, 10, 0, 200, 30, 8, true, true, true, false, null));
         return new TextChunker(settingsService, 300, 100, 100);
     }
 

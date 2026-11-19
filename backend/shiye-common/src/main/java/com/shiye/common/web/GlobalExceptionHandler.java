@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
@@ -57,6 +58,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleUploadSize(MaxUploadSizeExceededException ex) {
         return ResponseEntity.status(ErrorCode.FILE_TOO_LARGE.httpStatus())
                 .body(Result.fail(ErrorCode.FILE_TOO_LARGE, "文件不能超过 20MB"));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Result<Void>> handleMethodNotAllowed(
+            HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.httpStatus())
+                .body(Result.fail(ErrorCode.METHOD_NOT_ALLOWED));
     }
 
     @ExceptionHandler(Exception.class)

@@ -98,6 +98,8 @@ shiye:
       rerank-candidates: ${RETRIEVAL_RERANK_CANDIDATES:20}
   registration:
     enabled: ${REGISTRATION_ENABLED:true}
+    invitation-required: ${REGISTRATION_INVITATION_REQUIRED:false}
+    invitation-code: ${REGISTRATION_INVITATION_CODE:}
     default-token-quota: ${REGISTRATION_DEFAULT_TOKEN_QUOTA:200000}
     default-cost-quota: ${REGISTRATION_DEFAULT_COST_QUOTA:5.000000}
   usage:
@@ -107,6 +109,9 @@ shiye:
     daily-token-limit: ${USAGE_DAILY_TOKEN_LIMIT:0}
   file:
     upload-dir: ${FILE_UPLOAD_DIR:./data/uploads}
+  eval:
+    worker-enabled: ${EVAL_WORKER_ENABLED:true}
+    worker-delay-ms: ${EVAL_WORKER_DELAY_MS:30000}
   bookmark:
     worker-enabled: ${BOOKMARK_WORKER_ENABLED:true}
     worker-delay-ms: ${BOOKMARK_WORKER_DELAY_MS:3000}

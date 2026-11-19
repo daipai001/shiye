@@ -19,6 +19,8 @@ public record SystemSettings(
         Integer ragTopK,
         Boolean ragHybridEnabled,
         Boolean ragRerankEnabled,
-        Boolean ragCitationRequired
+        Boolean ragCitationRequired,
+        Boolean registrationInvitationRequired,
+        String registrationInvitationCode
 ) {
 }

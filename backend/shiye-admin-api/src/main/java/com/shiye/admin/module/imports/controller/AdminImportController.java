@@ -1,5 +1,6 @@
 package com.shiye.admin.module.imports.controller;
 
+import com.shiye.admin.module.audit.service.AdminAuditService;
 import com.shiye.admin.module.imports.domain.dto.AdminImportRetryRequest;
 import com.shiye.admin.module.imports.domain.vo.AdminImportItemVO;
 import com.shiye.admin.module.imports.domain.vo.AdminImportRetryResponse;
@@ -21,9 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminImportController {
 
     private final AdminImportService importService;
+    private final AdminAuditService auditService;
 
-    public AdminImportController(AdminImportService importService) {
+    public AdminImportController(AdminImportService importService,
+                                 AdminAuditService auditService) {
         this.importService = importService;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -53,21 +57,31 @@ public class AdminImportController {
     public Result<AdminImportRetryResponse> retry(
             @PathVariable long id,
             @RequestBody(required = false) AdminImportRetryRequest request) {
-        return Result.ok(importService.retry(id, request == null ? null : request.itemIds()));
+        AdminImportRetryResponse response = importService.retry(
+                id, request == null ? null : request.itemIds());
+        auditService.record("IMPORT_RETRY", "BOOKMARK_IMPORT", String.valueOf(id),
+                java.util.Map.of("retried", response.retried()));
+        return Result.ok(response);
     }
 
     @PostMapping("/{id}/pause")
     public Result<AdminImportStatusResponse> pause(@PathVariable long id) {
-        return Result.ok(importService.pause(id));
+        AdminImportStatusResponse response = importService.pause(id);
+        auditService.record("IMPORT_PAUSE", "BOOKMARK_IMPORT", String.valueOf(id), null);
+        return Result.ok(response);
     }
 
     @PostMapping("/{id}/resume")
     public Result<AdminImportStatusResponse> resume(@PathVariable long id) {
-        return Result.ok(importService.resume(id));
+        AdminImportStatusResponse response = importService.resume(id);
+        auditService.record("IMPORT_RESUME", "BOOKMARK_IMPORT", String.valueOf(id), null);
+        return Result.ok(response);
     }
 
     @PostMapping("/{id}/cancel")
     public Result<AdminImportStatusResponse> cancel(@PathVariable long id) {
-        return Result.ok(importService.cancel(id));
+        AdminImportStatusResponse response = importService.cancel(id);
+        auditService.record("IMPORT_CANCEL", "BOOKMARK_IMPORT", String.valueOf(id), null);
+        return Result.ok(response);
     }
 }

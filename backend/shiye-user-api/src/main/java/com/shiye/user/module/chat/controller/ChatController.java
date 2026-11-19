@@ -1,16 +1,20 @@
 package com.shiye.user.module.chat.controller;
 
 import com.shiye.common.api.ErrorCode;
+import com.shiye.common.api.Result;
 import com.shiye.common.exception.BizException;
+import com.shiye.user.common.ratelimit.MinuteRateLimiter;
 import com.shiye.user.common.security.UserContext;
 import com.shiye.user.module.chat.domain.dto.ChatStreamRequest;
 import com.shiye.user.module.chat.domain.dto.PageChatRequest;
+import com.shiye.user.module.chat.domain.vo.ChatCancelVO;
 import com.shiye.user.module.chat.service.ChatRateLimitService;
 import com.shiye.user.module.chat.service.ChatService;
 import com.shiye.user.module.usage.service.UsageService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -61,8 +65,13 @@ public class ChatController {
         return emitter;
     }
 
+    @PostMapping("/{requestId}/cancel")
+    public Result<ChatCancelVO> cancel(@PathVariable String requestId) {
+        return Result.ok(chatService.cancel(UserContext.requireUserId(), requestId));
+    }
+
     private void applyRateLimit(HttpServletResponse response, long userId) {
-        ChatRateLimitService.RateLimitResult result = rateLimitService.hit(userId);
+        MinuteRateLimiter.RateLimitResult result = rateLimitService.hit(userId);
         if (result == null) {
             return;
         }

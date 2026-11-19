@@ -17,6 +17,7 @@ const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const displayName = ref('')
+const invitationCode = ref('')
 const loading = ref(false)
 
 function switchMode(next: Mode) {
@@ -65,6 +66,7 @@ async function submit() {
             email: email.value.trim(),
             password: password.value,
             displayName: displayName.value.trim() || undefined,
+            invitationCode: invitationCode.value.trim() || undefined,
           }
     const { data } = await api.post<ApiResult<TokenResponse>>(endpoint, payload)
     auth.setSession(data.data)
@@ -168,6 +170,11 @@ async function submit() {
               autocomplete="new-password"
               placeholder="再输入一次"
             />
+          </label>
+
+          <label v-if="mode === 'register'" class="field">
+            <span>邀请码</span>
+            <input v-model="invitationCode" type="text" maxlength="64" placeholder="如需邀请码请填写" />
           </label>
 
           <button class="submit" type="submit" :disabled="loading">

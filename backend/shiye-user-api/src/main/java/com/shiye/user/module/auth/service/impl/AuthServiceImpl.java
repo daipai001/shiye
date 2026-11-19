@@ -9,6 +9,8 @@ import com.shiye.common.settings.SystemSettings;
 import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import com.shiye.user.module.auth.domain.dto.LoginRequest;
 import com.shiye.user.module.auth.domain.dto.RegisterRequest;
+import com.shiye.user.module.auth.domain.dto.UserPasswordUpdateRequest;
+import com.shiye.user.module.auth.domain.dto.UserProfileUpdateRequest;
 import com.shiye.user.module.auth.domain.entity.ExtensionAuthCodeEntity;
 import com.shiye.user.module.auth.domain.entity.RefreshTokenEntity;
 import com.shiye.user.module.auth.domain.entity.UserEntity;
@@ -66,6 +68,14 @@ public class AuthServiceImpl implements AuthService {
         SystemSettings settings = systemSettingsService.current();
         if (!settings.registrationEnabled()) {
             throw new BizException(ErrorCode.FORBIDDEN, "注册已关闭");
+        }
+        if (Boolean.TRUE.equals(settings.registrationInvitationRequired())) {
+            String expected = settings.registrationInvitationCode();
+            String provided = request.invitationCode() == null
+                    ? "" : request.invitationCode().trim();
+            if (expected == null || expected.isBlank() || !expected.equals(provided)) {
+                throw new BizException(ErrorCode.FORBIDDEN, "邀请码无效");
+            }
         }
         String email = normalizeEmail(request.email());
         if (userMapper.findByEmail(email) != null) {
@@ -182,18 +192,53 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public UserSummary me(long userId) {
-        UserEntity user = userMapper.findById(userId);
-        if (user == null) {
-            throw new BizException(ErrorCode.UNAUTHORIZED);
+        return UserSummary.from(requireActiveUser(userId));
+    }
+
+    @Override
+    @Transactional
+    public UserSummary updateProfile(long userId, UserProfileUpdateRequest request) {
+        UserEntity user = requireActiveUser(userId);
+        String displayName = request.displayName() == null
+                ? user.getDisplayName() : request.displayName().trim();
+        if (displayName == null || displayName.isBlank()) {
+            throw new BizException(ErrorCode.VALIDATION_ERROR, "昵称不能为空");
         }
-        if (!"ACTIVE".equals(user.getStatus())) {
-            throw new BizException(ErrorCode.USER_DISABLED);
+        String avatarUrl = request.avatarUrl() == null
+                ? user.getAvatarUrl() : request.avatarUrl().trim();
+        if (avatarUrl != null && avatarUrl.isBlank()) {
+            avatarUrl = null;
         }
+        user.setDisplayName(displayName);
+        user.setAvatarUrl(avatarUrl);
+        userMapper.updateProfile(userId, displayName, avatarUrl);
         return UserSummary.from(user);
     }
 
     @Override
+    @Transactional
+    public void changePassword(long userId, UserPasswordUpdateRequest request) {
+        UserEntity user = requireActiveUser(userId);
+        if (!passwordEncoder.matches(request.oldPassword(), user.getPasswordHash())) {
+            throw new BizException(ErrorCode.UNAUTHORIZED, "原密码错误");
+        }
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw new BizException(ErrorCode.VALIDATION_ERROR, "新密码不能与原密码相同");
+        }
+        userMapper.updatePassword(userId, passwordEncoder.encode(request.newPassword()));
+        refreshTokenMapper.revokeAllForSubject(SUBJECT_USER, userId);
+    }
+
+    @Override
     public UserQuotaVO quota(long userId) {
+        UserEntity user = requireActiveUser(userId);
+        return new UserQuotaVO(
+                user.getMonthlyTokenQuota() == null ? 0 : user.getMonthlyTokenQuota(),
+                user.getMonthlyCostQuota() == null ? BigDecimal.ZERO : user.getMonthlyCostQuota()
+        );
+    }
+
+    private UserEntity requireActiveUser(long userId) {
         UserEntity user = userMapper.findById(userId);
         if (user == null) {
             throw new BizException(ErrorCode.UNAUTHORIZED);
@@ -201,10 +246,7 @@ public class AuthServiceImpl implements AuthService {
         if (!"ACTIVE".equals(user.getStatus())) {
             throw new BizException(ErrorCode.USER_DISABLED);
         }
-        return new UserQuotaVO(
-                user.getMonthlyTokenQuota() == null ? 0 : user.getMonthlyTokenQuota(),
-                user.getMonthlyCostQuota() == null ? BigDecimal.ZERO : user.getMonthlyCostQuota()
-        );
+        return user;
     }
 
     private TokenResponse issueTokens(UserEntity user, String userAgent, String ip) {

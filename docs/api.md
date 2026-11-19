@@ -158,6 +158,7 @@
 | 40402 | 404 | ARTICLE_NOT_FOUND | 资料不存在 |
 | 40403 | 404 | CONVERSATION_NOT_FOUND | 会话不存在 |
 | 40404 | 404 | TASK_NOT_FOUND | 任务不存在 |
+| 40501 | 405 | METHOD_NOT_ALLOWED | 请求方法不支持 |
 | 40901 | 409 | CONFLICT | 唯一冲突/重复 |
 | 40902 | 409 | IDEMPOTENCY_CONFLICT | 幂等键冲突 |
 | 40903 | 409 | IMPORT_ALREADY_RUNNING | 导入任务运行中 |
@@ -268,7 +269,7 @@ admin-web → POST /admin/api/v1/auth/login
 | `email` | string | 是 | 邮箱，≤190 |
 | `password` | string | 是 | 8~72 位，至少字母+数字 |
 | `displayName` | string | 否 | ≤64 |
-| `invitationCode` | string | 否 | P1 |
+| `invitationCode` | string | 否 | 开启邀请码注册时必填 |
 
 **响应 `data`**
 
@@ -370,7 +371,7 @@ admin-web → POST /admin/api/v1/auth/login
 | `createdAt` | string | 创建时间 |
 | `quota` | Quota | 当月配额（用量模块 M3 接入） |
 
-> 当前认证里程碑先返回基础资料；`quota` 字段随用量记账模块一起实现，前端不要依赖它一定存在。
+> 已接入账户资料、密码修改和插件偏好持久化；`quota` 通过 `/usage/quota` 获取。
 
 **Quota**
 
@@ -875,7 +876,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
-#### PATCH `/tags/{id}`（P1）
+#### PATCH `/tags/{id}`
 
 **认证**：用户
 
@@ -887,7 +888,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
-#### DELETE `/tags/{id}`（P1）
+#### DELETE `/tags/{id}`
 
 **认证**：用户
 
@@ -895,7 +896,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
-#### POST `/articles/{id}/tags`（P1）
+#### POST `/articles/{id}/tags`
 
 **认证**：用户
 
@@ -905,7 +906,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
-#### DELETE `/articles/{id}/tags/{tagId}`（P1）
+#### DELETE `/articles/{id}/tags/{tagId}`
 
 **认证**：用户
 
@@ -915,7 +916,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 3.4 问答
 
-> **当前实现**：`POST /chat/stream` 已接入 DeepSeek SSE、混合检索和 rerank，支持 `ALL / ARTICLE / FOLDER` 范围；`POST /chat/page-stream` 支持插件当前页临时问答；`TAG / CURRENT` 资料库范围后续接入。
+> **当前实现**：`POST /chat/stream` 已接入 DeepSeek SSE、混合检索和 rerank，支持 `ALL / ARTICLE / FOLDER / TAG` 范围；`POST /chat/page-stream` 支持插件当前页临时问答。
 > 引用、usage、会话/消息持久化已接通；默认使用联调 embedding，真实语义检索需配置 BGE-M3。
 
 #### POST `/chat/stream`
@@ -985,7 +986,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
-#### POST `/chat/{requestId}/cancel`（P1）
+#### POST `/chat/{requestId}/cancel`
 
 **认证**：用户
 
@@ -1077,7 +1078,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
-#### POST `/messages/{id}/feedback`（P1）
+#### POST `/messages/{id}/feedback`
 
 **认证**：用户
 
@@ -1158,7 +1159,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
-#### GET `/usage/export`（P1）
+#### GET `/usage/export`
 
 **认证**：用户
 
@@ -1231,8 +1232,8 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 4.2 总览与用量
 
-> **当前实现**：总览、用量列表/汇总/CSV 导出、用户列表与配额/状态、导入任务与条目、索引任务、模型在线配置（Chat / Embedding / Rerank）、系统设置/预算在线编辑和连接测试已接入。
-> 告警通知和 RAG 参数在线编辑仍在后续阶段。
+> **当前实现**：总览、用量列表/汇总/CSV 导出、用户列表与配额/状态、导入任务与条目、索引任务、模型在线配置、系统设置/预算在线编辑、连接测试、RAG 评测、审计日志已接入。
+> 告警通知仍待接入。
 
 #### GET `/overview`
 
@@ -1625,6 +1626,8 @@ admin-web → POST /admin/api/v1/auth/login
   "ragHybridEnabled": true,
   "ragRerankEnabled": true,
   "ragCitationRequired": true,
+  "registrationInvitationRequired": false,
+  "registrationInvitationCode": null,
   "source": "DATABASE"
 }
 ```
@@ -1655,6 +1658,8 @@ admin-web → POST /admin/api/v1/auth/login
 | `ragHybridEnabled` | boolean | 向量 + 关键词混合检索 |
 | `ragRerankEnabled` | boolean | RAG rerank 开关（模型配置中的 rerank 也要开启） |
 | `ragCitationRequired` | boolean | 是否强制模型输出引用编号 |
+| `registrationInvitationRequired` | boolean | 注册是否需要邀请码 |
+| `registrationInvitationCode` | string/null | 邀请码；为空时关闭邀请校验 |
 
 **响应**：更新后的设置（含 `source`）
 
@@ -1684,7 +1689,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 4.6 审计与评测（P1/P2）
 
-#### GET `/audit-logs`（P2）
+#### GET `/audit-logs`
 
 **认证**：管理员
 
@@ -1694,37 +1699,49 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
-#### GET `/eval/cases`（P1）
+#### GET `/eval/cases`
 
 **认证**：管理员
 
-**Query**：`page`、`pageSize`、`status?`
+**Query**：`page`、`pageSize`、`userId?`、`status?`
 
 **响应**：分页评测用例。
 
 ---
 
-#### POST `/eval/cases`（P1）
+#### POST `/eval/cases`
 
 **认证**：管理员
 
-**请求**：`question`、`expectedArticleIds?`、`expectedChunkIds?`、`goldAnswer?`、`tags?`
+**请求**：`userId`（必填）、`question`、`expectedArticleIds?`、`expectedChunkIds?`、`goldAnswer?`、`tags?`、`status?`
 
 **响应**：用例。
 
 ---
 
-#### POST `/eval/runs`（P1）
+#### GET `/eval/runs`
 
 **认证**：管理员
 
-**请求**：`name`、`topK?`、`rerank?`、`model?`
+**Query**：`page`、`pageSize`、`userId?`
 
-**响应**：`{ "runId": "...", "status": "RUNNING" }`
+**响应**：分页评测运行（状态 PENDING/RUNNING/DONE）。
 
 ---
 
-#### GET `/eval/runs/{id}`（P1）
+#### POST `/eval/runs`
+
+**认证**：管理员
+
+**请求**：`userId`（必填）、`name`、`topK?`、`rerank?`、`model?`
+
+**响应**：`{ "id": "...", "status": "PENDING" }`
+
+> 运行由 user-api 的评测 worker 异步消费，复用线上检索链路计算 recall@5；完成后可通过运行详情查看指标和逐用例结果。
+
+---
+
+#### GET `/eval/runs/{id}`
 
 **认证**：管理员
 
@@ -1952,14 +1969,14 @@ Content-Type: application/json
 
 ---
 
-## 9. 待确认
+## 9. 已确认 / 仍待确认
 
-- [ ] 文件上传上限是否 20MB；是否允许 Markdown/TXT 之外的类型。
-- [ ] 用户端是否提供 CSV 导出（当前 P1）。
-- [ ] 标签手动编辑是否 V1 就开放（当前 P1）。
-- [ ] 管理端评测接口是否 V1 就做（当前 P1）。
-- [ ] 管理端路径是否统一为 `/admin/api/v1`（本文档采用）。
-- [ ] SSE 是否允许客户端传入 `requestId` 用于幂等/重连。
+- [x] 文件上传上限 20MB；支持 PDF / Markdown / TXT。
+- [x] 用户端提供 CSV 导出。
+- [x] 标签手动编辑已开放。
+- [x] 管理端评测接口已实现。
+- [x] 管理端路径统一为 `/admin/api/v1`。
+- [ ] SSE 是否允许客户端传入 `requestId` 用于幂等/重连（当前由服务端生成）。
 
 ---
 

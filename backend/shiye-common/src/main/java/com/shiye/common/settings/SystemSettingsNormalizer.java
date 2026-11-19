@@ -24,8 +24,19 @@ public final class SystemSettingsNormalizer {
                 intOrFallback(source.ragTopK(), fallback.ragTopK(), 1, 20),
                 boolOrFallback(source.ragHybridEnabled(), fallback.ragHybridEnabled()),
                 boolOrFallback(source.ragRerankEnabled(), fallback.ragRerankEnabled()),
-                boolOrFallback(source.ragCitationRequired(), fallback.ragCitationRequired())
+                boolOrFallback(source.ragCitationRequired(), fallback.ragCitationRequired()),
+                boolOrFallback(source.registrationInvitationRequired(),
+                        fallback.registrationInvitationRequired()),
+                textOrFallback(source.registrationInvitationCode(),
+                        fallback.registrationInvitationCode())
         );
+    }
+
+    private static String textOrFallback(String value, String fallback) {
+        if (value != null && !value.isBlank()) {
+            return value.trim();
+        }
+        return fallback == null ? null : fallback;
     }
 
     private static int intOrFallback(Integer value, Integer fallback, int min, int max) {

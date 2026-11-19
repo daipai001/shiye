@@ -14,6 +14,14 @@ export interface UserSummary {
   createdAt: string
 }
 
+export interface PluginSettings {
+  ballEnabled: boolean
+  defaultMode: string
+  defaultScope: string
+  shortcut?: string | null
+  siteBlacklist: string[]
+}
+
 export interface TokenResponse {
   accessToken: string
   refreshToken: string
@@ -137,6 +145,7 @@ export interface ChatMessage {
   firstTokenMs?: number | null
   latencyMs?: number | null
   citations: ChatCitation[]
+  feedback?: 'UP' | 'DOWN' | null
   createdAt?: string
   streaming?: boolean
 }
