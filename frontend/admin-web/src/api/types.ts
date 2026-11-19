@@ -5,6 +5,13 @@ export interface ApiResult<T> {
   requestId?: string
 }
 
+export interface PageResult<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 export interface AdminSummary {
   id: string
   email: string
@@ -18,4 +25,183 @@ export interface AdminTokenResponse {
   expiresIn: number
   tokenType: string
   admin: AdminSummary
+}
+
+export interface TrendPoint {
+  date: string
+  calls: number
+  tokens: number
+  cost: number
+}
+
+export interface SourceSplit {
+  source: string
+  calls: number
+  tokens: number
+  cost: number
+}
+
+export interface RecentFailure {
+  type: string
+  resourceId: string
+  userName?: string | null
+  errorCode?: string | null
+  errorMessage?: string | null
+  createdAt: string
+}
+
+export interface Overview {
+  users: number
+  articles: number
+  chunks: number
+  todayCalls: number
+  todayTokens: number
+  todayCost: number
+  errorRate: number
+  p95LatencyMs: number
+  trends: TrendPoint[]
+  sourceSplit: SourceSplit[]
+  recentFailures: RecentFailure[]
+}
+
+export interface AdminUser {
+  id: string
+  email: string
+  displayName: string
+  status: string
+  role: string
+  monthlyTokenQuota: number
+  tokensUsed: number
+  monthlyCostQuota: number
+  costUsed: number
+  articleCount: number
+  lastLoginAt?: string | null
+  createdAt: string
+}
+
+export interface AdminUsageGroup {
+  key: string
+  calls: number
+  tokens: number
+  cost: number
+}
+
+export interface AdminUsageSummary {
+  calls: number
+  tokens: number
+  cost: number
+  errorRate: number
+  sourceSplit: AdminUsageGroup[]
+  modelSplit: AdminUsageGroup[]
+}
+
+export interface AdminUsageRecord {
+  id: string
+  requestId: string
+  userId: string
+  userEmail?: string | null
+  source: string
+  scene: string
+  model: string
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  cost: number
+  currency: string
+  latencyMs?: number | null
+  firstTokenMs?: number | null
+  status: string
+  errorCode?: string | null
+  createdAt: string
+}
+
+export interface AdminUsageResponse {
+  items: AdminUsageRecord[]
+  total: number
+  page: number
+  pageSize: number
+  summary: AdminUsageSummary
+}
+
+export interface AdminImport {
+  id: string
+  userId: string
+  userEmail?: string | null
+  folderPath: string
+  status: string
+  total: number
+  success: number
+  failed: number
+  skipped: number
+  errorCode?: string | null
+  startedAt?: string | null
+  finishedAt?: string | null
+  createdAt: string
+}
+
+export interface AdminImportItem {
+  id: string
+  userId: string
+  userEmail?: string | null
+  title?: string | null
+  url: string
+  folderPath?: string | null
+  status: string
+  articleId?: string | null
+  errorCode?: string | null
+  errorMessage?: string | null
+}
+
+export interface AdminTask {
+  id: string
+  articleId?: string | null
+  userId: string
+  userEmail?: string | null
+  title?: string | null
+  url: string
+  stage: string
+  status: string
+  errorCode?: string | null
+  errorMessage?: string | null
+  createdAt: string
+  finishedAt?: string | null
+}
+
+export interface AdminModelConfig {
+  chat: {
+    provider: string
+    baseUrl: string
+    model: string
+    apiKeyMasked?: string | null
+    configured: boolean
+    maxTokens: number
+    temperature: number
+    inputPrice: number
+    outputPrice: number
+    currency: string
+  }
+  embedding: {
+    provider: string
+    baseUrl: string
+    model: string
+    apiKeyMasked?: string | null
+    configured: boolean
+    dimension: number
+    batchSize: number
+    inputPrice: number
+    currency: string
+  }
+  budget: {
+    globalMonthlyTokens: number
+    globalMonthlyCost: number
+    defaultUserTokens: number
+    defaultUserCost: number
+  }
+}
+
+export interface ModelTestResult {
+  ok: boolean
+  latencyMs: number
+  model?: string | null
+  message: string
 }

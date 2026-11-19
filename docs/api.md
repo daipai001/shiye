@@ -1176,6 +1176,9 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 4.2 总览与用量
 
+> **当前实现**：总览、用量列表/汇总/CSV 导出、用户列表与配额/状态、导入任务与条目、索引任务、模型只读配置与连接测试已接入。
+> `PUT /models`、`/settings`、`/budget` 和用量趋势聚合仍在后续阶段。
+
 #### GET `/overview`
 
 **认证**：管理员

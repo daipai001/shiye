@@ -192,6 +192,17 @@ RAG 问答闭环已打通：
 >
 > 切换模型后旧切片需要重建索引；`POST /articles/{id}/reindex` 已接入。本机 Redis 8 没有 RediSearch，当前用 Hash 存向量，检索阶段先走应用层余弦；部署 Redis Stack 后可替换为 HNSW 索引。
 
+管理后台已接入：
+
+- 总览：用户/资料/切片数、今日调用/tokens/成本/错误率/P95、7 天趋势、来源拆分、最近失败
+- 用户与配额：搜索、用量排序、调整月度 token/成本配额、禁用/启用（禁用会撤销 refresh token）
+- 用量与成本：按用户/来源/场景/状态筛选、汇总、来源/模型拆分、CSV 导出
+- 书签导入：任务列表、条目详情、暂停/恢复/取消/失败重试
+- 索引任务：逐条状态、失败原因、重试
+- 模型配置：展示 DeepSeek/BGE-M3 配置（key 掩码）、测试 Chat/Embedding 连接、预算展示
+
+> 模型配置当前仍由服务端环境变量/本地配置管理，管理端在线编辑下一阶段接入；索引任务页基于 `bookmark_items` 展示。
+
 前端页面只有在 dev server 运行时才能打开；API 也不在时登录会提示“无法连接后端服务”。
 
 ## 已知缺口（下一阶段）
@@ -199,13 +210,13 @@ RAG 问答闭环已打通：
 - 仓库默认 embedding 仍是 `dev`；新环境需按上面说明配置 BGE-M3 API Key。本机已配置并验证。
 - 本机 Redis 没有 RediSearch，检索走应用层余弦；数据量大后应换 Redis Stack HNSW。
 - 未做混合检索、RRF、rerank、AI 摘要/自动标签；摘要暂用 meta description 或正文前 220 字。
-- 插件悬浮球的资料库问答、收藏当前页，以及 `/articles/collect`、`/articles/upload` 尚未接入。
+- 管理端模型配置目前只读 + 连接测试，在线修改模型/key/价格尚未接入。
+- `/usage/summary` 趋势聚合、`/articles/upload` 尚未接入；管理端索引任务页基于 bookmark_items。
 - 注册/登录的 IP 限流和 `X-RateLimit-*` 响应头尚未接入；书签导入限流已接入。
-- 管理端导入、用户、用量、模型配置接口尚未接入，页面为占位。
 - 主文件夹自动同步（`chrome.bookmarks.onCreated/onRemoved`）属于 P1，尚未接入。
 
 ## 下一步
 
-1. 插件悬浮球资料库问答 + 收藏当前页（`/articles/collect`）
-2. 真实 BGE-M3 配置 + 全量 reindex + Redis Stack HNSW
-3. 管理后台（总览、用户、用量、导入、模型配置）与混合检索/rerank
+1. 部署到服务器（可选 SSH CD 已就绪，需要配置 secrets）
+2. 混合检索 + RRF + rerank，提升真实 BGE-M3 召回质量
+3. 管理端模型在线配置、用量趋势聚合、插件当前页问答

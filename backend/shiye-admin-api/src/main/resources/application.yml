@@ -42,3 +42,24 @@ shiye:
     admin-secret: ${ADMIN_JWT_SECRET:dev-admin-secret-change-me-32-bytes-minimum}
     admin-expire-seconds: ${ADMIN_JWT_EXPIRE_SECONDS:900}
     refresh-expire-seconds: ${REFRESH_EXPIRE_SECONDS:2592000}
+  ai:
+    chat:
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com/v1}
+      api-key: ${DEEPSEEK_API_KEY:}
+      model: ${DEEPSEEK_MODEL:deepseek-chat}
+      max-tokens: ${DEEPSEEK_MAX_TOKENS:1600}
+      temperature: ${DEEPSEEK_TEMPERATURE:0.25}
+      input-price: ${DEEPSEEK_INPUT_PRICE:2.0}
+      output-price: ${DEEPSEEK_OUTPUT_PRICE:8.0}
+      timeout-ms: ${DEEPSEEK_TIMEOUT_MS:45000}
+    embedding:
+      provider: ${EMBEDDING_PROVIDER:dev}
+      base-url: ${EMBEDDING_BASE_URL:https://api.siliconflow.cn/v1}
+      api-key: ${EMBEDDING_API_KEY:}
+      model: ${EMBEDDING_MODEL:BAAI/bge-m3}
+      dimension: ${EMBEDDING_DIMENSION:1024}
+      batch-size: ${EMBEDDING_BATCH_SIZE:16}
+      timeout-ms: ${EMBEDDING_TIMEOUT_MS:30000}
+  usage:
+    global-monthly-tokens: ${GLOBAL_MONTHLY_TOKENS:2000000}
+    global-monthly-cost: ${GLOBAL_MONTHLY_COST:20.00}
