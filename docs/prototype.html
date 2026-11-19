@@ -3259,7 +3259,7 @@ function renderExtensionBall() {
 
 function renderFloatPanel() {
   const page = state.currentPage;
-  const tabLabel = state.panelTab === 'library' ? '资料库' : state.panelTab === 'current' ? '当前页面' : '通用';
+  const tabLabel = state.panelTab === 'library' ? '资料库' : '当前页面';
   const scopeLabel = state.panelScope === 'folder' ? '技术文章' : state.panelScope === 'rag' ? 'RAG 标签' : '全部资料';
 
   const header = `
@@ -3267,7 +3267,6 @@ function renderFloatPanel() {
       <b>拾页</b>
       <button class="pill ${state.panelTab === 'library' ? 'active' : ''}" data-action="panel-tab" data-tab="library">资料库</button>
       <button class="pill ${state.panelTab === 'current' ? 'active' : ''}" data-action="panel-tab" data-tab="current">当前页面</button>
-      <button class="pill ${state.panelTab === 'general' ? 'active' : ''}" data-action="panel-tab" data-tab="general">通用</button>
       <span class="fp-actions">
         <button data-action="open-full-app" title="打开完整页面">↗</button>
         <button data-action="ball-toggle" title="收起">—</button>
@@ -3320,10 +3319,10 @@ function renderFloatPanel() {
 
     <div class="fp-input">
       <div class="box">
-        <textarea id="panelInput" rows="1" placeholder="${state.panelTab === 'current' ? '问当前页面…' : state.panelTab === 'general' ? '通用模式（P2）…' : '问资料库…'}"></textarea>
+        <textarea id="panelInput" rows="1" placeholder="${state.panelTab === 'current' ? '问当前页面…' : '问资料库…'}"></textarea>
         <button class="btn btn-sm" data-action="panel-send">发送</button>
       </div>
-      <div class="hint">Enter 发送 · 当前模式：${tabLabel}${state.panelTab === 'general' ? '（不引用资料）' : '（带引用）'}</div>
+      <div class="hint">Enter 发送 · 当前模式：${tabLabel}${state.panelTab === 'current' ? '（不写入资料库）' : '（带引用）'}</div>
     </div>
   </div>`;
 }
