@@ -6,6 +6,7 @@ import com.shiye.common.api.Result;
 import com.shiye.common.exception.BizException;
 import com.shiye.user.common.security.UserContext;
 import com.shiye.user.module.article.domain.dto.ArticleCollectRequest;
+import com.shiye.user.module.article.domain.dto.ArticleDeleteByUrlRequest;
 import com.shiye.user.module.article.domain.vo.ArticleChunkVO;
 import com.shiye.user.module.article.domain.vo.ArticleCollectResponse;
 import com.shiye.user.module.article.domain.vo.ArticleDetailVO;
@@ -128,6 +129,12 @@ public class ArticleController {
         long userId = UserContext.requireUserId();
         articleIngestService.reindex(userId, id);
         return Result.ok(new ArticleReindexResponse(String.valueOf(id), "PENDING"));
+    }
+
+    @PostMapping("/delete-by-url")
+    public Result<Void> deleteByUrl(@Valid @RequestBody ArticleDeleteByUrlRequest request) {
+        articleQueryService.deleteByUrl(UserContext.requireUserId(), request.url());
+        return Result.ok();
     }
 
     @DeleteMapping("/{id}")

@@ -389,10 +389,19 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
             articleMapper.insert(article);
             return article;
         } catch (DuplicateKeyException ex) {
-            ArticleEntity existing = articleMapper.findByUserAndUrlHash(
+            ArticleEntity existing = articleMapper.findByUserAndUrlHashIncludingDeleted(
                     userId, normalized.urlHash());
             if (existing == null) {
                 throw ex;
+            }
+            if (existing.getDeletedAt() != null) {
+                String finalTitle = truncate(title, 512);
+                String finalSourceType = sourceType == null ? "MANUAL" : sourceType;
+                articleMapper.reactivate(existing.getId(), userId, finalTitle, finalSourceType);
+                existing.setDeletedAt(null);
+                existing.setTitle(finalTitle);
+                existing.setSourceType(finalSourceType);
+                existing.setStatus(ArticleStatus.PENDING.name());
             }
             return existing;
         }

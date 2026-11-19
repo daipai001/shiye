@@ -18,4 +18,6 @@ public interface ArticleQueryService {
     ArticleStatsVO stats(long userId);
 
     void delete(long userId, long articleId);
+
+    void deleteByUrl(long userId, String url);
 }

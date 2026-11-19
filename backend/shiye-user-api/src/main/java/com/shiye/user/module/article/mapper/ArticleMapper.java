@@ -30,6 +30,17 @@ public interface ArticleMapper {
                    published_at, fetched_at, summary, content_text, content_hash,
                    word_count, language, status, file_asset_id, created_at, updated_at, deleted_at
             FROM articles
+            WHERE user_id = #{userId} AND url_hash = #{urlHash}
+            LIMIT 1
+            """)
+    ArticleEntity findByUserAndUrlHashIncludingDeleted(@Param("userId") long userId,
+                                                       @Param("urlHash") String urlHash);
+
+    @Select("""
+            SELECT id, user_id, title, url, url_hash, domain, source_type, author,
+                   published_at, fetched_at, summary, content_text, content_hash,
+                   word_count, language, status, file_asset_id, created_at, updated_at, deleted_at
+            FROM articles
             WHERE id = #{id} AND user_id = #{userId} AND deleted_at IS NULL
             """)
     ArticleEntity findByIdAndUser(@Param("id") long id, @Param("userId") long userId);
@@ -175,6 +186,20 @@ public interface ArticleMapper {
             """)
     List<ArticleEntity> findByIdsAndUser(@Param("userId") long userId,
                                          @Param("ids") List<Long> ids);
+
+    @Update("""
+            UPDATE articles
+            SET deleted_at = NULL,
+                title = #{title},
+                source_type = #{sourceType},
+                status = 'PENDING',
+                updated_at = UTC_TIMESTAMP(3)
+            WHERE id = #{id} AND user_id = #{userId}
+            """)
+    int reactivate(@Param("id") long id,
+                   @Param("userId") long userId,
+                   @Param("title") String title,
+                   @Param("sourceType") String sourceType);
 
     @Update("""
             UPDATE articles

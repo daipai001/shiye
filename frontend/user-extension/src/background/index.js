@@ -129,6 +129,27 @@ async function postBookmark(settings, folder, bookmark, retried = false) {
   }
 }
 
+async function deleteArticle(settings, url, retried = false) {
+  const response = await fetch(`${settings.apiBaseUrl}/articles/delete-by-url`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Client': 'extension',
+      Authorization: `Bearer ${settings.shiyeAccessToken}`,
+    },
+    body: JSON.stringify({ url }),
+  })
+  if (response.status === 401 && !retried) {
+    const refreshed = await refreshToken(settings)
+    if (refreshed) {
+      return deleteArticle({ ...settings, ...refreshed }, url, true)
+    }
+  }
+  if (!response.ok) {
+    throw new Error(`bookmark delete sync failed: HTTP ${response.status}`)
+  }
+}
+
 async function syncBookmark(bookmark) {
   if (!bookmark || !/^https?:\/\//i.test(bookmark.url || '')) {
     return
@@ -154,6 +175,21 @@ async function syncBookmark(bookmark) {
   }
 }
 
+async function syncRemovedBookmark(bookmark, parentId) {
+  if (!bookmark || !/^https?:\/\//i.test(bookmark.url || '')) {
+    return
+  }
+  const settings = await getSettings()
+  const folder = settings.autoSyncFolder
+  if (!settings.autoSyncEnabled || !folder || !settings.shiyeAccessToken) {
+    return
+  }
+  if (!(await isUnderFolder(parentId, folder.folderId))) {
+    return
+  }
+  await deleteArticle(settings, bookmark.url)
+}
+
 chrome.bookmarks.onCreated.addListener((_id, bookmark) => {
   void syncBookmark(bookmark).catch((error) => {
     console.warn('[shiye] auto sync failed:', error.message)
@@ -170,3 +206,9 @@ function syncById(id) {
 
 chrome.bookmarks.onChanged.addListener(syncById)
 chrome.bookmarks.onMoved.addListener(syncById)
+
+chrome.bookmarks.onRemoved.addListener((_id, removeInfo) => {
+  void syncRemovedBookmark(removeInfo?.node, removeInfo?.parentId).catch((error) => {
+    console.warn('[shiye] auto sync failed:', error.message)
+  })
+})

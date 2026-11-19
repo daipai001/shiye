@@ -838,9 +838,25 @@ admin-web → POST /admin/api/v1/auth/login
 
 **认证**：用户
 
-**响应**：`null`（软删除；异步清理 chunk/vector）
+**响应**：`null`（软删除；清理 chunk/vector/标签关系）
 
 **错误**：40402、40301
+
+---
+
+#### POST `/articles/delete-by-url`
+
+**认证**：用户
+
+**请求**
+
+```json
+{ "url": "https://example.com/rag" }
+```
+
+**说明**：按规范化 URL 查找当前用户的资料并软删除，同时清理切片、向量和标签关系；URL 不存在时直接返回成功（幂等）。插件书签删除同步使用此接口。
+
+**响应**：`null`
 
 ---
 

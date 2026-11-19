@@ -4,6 +4,7 @@ import com.shiye.common.api.ErrorCode;
 import com.shiye.common.api.PageResult;
 import com.shiye.common.exception.BizException;
 import com.shiye.user.common.ai.vector.ChunkVectorStore;
+import com.shiye.user.common.util.UrlNormalizer;
 import com.shiye.user.module.article.domain.entity.ArticleChunkEntity;
 import com.shiye.user.module.article.domain.entity.ArticleEntity;
 import com.shiye.user.module.article.domain.vo.ArticleChunkVO;
@@ -120,6 +121,24 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         chunkMapper.deleteByArticle(articleId, userId);
         tagService.replaceArticleTags(userId, articleId, List.of());
         articleMapper.softDelete(articleId, userId);
+    }
+
+    @Override
+    @Transactional
+    public void deleteByUrl(long userId, String url) {
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        UrlNormalizer.Normalized normalized;
+        try {
+            normalized = UrlNormalizer.normalize(url);
+        } catch (RuntimeException ex) {
+            return;
+        }
+        ArticleEntity article = articleMapper.findByUserAndUrlHash(userId, normalized.urlHash());
+        if (article != null) {
+            delete(userId, article.getId());
+        }
     }
 
     private ArticleEntity findOwned(long userId, long articleId) {
