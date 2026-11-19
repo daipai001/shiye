@@ -197,6 +197,8 @@ data: {"text":"你收藏的资料里..."}
 | `done` | `{finishReason}` | 结束 |
 | `error` | `{code, message, retryable}` | 错误 |
 
+> 启用 BGE-reranker 时，`citation.score` 为 reranker 的 `relevance_score`（0~1），`citation` 顺序即重排后的顺序；未启用或 rerank 失败时回退 RRF 混合检索分数。rerank token 写入 `ai_usage.scene=RERANK`，不影响 SSE 事件结构。
+
 客户端断开：服务端取消上游请求，记录 `ABORTED`。
 
 ### 1.10 页面/客户端映射

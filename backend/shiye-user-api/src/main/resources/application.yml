@@ -66,6 +66,14 @@ shiye:
       base-url: ${EMBEDDING_BASE_URL:https://api.siliconflow.cn/v1}
       api-key: ${EMBEDDING_API_KEY:}
       timeout-ms: ${EMBEDDING_TIMEOUT_MS:30000}
+    rerank:
+      # BGE-reranker，OpenAI 兼容 /rerank；未配置 key 时自动跳过并回退混合检索
+      enabled: ${RERANK_ENABLED:false}
+      base-url: ${RERANK_BASE_URL:https://api.siliconflow.cn/v1}
+      api-key: ${RERANK_API_KEY:}
+      model: ${RERANK_MODEL:BAAI/bge-reranker-v2-m3}
+      top-n: ${RERANK_TOP_N:20}
+      timeout-ms: ${RERANK_TIMEOUT_MS:20000}
     retrieval:
       top-k: ${RETRIEVAL_TOP_K:8}
       max-per-article: ${RETRIEVAL_MAX_PER_ARTICLE:3}
@@ -75,6 +83,8 @@ shiye:
       keyword-candidates: ${RETRIEVAL_KEYWORD_CANDIDATES:20}
       rrf-k: ${RETRIEVAL_RRF_K:60}
       hybrid-enabled: ${RETRIEVAL_HYBRID_ENABLED:true}
+      rerank-enabled: ${RETRIEVAL_RERANK_ENABLED:true}
+      rerank-candidates: ${RETRIEVAL_RERANK_CANDIDATES:20}
   usage:
     global-monthly-tokens: ${GLOBAL_MONTHLY_TOKENS:2000000}
     global-monthly-cost: ${GLOBAL_MONTHLY_COST:20.00}

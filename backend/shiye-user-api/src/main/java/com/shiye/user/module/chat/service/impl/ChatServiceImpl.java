@@ -26,6 +26,7 @@ import com.shiye.user.module.chat.mapper.ConversationMapper;
 import com.shiye.user.module.chat.mapper.MessageMapper;
 import com.shiye.user.module.chat.service.ChatService;
 import com.shiye.user.module.chat.service.ChunkRetrievalService;
+import com.shiye.user.module.chat.support.RetrievalResult;
 import com.shiye.user.module.chat.support.RetrievedChunk;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
 import com.shiye.user.module.usage.service.UsageService;
@@ -192,8 +193,10 @@ public class ChatServiceImpl implements ChatService {
             userMessage.setStatus("SUCCESS");
             messageMapper.insert(userMessage);
 
-            List<RetrievedChunk> chunks = retrievalService.retrieve(
+            RetrievalResult retrieval = retrievalService.retrieve(
                     userId, question, scope.type(), scope.id(), null);
+            List<RetrievedChunk> chunks = retrieval.chunks();
+            recordRerankUsage(userId, source, conversation, requestId, retrieval);
 
             assistant = new MessageEntity();
             assistant.setConversationId(conversation.getId());
@@ -313,6 +316,21 @@ public class ChatServiceImpl implements ChatService {
                 log.warn("record failed chat usage: {}", ex.getMessage());
             }
             safeSend(emitter, "error", new ChatSseError(code, message, true));
+        }
+    }
+
+    private void recordRerankUsage(long userId, String source, ConversationEntity conversation,
+                                   String requestId, RetrievalResult retrieval) {
+        if (!retrieval.reranked()) {
+            return;
+        }
+        try {
+            usageService.recordRerank(
+                    userId, requestId + "-rr", source, retrieval.rerankModel(),
+                    retrieval.rerankTokens(), retrieval.rerankLatencyMs(),
+                    conversation.getId());
+        } catch (RuntimeException ex) {
+            log.warn("record rerank usage failed: {}", ex.getMessage());
         }
     }
 

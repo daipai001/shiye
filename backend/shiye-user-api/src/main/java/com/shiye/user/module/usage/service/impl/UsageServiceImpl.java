@@ -169,6 +169,32 @@ public class UsageServiceImpl implements UsageService {
     }
 
     @Override
+    @Transactional
+    public void recordRerank(long userId, String requestId, String source, String model,
+                             int tokens, int latencyMs, long conversationId) {
+        AiUsageEntity entity = new AiUsageEntity();
+        entity.setRequestId(requestId);
+        entity.setUserId(userId);
+        entity.setSource(source);
+        entity.setScene("RERANK");
+        entity.setModel(model);
+        entity.setPromptTokens(Math.max(0, tokens));
+        entity.setCompletionTokens(0);
+        entity.setTotalTokens(Math.max(0, tokens));
+        entity.setCachedTokens(0);
+        entity.setInputPrice(BigDecimal.ZERO);
+        entity.setOutputPrice(BigDecimal.ZERO);
+        entity.setCost(BigDecimal.ZERO);
+        entity.setCurrency("CNY");
+        entity.setLatencyMs(latencyMs);
+        entity.setStatus("SUCCESS");
+        entity.setEstimated(false);
+        entity.setConversationId(conversationId);
+        aiUsageMapper.insert(entity);
+        monthlyMapper.increment(userId, currentMonth(), Math.max(0, tokens), BigDecimal.ZERO);
+    }
+
+    @Override
     public PageResult<UsageRecordVO> records(long userId, int page, int pageSize,
                                              String source, String scene, String model, String status) {
         int safePage = Math.max(1, page);

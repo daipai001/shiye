@@ -3,11 +3,15 @@ package com.shiye.user.module.chat.service;
 import com.shiye.common.api.ErrorCode;
 import com.shiye.common.exception.BizException;
 import com.shiye.user.common.ai.embedding.EmbeddingService;
+import com.shiye.user.common.ai.rerank.RerankException;
+import com.shiye.user.common.ai.rerank.RerankResult;
+import com.shiye.user.common.ai.rerank.RerankService;
 import com.shiye.user.module.article.domain.entity.ArticleChunkSearchRow;
 import com.shiye.user.module.article.domain.entity.ArticleEntity;
 import com.shiye.user.module.article.mapper.ArticleChunkMapper;
 import com.shiye.user.module.article.mapper.ArticleFolderMapper;
 import com.shiye.user.module.article.mapper.ArticleMapper;
+import com.shiye.user.module.chat.support.RetrievalResult;
 import com.shiye.user.module.chat.support.RetrievedChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,18 +34,22 @@ import java.util.Set;
  * RAG 检索：
  * - 向量召回：Redis 读取用户 chunk 向量，应用层余弦；
  * - 关键词召回：MySQL ngram FULLTEXT；
- * - RRF 融合两路排名。部署 Redis Stack 后可将向量部分替换为 RediSearch HNSW。
+ * - RRF 融合两路排名；
+ * - BGE-reranker 对融合候选池二次重排，失败时回退 RRF。
+ * 部署 Redis Stack 后可将向量部分替换为 RediSearch HNSW。
  */
 @Service
 public class ChunkRetrievalService {
 
     private static final Logger log = LoggerFactory.getLogger(ChunkRetrievalService.class);
+    private static final int MAX_RERANK_DOC_CHARS = 4000;
 
     private final EmbeddingService embeddingService;
     private final StringRedisTemplate redisTemplate;
     private final ArticleMapper articleMapper;
     private final ArticleFolderMapper folderMapper;
     private final ArticleChunkMapper chunkMapper;
+    private final RerankService rerankService;
     private final int defaultTopK;
     private final int maxPerArticle;
     private final double minScore;
@@ -50,6 +58,8 @@ public class ChunkRetrievalService {
     private final int keywordCandidates;
     private final int rrfK;
     private final boolean hybridEnabled;
+    private final boolean rerankEnabled;
+    private final int rerankCandidates;
 
     public ChunkRetrievalService(
             EmbeddingService embeddingService,
@@ -57,6 +67,7 @@ public class ChunkRetrievalService {
             ArticleMapper articleMapper,
             ArticleFolderMapper folderMapper,
             ArticleChunkMapper chunkMapper,
+            RerankService rerankService,
             @Value("${shiye.ai.retrieval.top-k:8}") int defaultTopK,
             @Value("${shiye.ai.retrieval.max-per-article:3}") int maxPerArticle,
             @Value("${shiye.ai.retrieval.min-score:0.2}") double minScore,
@@ -64,12 +75,15 @@ public class ChunkRetrievalService {
             @Value("${shiye.ai.retrieval.vector-candidates:30}") int vectorCandidates,
             @Value("${shiye.ai.retrieval.keyword-candidates:20}") int keywordCandidates,
             @Value("${shiye.ai.retrieval.rrf-k:60}") int rrfK,
-            @Value("${shiye.ai.retrieval.hybrid-enabled:true}") boolean hybridEnabled) {
+            @Value("${shiye.ai.retrieval.hybrid-enabled:true}") boolean hybridEnabled,
+            @Value("${shiye.ai.retrieval.rerank-enabled:true}") boolean rerankEnabled,
+            @Value("${shiye.ai.retrieval.rerank-candidates:20}") int rerankCandidates) {
         this.embeddingService = embeddingService;
         this.redisTemplate = redisTemplate;
         this.articleMapper = articleMapper;
         this.folderMapper = folderMapper;
         this.chunkMapper = chunkMapper;
+        this.rerankService = rerankService;
         this.defaultTopK = Math.max(1, Math.min(defaultTopK, 20));
         this.maxPerArticle = Math.max(1, maxPerArticle);
         this.minScore = minScore;
@@ -78,34 +92,38 @@ public class ChunkRetrievalService {
         this.keywordCandidates = Math.max(1, Math.min(keywordCandidates, 100));
         this.rrfK = Math.max(1, rrfK);
         this.hybridEnabled = hybridEnabled;
+        this.rerankEnabled = rerankEnabled;
+        this.rerankCandidates = Math.max(1, Math.min(rerankCandidates, 50));
     }
 
-    public List<RetrievedChunk> retrieve(long userId, String query,
-                                         String scopeType, Long scopeId, Integer requestedTopK) {
+    public RetrievalResult retrieve(long userId, String query,
+                                    String scopeType, Long scopeId, Integer requestedTopK) {
         String scope = scopeType == null || scopeType.isBlank()
                 ? "ALL"
                 : scopeType.trim().toUpperCase(Locale.ROOT);
         Set<Long> allowedArticleIds = resolveScope(userId, scope, scopeId);
         if (allowedArticleIds != null && allowedArticleIds.isEmpty()) {
-            return List.of();
+            return RetrievalResult.withoutRerank(List.of());
         }
 
         List<Candidate> vectorResults = vectorCandidates(userId, query, allowedArticleIds);
         List<Candidate> keywordResults = hybridEnabled
                 ? keywordCandidates(userId, query, scope, scopeId, allowedArticleIds)
                 : List.of();
-
-        List<Candidate> selected;
-        if (!hybridEnabled || keywordResults.isEmpty()) {
-            selected = selectTop(vectorResults, requestedTopK, Comparator.comparingDouble(Candidate::vectorScore).reversed());
-        } else if (vectorResults.isEmpty()) {
-            selected = selectTop(keywordResults, requestedTopK,
-                    Comparator.comparingDouble(Candidate::keywordScore).reversed());
-        } else {
-            selected = fuseWithRrf(vectorResults, keywordResults, requestedTopK);
+        if (vectorResults.isEmpty() && keywordResults.isEmpty()) {
+            return RetrievalResult.withoutRerank(List.of());
         }
+
+        List<Candidate> pool = buildCandidatePool(vectorResults, keywordResults);
+        RerankResult rerankResult = null;
+        if (rerankEnabled && rerankService.isEnabled() && !pool.isEmpty()) {
+            rerankResult = tryRerank(query, pool);
+        }
+        List<Candidate> selected = rerankResult == null
+                ? fallbackSelect(vectorResults, keywordResults, requestedTopK)
+                : selectReranked(pool, rerankResult, requestedTopK);
         if (selected.isEmpty()) {
-            return List.of();
+            return RetrievalResult.withoutRerank(List.of());
         }
 
         List<Long> articleIds = selected.stream()
@@ -134,7 +152,11 @@ public class ChunkRetrievalService {
                     candidate.charEnd()
             ));
         }
-        return results;
+        if (rerankResult == null) {
+            return RetrievalResult.withoutRerank(results);
+        }
+        return new RetrievalResult(results, true, rerankService.model(),
+                rerankResult.inputTokens(), rerankResult.latencyMs());
     }
 
     private List<Candidate> vectorCandidates(long userId, String query, Set<Long> allowedArticleIds) {
@@ -222,9 +244,84 @@ public class ChunkRetrievalService {
         }
     }
 
-    private List<Candidate> fuseWithRrf(List<Candidate> vectorResults,
-                                        List<Candidate> keywordResults,
-                                        Integer requestedTopK) {
+    /**
+     * 构建 rerank 候选池：两路都有时按 RRF 排，只有一路时按该路分数排；
+     * 池子同样限制单篇数量，避免长文档挤占其他资料。
+     */
+    private List<Candidate> buildCandidatePool(List<Candidate> vectorResults,
+                                               List<Candidate> keywordResults) {
+        List<Candidate> ordered;
+        if (!vectorResults.isEmpty() && !keywordResults.isEmpty()) {
+            ordered = fuse(vectorResults, keywordResults);
+        } else if (!vectorResults.isEmpty()) {
+            ordered = new ArrayList<>(vectorResults);
+            ordered.sort(Comparator.comparingDouble(Candidate::vectorScore).reversed());
+        } else {
+            ordered = new ArrayList<>(keywordResults);
+            ordered.sort(Comparator.comparingDouble(Candidate::keywordScore).reversed());
+        }
+        return limitPerArticle(ordered, rerankCandidates);
+    }
+
+    private RerankResult tryRerank(String query, List<Candidate> pool) {
+        List<String> documents = pool.stream()
+                .map(candidate -> truncate(candidate.content(), MAX_RERANK_DOC_CHARS))
+                .toList();
+        try {
+            RerankResult result = rerankService.rerank(query, documents);
+            if (result.items().isEmpty()) {
+                log.warn("rerank returned no items, fallback to hybrid order");
+                return null;
+            }
+            return result;
+        } catch (RerankException ex) {
+            log.warn("rerank failed ({}), fallback to hybrid order: {}",
+                    ex.getCode(), ex.getMessage());
+            return null;
+        } catch (RuntimeException ex) {
+            log.warn("rerank failed, fallback to hybrid order: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private List<Candidate> selectReranked(List<Candidate> pool, RerankResult rerankResult,
+                                           Integer requestedTopK) {
+        Map<Integer, Double> scoreByIndex = new HashMap<>();
+        for (RerankResult.Item item : rerankResult.items()) {
+            scoreByIndex.put(item.index(), item.score());
+        }
+        for (int i = 0; i < pool.size(); i++) {
+            Candidate candidate = pool.get(i);
+            Double score = scoreByIndex.get(i);
+            if (score != null) {
+                candidate.hasRerankScore = true;
+                candidate.rerankScore = score;
+                candidate.displayScoreValue = score;
+            }
+        }
+        List<Candidate> ordered = new ArrayList<>(pool);
+        ordered.sort(Comparator
+                .comparingDouble(Candidate::rerankScore).reversed()
+                .thenComparing(Comparator.comparingDouble(Candidate::displayScore).reversed()));
+        return limitPerArticle(ordered, resolveTopK(requestedTopK));
+    }
+
+    private List<Candidate> fallbackSelect(List<Candidate> vectorResults,
+                                           List<Candidate> keywordResults,
+                                           Integer requestedTopK) {
+        if (keywordResults.isEmpty()) {
+            return selectTop(vectorResults, requestedTopK,
+                    Comparator.comparingDouble(Candidate::vectorScore).reversed());
+        }
+        if (vectorResults.isEmpty()) {
+            return selectTop(keywordResults, requestedTopK,
+                    Comparator.comparingDouble(Candidate::keywordScore).reversed());
+        }
+        return limitPerArticle(fuse(vectorResults, keywordResults), resolveTopK(requestedTopK));
+    }
+
+    private List<Candidate> fuse(List<Candidate> vectorResults,
+                                 List<Candidate> keywordResults) {
         Map<Long, Candidate> merged = new LinkedHashMap<>();
         for (int i = 0; i < vectorResults.size(); i++) {
             Candidate source = vectorResults.get(i);
@@ -254,16 +351,18 @@ public class ChunkRetrievalService {
         ordered.sort(Comparator
                 .comparingDouble(Candidate::rrfScore).reversed()
                 .thenComparing(Comparator.comparingDouble(Candidate::displayScore).reversed()));
-        int topK = requestedTopK == null ? defaultTopK : Math.max(1, Math.min(requestedTopK, 20));
-        return limitPerArticle(ordered, topK);
+        return ordered;
     }
 
     private List<Candidate> selectTop(List<Candidate> candidates, Integer requestedTopK,
                                       Comparator<Candidate> comparator) {
         List<Candidate> ordered = new ArrayList<>(candidates);
         ordered.sort(comparator);
-        int topK = requestedTopK == null ? defaultTopK : Math.max(1, Math.min(requestedTopK, 20));
-        return limitPerArticle(ordered, topK);
+        return limitPerArticle(ordered, resolveTopK(requestedTopK));
+    }
+
+    private int resolveTopK(Integer requestedTopK) {
+        return requestedTopK == null ? defaultTopK : Math.max(1, Math.min(requestedTopK, 20));
     }
 
     private List<Candidate> limitPerArticle(List<Candidate> ordered, int topK) {
@@ -278,7 +377,7 @@ public class ChunkRetrievalService {
                 continue;
             }
             perArticle.put(candidate.articleId(), count + 1);
-            if (candidate.displayScoreValue == 0) {
+            if (!candidate.hasRerankScore && candidate.displayScoreValue == 0) {
                 candidate.displayScoreValue = candidate.vectorScore() > 0
                         ? candidate.vectorScore()
                         : Math.min(0.85, Math.max(0, candidate.keywordScore() / 10.0));
@@ -371,6 +470,13 @@ public class ChunkRetrievalService {
         return parsed == null ? 0 : parsed.intValue();
     }
 
+    private String truncate(String value, int max) {
+        if (value == null) {
+            return "";
+        }
+        return value.length() <= max ? value : value.substring(0, max);
+    }
+
     private static final class Candidate {
         private final long articleId;
         private final long chunkId;
@@ -380,7 +486,9 @@ public class ChunkRetrievalService {
         private double vectorScore;
         private double keywordScore;
         private double rrfScore;
+        private double rerankScore = -1;
         private double displayScoreValue;
+        private boolean hasRerankScore;
 
         private Candidate(long articleId, long chunkId, String content,
                           int charStart, int charEnd) {
@@ -425,6 +533,10 @@ public class ChunkRetrievalService {
 
         private double rrfScore() {
             return rrfScore;
+        }
+
+        private double rerankScore() {
+            return rerankScore;
         }
 
         private double displayScore() {

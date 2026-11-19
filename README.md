@@ -177,6 +177,7 @@ RAG 问答闭环已打通：
 - DeepSeek 流式回答，复用本地 OfferDesk 配置（`shiye.ai.chat`，已 gitignore）
 - 问答范围 ALL / ARTICLE / FOLDER；检索结果按 `user_id` 过滤，单篇最多 3 个切片
 - 混合检索：BGE-M3 向量召回 + MySQL ngram FULLTEXT 关键词召回 + RRF 融合（`migrations/V002__chunk_fulltext.sql`）
+- BGE-reranker 二次重排：对 RRF 候选池（默认最多 20 条）调用 `BAAI/bge-reranker-v2-m3`，失败或未配置 key 时自动回退 RRF；引用分数为 rerank relevance score
 - 回答引用与 `citations` 落库，包含标题、片段、分数、`charStart/charEnd`
 - 会话/消息/引用持久化；问答页支持流式输出、引用卡片、会话列表
 - AI 用量记账：`ai_usage` + `user_usage_monthly`，记录 token、单价快照、成本、耗时
@@ -198,6 +199,18 @@ RAG 问答闭环已打通：
 > 本机已切换到 BGE-M3 并验证：切片 `embedding_model=BAAI/bge-m3`、维度 1024，中文查询能命中相关英文切片（相似度约 0.60/0.49/0.46）。key 只存在于本地忽略配置，不提交仓库。
 >
 > 切换模型后旧切片需要重建索引；`POST /articles/{id}/reindex` 已接入。本机 Redis 8 没有 RediSearch，当前用 Hash 存向量，检索阶段先走应用层余弦；部署 Redis Stack 后可替换为 HNSW 索引。
+>
+> 可选开启 BGE-reranker（配置 `RERANK_*`，本地配置已开启）：
+>
+> ```powershell
+> $env:RERANK_ENABLED="true"
+> $env:RERANK_BASE_URL="https://api.siliconflow.cn/v1"
+> $env:RERANK_API_KEY="你的 key"
+> $env:RERANK_MODEL="BAAI/bge-reranker-v2-m3"
+> $env:RETRIEVAL_RERANK_CANDIDATES="20"
+> ```
+>
+> rerank 用量写入 `ai_usage.scene=RERANK`（当前成本记 0，token 计入月度用量）；接口失败只记 WARN 并回退 RRF，不影响问答。
 
 管理后台已接入：
 
@@ -216,7 +229,7 @@ RAG 问答闭环已打通：
 
 - 仓库默认 embedding 仍是 `dev`；新环境需按上面说明配置 BGE-M3 API Key。本机已配置并验证。
 - 本机 Redis 没有 RediSearch，向量检索走应用层余弦；数据量大后应换 Redis Stack HNSW。
-- 已做向量 + 关键词 + RRF 混合检索；尚未接入 BGE-reranker 二次重排和 AI 摘要/自动标签。
+- 已做向量 + 关键词 + RRF 混合检索和 BGE-reranker 二次重排；AI 摘要/自动标签尚未接入。
 - 管理端模型配置目前只读 + 连接测试，在线修改模型/key/价格尚未接入。
 - `/usage/summary` 趋势聚合、`/articles/upload` 尚未接入；管理端索引任务页基于 bookmark_items。
 - 注册/登录的 IP 限流和 `X-RateLimit-*` 响应头尚未接入；书签导入限流已接入。
@@ -224,6 +237,6 @@ RAG 问答闭环已打通：
 
 ## 下一步
 
-1. BGE-reranker 二次重排 + AI 摘要/自动标签
+1. AI 摘要/自动标签 + 摘要向量化
 2. 管理端模型在线配置、用量趋势聚合、插件当前页问答
 3. 部署到服务器（可选 SSH CD 已就绪，需要配置 secrets）
