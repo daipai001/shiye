@@ -69,6 +69,12 @@ mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/schema.sql
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/seed.sql
 ```
 
+已有数据库升级到混合检索时，额外执行：
+
+```bash
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V002__chunk_fulltext.sql
+```
+
 - 管理员：`admin@shiye.local`
 - 初始密码：见项目负责人的私密记录；首次登录后修改
 - 迁移：`deploy/sql/migrations/V001__init.sql`
