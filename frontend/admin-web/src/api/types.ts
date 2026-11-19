@@ -304,6 +304,8 @@ export interface EvalResult {
   recallAt5?: number | null
   citationAccuracy?: number | null
   answerCorrectness?: number | null
+  answerText?: string | null
+  judgeReason?: string | null
   latencyMs?: number | null
   cost?: number | null
   createdAt: string

@@ -9,4 +9,5 @@ public class EvalCaseRow {
     private String question;
     private String expectedArticleIds;
     private String expectedChunkIds;
+    private String goldAnswer;
 }

@@ -1797,7 +1797,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 **响应**：`{ "id": "...", "status": "PENDING" }`
 
-> 运行由 user-api 的评测 worker 异步消费，复用线上检索链路计算 recall@5；完成后可通过运行详情查看指标和逐用例结果。
+> 运行由 user-api 的评测 worker 异步消费：复用线上检索链路，生成回答并计算 recall@5、引用准确率、LLM-as-judge 答案正确率、平均延迟和成本；`model` 留空时使用运行时 Chat 模型。
 
 ---
 
@@ -1806,6 +1806,12 @@ admin-web → POST /admin/api/v1/auth/login
 **认证**：管理员
 
 **响应**：运行详情 + 指标 + 结果。
+
+运行指标字段：`cases`、`scoredCases`、`avgRecallAt5`、`citationScoredCases`、`avgCitationAccuracy`、`correctnessScoredCases`、`avgAnswerCorrectness`、`avgLatencyMs`、`totalCost`、`model`、`topK`。
+
+结果字段：`caseId`、`question`、`retrievedChunkIds`、`recallAt5`、`citationAccuracy`、`answerCorrectness`、`answerText`、`judgeReason`、`latencyMs`、`cost`。
+
+> 引用准确率 = 回答引用来源中命中期望切片/资料的比例；未提供 `goldAnswer` 时 `answerCorrectness` 为空。评测调用以 `source=ADMIN`、`scene=EVAL` 记入 `ai_usage` 和用户当月用量。
 
 ---
 

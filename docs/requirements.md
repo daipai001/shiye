@@ -662,6 +662,8 @@ URL：https://...
 - 失败分类：没召回、召回错、引用错、模型编造、超时。
 - 目标：recall@5 ≥ 80%，引用准确率 ≥ 85%，答案正确率 ≥ 80%，首 token < 2s。
 
+> 当前实现：评测 worker 复用线上检索，生成回答并计算 recall@5、引用准确率、LLM-as-judge 正确率、平均延迟和单次成本；评测集需要管理员按真实资料录入。
+
 #### 3.4.12 当前页面模式（P1）
 
 - 读取当前页 title/url/选中文本/Readability 正文。
@@ -1132,7 +1134,7 @@ V1 管理端是独立的 `admin-web` + `shiye-admin-api`，不是 user-web 的 `
   → SSE 推给前端
 ```
 
-> **实现状态（2026-11-19）**：DeepSeek SSE、引用落库、会话/消息、usage/配额检查、真实 BGE-M3、向量 + MySQL FULLTEXT 关键词 + RRF 混合检索、BGE-reranker 二次重排、AI 摘要与自动标签、PDF/Markdown/TXT 上传、标签/文件夹筛选与标签管理、问答范围 ALL/ARTICLE/FOLDER/TAG、插件当前页问答、书签自动同步、插件默认模式/范围、问答取消/反馈、用户资料/密码、用量导出、邀请码注册、预算 Webhook 告警、管理端模型/系统设置/RAG 参数在线配置、用户密码重置、RAG 评测、审计日志和操作限流已接入；本机向量检索仍用 Redis Hash + 应用层余弦（无 RediSearch）。
+> **实现状态（2026-11-19）**：DeepSeek SSE、引用落库、会话/消息、usage/配额检查、真实 BGE-M3、向量 + MySQL FULLTEXT 关键词 + RRF 混合检索、BGE-reranker 二次重排、AI 摘要与自动标签、PDF/Markdown/TXT 上传、标签/文件夹筛选与标签管理、问答范围 ALL/ARTICLE/FOLDER/TAG、插件当前页问答、书签自动同步、插件默认模式/范围、问答取消/反馈、用户资料/密码、用量导出、邀请码注册、预算 Webhook 告警、管理端模型/系统设置/RAG 参数在线配置、用户密码重置、RAG 评测（recall/引用/正确率/延迟/成本）、审计日志和操作限流已接入；本机向量检索仍用 Redis Hash + 应用层余弦（无 RediSearch）。
 
 ### 5.4 用量记账与配额
 

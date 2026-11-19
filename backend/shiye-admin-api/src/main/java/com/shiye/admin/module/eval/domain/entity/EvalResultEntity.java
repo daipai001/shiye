@@ -15,6 +15,8 @@ public class EvalResultEntity {
     private BigDecimal recallAt5;
     private BigDecimal citationAccuracy;
     private BigDecimal answerCorrectness;
+    private String answerText;
+    private String judgeReason;
     private Integer latencyMs;
     private BigDecimal cost;
     private LocalDateTime createdAt;

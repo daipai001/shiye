@@ -147,6 +147,11 @@ public class DeepSeekChatClient {
         return modelConfig.chat().model();
     }
 
+    public String resolveModel(String modelOverride) {
+        return modelOverride == null || modelOverride.isBlank()
+                ? modelConfig.chat().model() : modelOverride.trim();
+    }
+
     public boolean isConfigured() {
         return !modelConfig.chat().apiKey().isEmpty();
     }
@@ -156,13 +161,21 @@ public class DeepSeekChatClient {
      */
     public ChatCompletion complete(List<ChatMessage> messages, int maxCompletionTokens,
                                    boolean jsonMode) {
+        return complete(messages, maxCompletionTokens, jsonMode, null);
+    }
+
+    /**
+     * 非流式补全，可指定模型覆盖值；为空时使用运行时 Chat 模型。
+     */
+    public ChatCompletion complete(List<ChatMessage> messages, int maxCompletionTokens,
+                                   boolean jsonMode, String modelOverride) {
         ModelConfig.Chat config = modelConfig.chat();
         if (config.apiKey().isEmpty()) {
             throw new ChatException("AI_NOT_CONFIGURED", "DeepSeek API Key 未配置");
         }
         int safeMaxTokens = Math.max(64, maxCompletionTokens);
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", config.model());
+        body.put("model", resolveModel(modelOverride));
         body.put("messages", toPayload(messages));
         body.put("stream", false);
         body.put("temperature", 0.2);

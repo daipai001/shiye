@@ -23,6 +23,11 @@ public interface UsageService {
                              int latencyMs, Integer firstTokenMs,
                              boolean estimated, Long conversationId);
 
+    RecordedUsage recordEval(long userId, String requestId, String model,
+                            int promptTokens, int completionTokens,
+                            BigDecimal inputPrice, BigDecimal outputPrice,
+                            int latencyMs, boolean estimated);
+
     void recordFailedChat(long userId, String requestId, String source, String model,
                           String errorCode, int latencyMs, Long conversationId);
 

@@ -102,7 +102,7 @@ public interface AdminEvalMapper {
     @Select("""
             SELECT e.id, e.run_id, e.case_id, c.question, e.retrieved_chunk_ids,
                    e.recall_at_5, e.citation_accuracy, e.answer_correctness,
-                   e.latency_ms, e.cost, e.created_at
+                   e.answer_text, e.judge_reason, e.latency_ms, e.cost, e.created_at
             FROM rag_eval_results e
             LEFT JOIN rag_eval_cases c ON c.id = e.case_id
             WHERE e.run_id = #{runId}

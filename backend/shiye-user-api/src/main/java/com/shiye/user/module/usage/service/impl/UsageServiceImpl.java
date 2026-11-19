@@ -132,12 +132,7 @@ public class UsageServiceImpl implements UsageService {
         int totalTokens = promptTokens + completionTokens;
         BigDecimal safeInput = inputPrice == null ? BigDecimal.ZERO : inputPrice;
         BigDecimal safeOutput = outputPrice == null ? BigDecimal.ZERO : outputPrice;
-        BigDecimal cost = BigDecimal.valueOf(promptTokens)
-                .multiply(safeInput)
-                .divide(BigDecimal.valueOf(1_000_000), 8, RoundingMode.HALF_UP)
-                .add(BigDecimal.valueOf(completionTokens)
-                        .multiply(safeOutput)
-                        .divide(BigDecimal.valueOf(1_000_000), 8, RoundingMode.HALF_UP));
+        BigDecimal cost = cost(promptTokens, completionTokens, safeInput, safeOutput);
 
         AiUsageEntity entity = new AiUsageEntity();
         entity.setRequestId(requestId);
@@ -162,6 +157,50 @@ public class UsageServiceImpl implements UsageService {
 
         monthlyMapper.increment(userId, currentMonth(), totalTokens, cost);
         return new RecordedUsage(promptTokens, completionTokens, totalTokens, cost, "CNY", estimated);
+    }
+
+    @Override
+    @Transactional
+    public RecordedUsage recordEval(long userId, String requestId, String model,
+                                    int promptTokens, int completionTokens,
+                                    BigDecimal inputPrice, BigDecimal outputPrice,
+                                    int latencyMs, boolean estimated) {
+        int totalTokens = promptTokens + completionTokens;
+        BigDecimal safeInput = inputPrice == null ? BigDecimal.ZERO : inputPrice;
+        BigDecimal safeOutput = outputPrice == null ? BigDecimal.ZERO : outputPrice;
+        BigDecimal cost = cost(promptTokens, completionTokens, safeInput, safeOutput);
+
+        AiUsageEntity entity = new AiUsageEntity();
+        entity.setRequestId(requestId);
+        entity.setUserId(userId);
+        entity.setSource("ADMIN");
+        entity.setScene("EVAL");
+        entity.setModel(model);
+        entity.setPromptTokens(promptTokens);
+        entity.setCompletionTokens(completionTokens);
+        entity.setTotalTokens(totalTokens);
+        entity.setCachedTokens(0);
+        entity.setInputPrice(safeInput);
+        entity.setOutputPrice(safeOutput);
+        entity.setCost(cost);
+        entity.setCurrency("CNY");
+        entity.setLatencyMs(latencyMs);
+        entity.setStatus("SUCCESS");
+        entity.setEstimated(estimated);
+        aiUsageMapper.insert(entity);
+
+        monthlyMapper.increment(userId, currentMonth(), totalTokens, cost);
+        return new RecordedUsage(promptTokens, completionTokens, totalTokens, cost, "CNY", estimated);
+    }
+
+    private BigDecimal cost(int promptTokens, int completionTokens,
+                            BigDecimal inputPrice, BigDecimal outputPrice) {
+        return BigDecimal.valueOf(promptTokens)
+                .multiply(inputPrice)
+                .divide(BigDecimal.valueOf(1_000_000), 8, RoundingMode.HALF_UP)
+                .add(BigDecimal.valueOf(completionTokens)
+                        .multiply(outputPrice)
+                        .divide(BigDecimal.valueOf(1_000_000), 8, RoundingMode.HALF_UP));
     }
 
     @Override
@@ -226,12 +265,7 @@ public class UsageServiceImpl implements UsageService {
         int totalTokens = promptTokens + completionTokens;
         BigDecimal safeInput = inputPrice == null ? BigDecimal.ZERO : inputPrice;
         BigDecimal safeOutput = outputPrice == null ? BigDecimal.ZERO : outputPrice;
-        BigDecimal cost = BigDecimal.valueOf(promptTokens)
-                .multiply(safeInput)
-                .divide(BigDecimal.valueOf(1_000_000), 8, RoundingMode.HALF_UP)
-                .add(BigDecimal.valueOf(completionTokens)
-                        .multiply(safeOutput)
-                        .divide(BigDecimal.valueOf(1_000_000), 8, RoundingMode.HALF_UP));
+        BigDecimal cost = cost(promptTokens, completionTokens, safeInput, safeOutput);
 
         AiUsageEntity entity = new AiUsageEntity();
         entity.setRequestId(requestId);

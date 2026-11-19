@@ -630,7 +630,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | `request_id` | VARCHAR(64) | 否 | — | 请求唯一 ID |
 | `user_id` | BIGINT UNSIGNED | 否 | — | 用户 |
 | `source` | VARCHAR(16) | 否 | — | WEB / EXTENSION / ADMIN / API |
-| `scene` | VARCHAR(16) | 否 | — | CHAT / EMBEDDING / RERANK / SUMMARY |
+| `scene` | VARCHAR(16) | 否 | — | CHAT / EMBEDDING / RERANK / SUMMARY / EVAL |
 | `model` | VARCHAR(64) | 否 | — | 模型 |
 | `prompt_tokens` | INT UNSIGNED | 否 | 0 | 输入 |
 | `completion_tokens` | INT UNSIGNED | 否 | 0 | 输出 |
@@ -830,7 +830,9 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | `retrieved_chunk_ids` | JSON | 是 | NULL | 召回 |
 | `recall_at_5` | DECIMAL(6,4) | 是 | NULL | recall@5 |
 | `citation_accuracy` | DECIMAL(6,4) | 是 | NULL | 引用准确率 |
-| `answer_correctness` | DECIMAL(6,4) | 是 | NULL | 答案正确率 |
+| `answer_correctness` | DECIMAL(6,4) | 是 | NULL | LLM-as-judge 答案正确率 |
+| `answer_text` | TEXT | 是 | NULL | 模型回答 |
+| `judge_reason` | TEXT | 是 | NULL | 判定说明 |
 | `latency_ms` | INT UNSIGNED | 是 | NULL | 延迟 |
 | `cost` | DECIMAL(14,8) | 是 | NULL | 成本 |
 | `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
@@ -899,7 +901,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 消息 | `messages.role` | `USER` / `ASSISTANT` / `SYSTEM` |
 | 消息 | `messages.status` | `SUCCESS` / `FAILED` / `ABORTED` |
 | AI | `ai_usage.source` | `WEB` / `EXTENSION` / `ADMIN` / `API` |
-| AI | `ai_usage.scene` | `CHAT` / `EMBEDDING` / `RERANK` / `SUMMARY` |
+| AI | `ai_usage.scene` | `CHAT` / `EMBEDDING` / `RERANK` / `SUMMARY` / `EVAL` |
 | AI | `ai_usage.status` | `SUCCESS` / `FAILED` / `ABORTED` |
 | 反馈 | `message_feedback.rating` | `UP` / `DOWN` |
 | 插件 | `user_plugin_settings.default_mode` | `LIBRARY` / `CURRENT` |
@@ -954,7 +956,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 ## 8. 迁移策略
 
-- 迁移文件：`deploy/sql/migrations/V001__init.sql`、`V002__chunk_fulltext.sql`、`V003__plugin_default_scope.sql`。
+- 迁移文件：`deploy/sql/migrations/V001__init.sql`、`V002__chunk_fulltext.sql`、`V003__plugin_default_scope.sql`、`V004__eval_answer_details.sql`。
 - 每个迁移必须幂等/可重复执行；记录到 `schema_migrations`。
 - 不修改已发布的迁移；新增迁移。
 - 大表加字段用 `ALGORITHM=INPLACE` 或分批回填。

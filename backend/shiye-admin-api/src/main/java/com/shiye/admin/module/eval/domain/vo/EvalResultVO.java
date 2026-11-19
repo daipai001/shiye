@@ -12,6 +12,8 @@ public record EvalResultVO(
         BigDecimal recallAt5,
         BigDecimal citationAccuracy,
         BigDecimal answerCorrectness,
+        String answerText,
+        String judgeReason,
         Integer latencyMs,
         BigDecimal cost,
         LocalDateTime createdAt

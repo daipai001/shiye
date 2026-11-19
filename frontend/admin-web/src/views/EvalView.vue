@@ -248,6 +248,20 @@ onMounted(load)
         </div>
         <pre class="metrics">{{ JSON.stringify(detail.metrics || {}, null, 2) }}</pre>
         <el-table :data="detail.results || []" size="small" empty-text="暂无结果">
+          <el-table-column type="expand">
+            <template #default="{ row }">
+              <div class="eval-detail">
+                <div>
+                  <b>模型回答</b>
+                  <pre>{{ row.answerText || '未生成回答' }}</pre>
+                </div>
+                <div>
+                  <b>判定说明</b>
+                  <pre>{{ row.judgeReason || '-' }}</pre>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column prop="caseId" label="用例" width="80" />
           <el-table-column prop="question" label="问题" min-width="220" show-overflow-tooltip />
           <el-table-column label="recall@5" width="100">
@@ -255,10 +269,25 @@ onMounted(load)
               {{ row.recallAt5 != null ? Number(row.recallAt5).toFixed(3) : '-' }}
             </template>
           </el-table-column>
+          <el-table-column label="引用准确率" width="110">
+            <template #default="{ row }">
+              {{ row.citationAccuracy != null ? Number(row.citationAccuracy).toFixed(3) : '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="答案正确率" width="110">
+            <template #default="{ row }">
+              {{ row.answerCorrectness != null ? Number(row.answerCorrectness).toFixed(3) : '-' }}
+            </template>
+          </el-table-column>
           <el-table-column label="耗时" width="90">
             <template #default="{ row }">{{ row.latencyMs != null ? `${row.latencyMs} ms` : '-' }}</template>
           </el-table-column>
-          <el-table-column label="召回切片" min-width="180" show-overflow-tooltip>
+          <el-table-column label="成本" width="110">
+            <template #default="{ row }">
+              {{ row.cost != null ? `¥${Number(row.cost).toFixed(6)}` : '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="召回切片" min-width="140" show-overflow-tooltip>
             <template #default="{ row }">{{ (row.retrievedChunkIds || []).join(', ') }}</template>
           </el-table-column>
         </el-table>
@@ -314,5 +343,33 @@ onMounted(load)
   line-height: 1.6;
   max-height: 180px;
   overflow: auto;
+}
+.eval-detail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 8px 12px;
+}
+.eval-detail b {
+  color: var(--ink);
+  font-size: 10.5px;
+}
+.eval-detail pre {
+  margin: 6px 0 0;
+  padding: 8px;
+  background: #fbfbf9;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 10px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
+}
+@media (max-width: 900px) {
+  .eval-detail {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

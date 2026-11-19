@@ -74,6 +74,7 @@ mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/seed.sql
 ```bash
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V002__chunk_fulltext.sql
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V003__plugin_default_scope.sql
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V004__eval_answer_details.sql
 ```
 
 - 管理员：`admin@shiye.local`
@@ -239,7 +240,7 @@ RAG 问答闭环已打通：
 - 索引任务：逐条状态、失败原因、重试
 - 模型配置：展示 Chat / Embedding / Rerank，在线编辑 base URL、模型、key（留空保持）、价格和开关；保存到 `system_settings`，user-api 5 秒内生效；保留连接测试
 - 系统设置：注册开关、邀请码、默认新用户配额、全站月度预算、告警阈值、问答限流、每日 token 上限，以及 chunk 字数/重叠、topK、混合检索、rerank、强制引用；保存后 user-api 5 秒内生效
-- RAG 评测：维护评测用例、创建异步运行、复用线上检索计算 recall@5
+- RAG 评测：维护评测用例、创建异步运行，复用线上检索生成回答，计算 recall@5、引用准确率、LLM-as-judge 答案正确率、延迟和成本
 - 审计日志：模型、系统设置、用户、导入、任务和评测操作的审计记录
 
 > 模型配置已支持在线编辑并写入 `system_settings`；key 在数据库中以 JSON 存储（管理端只返回掩码），生产环境应限制数据库访问权限。Embedding provider 切换仍需重启，修改模型/维度后需重建索引。
@@ -253,13 +254,11 @@ RAG 问答闭环已打通：
 - 已做向量 + 关键词 + RRF 混合检索、BGE-reranker 二次重排、资料 AI 摘要/自动标签、插件当前页问答、书签新增/修改/删除自动同步和管理端模型在线配置。
 - 管理端模型和系统设置均已支持在线编辑；预算告警已支持 Webhook，可在管理端测试发送。
 - 邀请码注册已接入；邮箱验证尚未接入。
-- RAG 评测目前计算 recall@5 和检索延迟；引用准确率、答案正确率、LLM-as-judge 和内置 30 条评测集尚未接入。
 - 上传资料索引任务尚未写入 `ingest_tasks`，管理端任务页当前展示书签导入任务。
 - 扫描版 PDF 未接 OCR；本机向量检索仍为应用层余弦。
 - 问答限流（10 次/分钟/用户）和管理端操作限流（60 次/分钟/管理员）已接入。
 
 ## 下一步
 
-1. RAG 评测质量指标与评测集
-2. 邮箱验证（需要 SMTP）
-3. 部署到服务器（可选 SSH CD 已就绪，需要配置 secrets）
+1. 邮箱验证（需要 SMTP）
+2. 部署到服务器（可选 SSH CD 已就绪，需要配置 secrets）

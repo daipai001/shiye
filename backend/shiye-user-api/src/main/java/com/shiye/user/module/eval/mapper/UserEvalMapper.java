@@ -31,7 +31,7 @@ public interface UserEvalMapper {
     int markStarted(@Param("id") long id);
 
     @Select("""
-            SELECT id, user_id, question, expected_article_ids, expected_chunk_ids
+            SELECT id, user_id, question, expected_article_ids, expected_chunk_ids, gold_answer
             FROM rag_eval_cases
             WHERE user_id = #{userId} AND status = 'ACTIVE'
             ORDER BY id
@@ -40,20 +40,28 @@ public interface UserEvalMapper {
 
     @Insert("""
             INSERT INTO rag_eval_results
-                (run_id, case_id, retrieved_chunk_ids, recall_at_5, latency_ms, cost)
+                (run_id, case_id, retrieved_chunk_ids, recall_at_5, citation_accuracy,
+                 answer_correctness, answer_text, judge_reason, latency_ms, cost)
             VALUES (#{runId}, #{caseId}, CAST(#{retrievedChunkIds} AS JSON),
-                    #{recallAt5}, #{latencyMs}, 0)
+                    #{recallAt5}, #{citationAccuracy}, #{answerCorrectness},
+                    #{answerText}, #{judgeReason}, #{latencyMs}, #{cost})
             """)
     int insertResult(@Param("runId") long runId,
                      @Param("caseId") long caseId,
                      @Param("retrievedChunkIds") String retrievedChunkIds,
                      @Param("recallAt5") BigDecimal recallAt5,
-                     @Param("latencyMs") int latencyMs);
+                     @Param("citationAccuracy") BigDecimal citationAccuracy,
+                     @Param("answerCorrectness") BigDecimal answerCorrectness,
+                     @Param("answerText") String answerText,
+                     @Param("judgeReason") String judgeReason,
+                     @Param("latencyMs") int latencyMs,
+                     @Param("cost") BigDecimal cost);
 
     @Update("""
             UPDATE rag_eval_runs
             SET metrics = CAST(#{metrics} AS JSON),
                 embedding_model = #{embeddingModel},
+                model = #{model},
                 top_k = #{topK},
                 finished_at = UTC_TIMESTAMP(3)
             WHERE id = #{id}
@@ -61,5 +69,6 @@ public interface UserEvalMapper {
     int finishRun(@Param("id") long id,
                   @Param("metrics") String metrics,
                   @Param("embeddingModel") String embeddingModel,
+                  @Param("model") String model,
                   @Param("topK") int topK);
 }

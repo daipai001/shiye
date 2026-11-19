@@ -143,6 +143,8 @@ public class AdminEvalServiceImpl implements AdminEvalService {
                 entity.getRecallAt5(),
                 entity.getCitationAccuracy(),
                 entity.getAnswerCorrectness(),
+                entity.getAnswerText(),
+                entity.getJudgeReason(),
                 entity.getLatencyMs(),
                 entity.getCost(),
                 entity.getCreatedAt()
