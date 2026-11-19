@@ -642,8 +642,8 @@ admin-web → POST /admin/api/v1/auth/login
 ### 3.3 资料与标签
 
 > **M2b 当前实现范围**：`GET /articles`、`GET /articles/stats`、`GET /articles/{id}`、`GET /articles/{id}/chunks`、`DELETE /articles/{id}`；书签导入 worker 自动抓取/解析/切片/向量化。
-> `POST /articles/collect`、`POST /articles/upload`、`POST /articles/{id}/reindex`、标签与文件夹筛选在后续里程碑接入。
-> 标签 `tags`、文件夹 `folders` 字段暂不返回。所有时间字段为 UTC，前端负责本地化显示。
+> `POST /articles/collect`、`POST /articles/{id}/reindex` 已接入；资料 READY 后异步生成 AI 摘要和标签，`tags` 已在资料列表/详情返回，文件夹筛选在后续里程碑接入。
+> `GET /tags` 已接入；`folders` 字段暂不返回。所有时间字段为 UTC，前端负责本地化显示。
 
 #### POST `/articles/collect`
 

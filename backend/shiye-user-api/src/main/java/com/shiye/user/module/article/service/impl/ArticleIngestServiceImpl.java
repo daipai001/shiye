@@ -13,6 +13,7 @@ import com.shiye.user.module.article.domain.entity.ArticleEntity;
 import com.shiye.user.module.article.mapper.ArticleChunkMapper;
 import com.shiye.user.module.article.mapper.ArticleFolderMapper;
 import com.shiye.user.module.article.mapper.ArticleMapper;
+import com.shiye.user.module.article.service.ArticleEnrichmentService;
 import com.shiye.user.module.article.service.ArticleIngestService;
 import com.shiye.user.module.article.support.ArticleStatus;
 import com.shiye.user.module.article.support.FetchedPage;
@@ -50,6 +51,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
     private final TextChunker textChunker;
     private final EmbeddingService embeddingService;
     private final ChunkVectorStore vectorStore;
+    private final ArticleEnrichmentService enrichmentService;
     private final Executor ingestExecutor;
     private final int maxTextChars;
 
@@ -61,6 +63,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                                     TextChunker textChunker,
                                     EmbeddingService embeddingService,
                                     ChunkVectorStore vectorStore,
+                                    ArticleEnrichmentService enrichmentService,
                                     @Qualifier("ingestExecutor") Executor ingestExecutor,
                                     @Value("${shiye.article.max-text-chars:500000}") int maxTextChars) {
         this.articleMapper = articleMapper;
@@ -71,6 +74,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         this.textChunker = textChunker;
         this.embeddingService = embeddingService;
         this.vectorStore = vectorStore;
+        this.enrichmentService = enrichmentService;
         this.ingestExecutor = ingestExecutor;
         this.maxTextChars = Math.max(10000, maxTextChars);
     }
@@ -274,6 +278,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         articleMapper.updateStatus(articleId, userId, ArticleStatus.READY.name());
         log.info("ingested article {} for user {}: {} chunks, model={}",
                 articleId, userId, stored.size(), embeddingService.model());
+        enrichmentService.enrichAsync(userId, articleId);
     }
 
     private UrlNormalizer.Normalized normalize(String url) {

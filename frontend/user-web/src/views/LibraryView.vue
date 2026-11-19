@@ -12,6 +12,7 @@ import type {
   ArticleSummary,
   BookmarkImportSummary,
   PageResult,
+  Tag,
 } from '../api/types'
 
 const router = useRouter()
@@ -56,6 +57,17 @@ function badgeClass(status: string) {
 
 function formatTime(value?: string | null) {
   return formatUtcTime(value)
+}
+
+function tagStyle(tag: Tag) {
+  if (!tag.color) {
+    return {}
+  }
+  return {
+    color: tag.color,
+    borderColor: `${tag.color}55`,
+    background: `${tag.color}14`,
+  }
 }
 
 async function loadStats() {
@@ -209,6 +221,11 @@ onMounted(loadAll)
               <span :class="badgeClass(item.status)">{{ statusLabel(item.status) }}</span>
             </div>
             <p class="summary">{{ item.summary || '暂无摘要' }}</p>
+            <div v-if="item.tags?.length" class="tag-line">
+              <span v-for="tag in item.tags" :key="tag.id" class="tag-chip" :style="tagStyle(tag)">
+                {{ tag.name }}
+              </span>
+            </div>
             <div class="meta">
               <span>{{ item.domain || '未知来源' }}</span>
               <span>{{ item.wordCount }} 字</span>
@@ -280,6 +297,11 @@ onMounted(loadAll)
           <span v-if="detail.author">{{ detail.author }}</span>
         </div>
         <p class="detail-summary">{{ detail.summary || '暂无摘要' }}</p>
+        <div v-if="detail.tags?.length" class="tag-line detail-tags">
+          <span v-for="tag in detail.tags" :key="tag.id" class="tag-chip" :style="tagStyle(tag)">
+            {{ tag.name }}
+          </span>
+        </div>
 
         <el-tabs v-model="activeTab">
           <el-tab-pane label="正文" name="content">
@@ -412,6 +434,27 @@ onMounted(loadAll)
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.tag-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--muted);
+  background: #faf9f6;
+}
+.detail-tags {
+  margin: 4px 0 14px;
 }
 .meta,
 .import-meta,

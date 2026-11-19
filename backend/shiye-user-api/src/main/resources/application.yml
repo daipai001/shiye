@@ -57,6 +57,12 @@ shiye:
       temperature: ${DEEPSEEK_TEMPERATURE:0.25}
       input-price: ${DEEPSEEK_INPUT_PRICE:2.0}
       output-price: ${DEEPSEEK_OUTPUT_PRICE:8.0}
+    enrichment:
+      # 资料 READY 后异步生成 AI 摘要和 2-5 个标签；失败保留原摘要
+      enabled: ${AI_ENRICHMENT_ENABLED:true}
+      max-input-chars: ${AI_ENRICHMENT_MAX_INPUT_CHARS:6000}
+      max-tags: ${AI_ENRICHMENT_MAX_TAGS:5}
+      max-tokens: ${AI_ENRICHMENT_MAX_TOKENS:500}
     embedding:
       # dev = 本地确定性向量（仅用于联调，不是语义向量）；http = OpenAI 兼容 /embeddings
       provider: ${EMBEDDING_PROVIDER:dev}

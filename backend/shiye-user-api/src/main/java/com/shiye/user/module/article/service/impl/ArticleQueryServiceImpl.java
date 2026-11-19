@@ -15,10 +15,13 @@ import com.shiye.user.module.article.mapper.ArticleMapper;
 import com.shiye.user.module.article.service.ArticleQueryService;
 import com.shiye.user.module.article.support.ArticleSourceType;
 import com.shiye.user.module.article.support.ArticleStatus;
+import com.shiye.user.module.tag.domain.vo.TagVO;
+import com.shiye.user.module.tag.service.TagService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ArticleQueryServiceImpl implements ArticleQueryService {
@@ -28,13 +31,16 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
     private final ArticleMapper articleMapper;
     private final ArticleChunkMapper chunkMapper;
     private final ChunkVectorStore vectorStore;
+    private final TagService tagService;
 
     public ArticleQueryServiceImpl(ArticleMapper articleMapper,
                                    ArticleChunkMapper chunkMapper,
-                                   ChunkVectorStore vectorStore) {
+                                   ChunkVectorStore vectorStore,
+                                   TagService tagService) {
         this.articleMapper = articleMapper;
         this.chunkMapper = chunkMapper;
         this.vectorStore = vectorStore;
+        this.tagService = tagService;
     }
 
     @Override
@@ -54,11 +60,14 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         if (total == 0) {
             return PageResult.empty(safePage, safeSize);
         }
-        List<ArticleSummaryVO> items = articleMapper
-                .findPage(userId, qFilter, statusFilter, sourceFilter,
-                        (safePage - 1) * safeSize, safeSize)
-                .stream()
-                .map(ArticleSummaryVO::from)
+        List<ArticleEntity> entities = articleMapper.findPage(
+                userId, qFilter, statusFilter, sourceFilter,
+                (safePage - 1) * safeSize, safeSize);
+        List<Long> articleIds = entities.stream().map(ArticleEntity::getId).toList();
+        Map<Long, List<TagVO>> tags = tagService.byArticleIds(userId, articleIds);
+        List<ArticleSummaryVO> items = entities.stream()
+                .map(entity -> ArticleSummaryVO.from(
+                        entity, tags.getOrDefault(entity.getId(), List.of())))
                 .toList();
         return PageResult.of(items, total, safePage, safeSize);
     }
@@ -67,7 +76,9 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
     public ArticleDetailVO detail(long userId, long articleId) {
         ArticleEntity article = findOwned(userId, articleId);
         article.setChunkCount((int) chunkMapper.countByArticle(articleId, userId));
-        return ArticleDetailVO.from(article);
+        List<TagVO> tags = tagService.byArticleIds(userId, List.of(articleId))
+                .getOrDefault(articleId, List.of());
+        return ArticleDetailVO.from(article, tags);
     }
 
     @Override
@@ -105,6 +116,7 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
             vectorStore.delete(userId, chunk.getId());
         }
         chunkMapper.deleteByArticle(articleId, userId);
+        tagService.replaceArticleTags(userId, articleId, List.of());
         articleMapper.softDelete(articleId, userId);
     }
 

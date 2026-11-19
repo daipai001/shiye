@@ -212,6 +212,16 @@ RAG 问答闭环已打通：
 >
 > rerank 用量写入 `ai_usage.scene=RERANK`（当前成本记 0，token 计入月度用量）；接口失败只记 WARN 并回退 RRF，不影响问答。
 
+资料整理（AI enrichment）已接入：
+
+- 资料进入 `READY` 后异步调用 DeepSeek JSON 模式，生成 80-160 字中文摘要和 2-5 个标签
+- 摘要覆盖抓取阶段的 meta/正文摘要；标签写入 `tags` / `article_tags`，同一用户复用同名标签
+- 资料列表和详情返回 `tags`，`GET /api/v1/tags` 返回标签及资料数
+- enrichment 失败、未配置 key 或配额不足时保留原摘要，不影响资料入库和检索
+- 用量写入 `ai_usage.scene=SUMMARY`，记录 token、成本、耗时和 `article_id`
+
+> 配置开关：`AI_ENRICHMENT_ENABLED`（默认 true，同时要求 `AI_ENABLED=true` 且配置 DeepSeek Key）、`AI_ENRICHMENT_MAX_INPUT_CHARS=6000`、`AI_ENRICHMENT_MAX_TAGS=5`。
+
 管理后台已接入：
 
 - 总览：用户/资料/切片数、今日调用/tokens/成本/错误率/P95、7 天趋势、来源拆分、最近失败
@@ -229,7 +239,7 @@ RAG 问答闭环已打通：
 
 - 仓库默认 embedding 仍是 `dev`；新环境需按上面说明配置 BGE-M3 API Key。本机已配置并验证。
 - 本机 Redis 没有 RediSearch，向量检索走应用层余弦；数据量大后应换 Redis Stack HNSW。
-- 已做向量 + 关键词 + RRF 混合检索和 BGE-reranker 二次重排；AI 摘要/自动标签尚未接入。
+- 已做向量 + 关键词 + RRF 混合检索、BGE-reranker 二次重排和资料 AI 摘要/自动标签；插件当前页问答、书签自动同步尚未接入。
 - 管理端模型配置目前只读 + 连接测试，在线修改模型/key/价格尚未接入。
 - `/usage/summary` 趋势聚合、`/articles/upload` 尚未接入；管理端索引任务页基于 bookmark_items。
 - 注册/登录的 IP 限流和 `X-RateLimit-*` 响应头尚未接入；书签导入限流已接入。
@@ -237,6 +247,6 @@ RAG 问答闭环已打通：
 
 ## 下一步
 
-1. AI 摘要/自动标签 + 摘要向量化
-2. 管理端模型在线配置、用量趋势聚合、插件当前页问答
+1. 插件当前页问答 + 书签变更自动同步
+2. 管理端模型在线配置、用量趋势聚合
 3. 部署到服务器（可选 SSH CD 已就绪，需要配置 secrets）

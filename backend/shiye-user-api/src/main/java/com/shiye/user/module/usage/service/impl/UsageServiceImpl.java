@@ -195,6 +195,44 @@ public class UsageServiceImpl implements UsageService {
     }
 
     @Override
+    @Transactional
+    public void recordSummary(long userId, String requestId, String source, String model,
+                              int promptTokens, int completionTokens,
+                              BigDecimal inputPrice, BigDecimal outputPrice,
+                              int latencyMs, boolean estimated, long articleId) {
+        int totalTokens = promptTokens + completionTokens;
+        BigDecimal safeInput = inputPrice == null ? BigDecimal.ZERO : inputPrice;
+        BigDecimal safeOutput = outputPrice == null ? BigDecimal.ZERO : outputPrice;
+        BigDecimal cost = BigDecimal.valueOf(promptTokens)
+                .multiply(safeInput)
+                .divide(BigDecimal.valueOf(1_000_000), 8, RoundingMode.HALF_UP)
+                .add(BigDecimal.valueOf(completionTokens)
+                        .multiply(safeOutput)
+                        .divide(BigDecimal.valueOf(1_000_000), 8, RoundingMode.HALF_UP));
+
+        AiUsageEntity entity = new AiUsageEntity();
+        entity.setRequestId(requestId);
+        entity.setUserId(userId);
+        entity.setSource(source);
+        entity.setScene("SUMMARY");
+        entity.setModel(model);
+        entity.setPromptTokens(promptTokens);
+        entity.setCompletionTokens(completionTokens);
+        entity.setTotalTokens(totalTokens);
+        entity.setCachedTokens(0);
+        entity.setInputPrice(safeInput);
+        entity.setOutputPrice(safeOutput);
+        entity.setCost(cost);
+        entity.setCurrency("CNY");
+        entity.setLatencyMs(latencyMs);
+        entity.setStatus("SUCCESS");
+        entity.setEstimated(estimated);
+        entity.setArticleId(articleId);
+        aiUsageMapper.insert(entity);
+        monthlyMapper.increment(userId, currentMonth(), totalTokens, cost);
+    }
+
+    @Override
     public PageResult<UsageRecordVO> records(long userId, int page, int pageSize,
                                              String source, String scene, String model, String status) {
         int safePage = Math.max(1, page);

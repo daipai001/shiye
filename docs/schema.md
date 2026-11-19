@@ -431,7 +431,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 - URL 资料用 `url_hash` 去重；上传资料 `url_hash=NULL`（MySQL 唯一索引允许多个 NULL），应用层用 `content_hash` 去重。
 - `content_text` 只存清洗后正文；原始 HTML/PDF 放 `file_assets`。
 - 软删除后异步清理 chunks/vector。
-- 摘要/标签由 `ingest_tasks.stage=ENRICH` 生成；失败不阻塞 `READY`，可在后台重试。
+- 摘要/标签在资料进入 `READY` 后异步生成（当前由 `ArticleEnrichmentService` 调度，不单独写 `ingest_tasks.stage=ENRICH`）；失败保留抓取摘要，不阻塞入库。
 
 ---
 

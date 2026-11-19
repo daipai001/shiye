@@ -76,6 +76,15 @@ public interface ArticleMapper {
                      @Param("userId") long userId,
                      @Param("status") String status);
 
+    @Update("""
+            UPDATE articles
+            SET summary = #{summary}, updated_at = UTC_TIMESTAMP(3)
+            WHERE id = #{id} AND user_id = #{userId} AND deleted_at IS NULL
+            """)
+    int updateSummary(@Param("id") long id,
+                      @Param("userId") long userId,
+                      @Param("summary") String summary);
+
     @Select("""
             <script>
             SELECT a.id, a.user_id, a.title, a.url, a.url_hash, a.domain, a.source_type, a.author,

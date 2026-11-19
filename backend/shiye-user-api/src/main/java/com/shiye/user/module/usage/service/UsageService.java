@@ -25,6 +25,11 @@ public interface UsageService {
     void recordRerank(long userId, String requestId, String source, String model,
                       int tokens, int latencyMs, long conversationId);
 
+    void recordSummary(long userId, String requestId, String source, String model,
+                       int promptTokens, int completionTokens,
+                       BigDecimal inputPrice, BigDecimal outputPrice,
+                       int latencyMs, boolean estimated, long articleId);
+
     PageResult<UsageRecordVO> records(long userId, int page, int pageSize,
                                       String source, String scene, String model, String status);
 }

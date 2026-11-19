@@ -162,6 +162,66 @@ public class DeepSeekChatClient {
         return model;
     }
 
+    public boolean isConfigured() {
+        return !apiKey.isEmpty();
+    }
+
+    /**
+     * 非流式补全，用于摘要/标签等后台任务；jsonMode 失败时自动去掉 response_format 重试。
+     */
+    public ChatCompletion complete(List<ChatMessage> messages, int maxCompletionTokens,
+                                   boolean jsonMode) {
+        if (apiKey.isEmpty()) {
+            throw new ChatException("AI_NOT_CONFIGURED", "DeepSeek API Key 未配置");
+        }
+        int safeMaxTokens = Math.max(64, maxCompletionTokens);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", model);
+        body.put("messages", toPayload(messages));
+        body.put("stream", false);
+        body.put("temperature", 0.2);
+        body.put("max_tokens", safeMaxTokens);
+        if (jsonMode) {
+            body.put("response_format", Map.of("type", "json_object"));
+        }
+
+        HttpResponse<String> response = sendJson(body);
+        if (jsonMode && response.statusCode() == 400) {
+            body.remove("response_format");
+            response = sendJson(body);
+        }
+        if (response.statusCode() != 200) {
+            throw new ChatException("AI_UNAVAILABLE",
+                    "DeepSeek 返回 HTTP " + response.statusCode());
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode choice = root.path("choices").path(0);
+            String content = choice.path("message").path("content").asText("");
+            String finishReason = choice.path("finish_reason").asText(null);
+            JsonNode usage = root.path("usage");
+            int promptTokens = usage.path("prompt_tokens").asInt(0);
+            int completionTokens = usage.path("completion_tokens").asInt(0);
+            int totalTokens = usage.path("total_tokens").asInt(0);
+            boolean estimated = false;
+            if (totalTokens == 0) {
+                estimated = true;
+                promptTokens = estimateTokens(messages);
+                completionTokens = estimateTokens(content);
+                totalTokens = promptTokens + completionTokens;
+            }
+            log.debug("deepseek completion finished, model={}, tokens={}, estimated={}",
+                    model, totalTokens, estimated);
+            return new ChatCompletion(content, promptTokens, completionTokens,
+                    totalTokens, estimated, finishReason);
+        } catch (ChatException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ChatException("AI_BAD_RESPONSE", "DeepSeek 返回格式不正确", ex);
+        }
+    }
+
     public BigDecimal inputPrice() {
         return inputPrice;
     }
@@ -182,6 +242,28 @@ public class DeepSeekChatClient {
                             objectMapper.writeValueAsString(body)))
                     .build();
             return httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        } catch (HttpTimeoutException ex) {
+            throw new ChatException("AI_TIMEOUT", "DeepSeek 连接超时", ex);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new ChatException("AI_UNAVAILABLE", "DeepSeek 请求被中断", ex);
+        } catch (Exception ex) {
+            log.warn("deepseek request failed: {}", ex.getMessage());
+            throw new ChatException("AI_UNAVAILABLE", "DeepSeek 请求失败", ex);
+        }
+    }
+
+    private HttpResponse<String> sendJson(Map<String, Object> body) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/chat/completions"))
+                    .timeout(Duration.ofMillis(timeoutMs))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(
+                            objectMapper.writeValueAsString(body)))
+                    .build();
+            return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (HttpTimeoutException ex) {
             throw new ChatException("AI_TIMEOUT", "DeepSeek 连接超时", ex);
         } catch (InterruptedException ex) {

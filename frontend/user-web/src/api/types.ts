@@ -60,8 +60,16 @@ export interface ArticleSummary {
   wordCount: number
   chunkCount: number
   language?: string | null
+  tags?: Tag[]
   createdAt: string
   updatedAt: string
+}
+
+export interface Tag {
+  id: string
+  name: string
+  color?: string | null
+  articleCount?: number
 }
 
 export interface ArticleDetail extends ArticleSummary {
