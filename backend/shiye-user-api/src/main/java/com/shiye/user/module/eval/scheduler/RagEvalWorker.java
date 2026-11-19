@@ -75,7 +75,8 @@ public class RagEvalWorker {
         for (EvalCaseRow evalCase : cases) {
             long started = System.currentTimeMillis();
             RetrievalResult result = retrievalService.retrieve(
-                    run.getUserId(), evalCase.getQuestion(), "ALL", null, topK);
+                    run.getUserId(), evalCase.getQuestion(), "ALL", null, topK,
+                    Boolean.TRUE.equals(run.getRerank()));
             List<Long> retrievedChunkIds = result.chunks().stream()
                     .map(RetrievedChunk::chunkId)
                     .toList();

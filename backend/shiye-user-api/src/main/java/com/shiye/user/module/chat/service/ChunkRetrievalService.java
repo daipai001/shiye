@@ -98,6 +98,11 @@ public class ChunkRetrievalService {
 
     public RetrievalResult retrieve(long userId, String query,
                                     String scopeType, Long scopeId, Integer requestedTopK) {
+        return retrieve(userId, query, scopeType, scopeId, requestedTopK, null);
+    }
+
+    public RetrievalResult retrieve(long userId, String query, String scopeType, Long scopeId,
+                                    Integer requestedTopK, Boolean rerankOverride) {
         String scope = scopeType == null || scopeType.isBlank()
                 ? "ALL"
                 : scopeType.trim().toUpperCase(Locale.ROOT);
@@ -108,7 +113,8 @@ public class ChunkRetrievalService {
         SystemSettings settings = systemSettingsService.current();
         int defaultTopK = settings.ragTopK();
         boolean hybridEnabled = Boolean.TRUE.equals(settings.ragHybridEnabled());
-        boolean rerankEnabled = Boolean.TRUE.equals(settings.ragRerankEnabled());
+        boolean rerankEnabled = rerankOverride != null
+                ? rerankOverride : Boolean.TRUE.equals(settings.ragRerankEnabled());
 
         List<Candidate> vectorResults = vectorCandidates(userId, query, allowedArticleIds);
         List<Candidate> keywordResults = hybridEnabled
