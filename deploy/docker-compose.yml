@@ -93,6 +93,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:-dev-admin-secret-change-me-32-bytes-minimum}
+      ADMIN_RATE_LIMIT_PER_MINUTE: ${ADMIN_RATE_LIMIT_PER_MINUTE:-60}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}

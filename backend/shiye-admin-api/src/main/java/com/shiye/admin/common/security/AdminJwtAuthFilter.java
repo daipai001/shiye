@@ -21,10 +21,13 @@ public class AdminJwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtTokenService jwtTokenService;
     private final ObjectMapper objectMapper;
+    private final AdminRateLimitService rateLimitService;
 
-    public AdminJwtAuthFilter(JwtTokenService jwtTokenService, ObjectMapper objectMapper) {
+    public AdminJwtAuthFilter(JwtTokenService jwtTokenService, ObjectMapper objectMapper,
+                              AdminRateLimitService rateLimitService) {
         this.jwtTokenService = jwtTokenService;
         this.objectMapper = objectMapper;
+        this.rateLimitService = rateLimitService;
     }
 
     @Override
@@ -54,12 +57,30 @@ public class AdminJwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
             AdminContext.set(new AdminContext.AdminPrincipal(principal.subjectId(), principal.role()));
+            if (!allowRequest(response, principal.subjectId())) {
+                return;
+            }
             filterChain.doFilter(request, response);
         } catch (BizException ex) {
             writeError(response, ex.getErrorCode());
         } finally {
             AdminContext.clear();
         }
+    }
+
+    private boolean allowRequest(HttpServletResponse response, long adminId) throws IOException {
+        AdminRateLimitService.RateLimitResult result = rateLimitService.hit(adminId);
+        if (result == null) {
+            return true;
+        }
+        response.setHeader("X-RateLimit-Limit", String.valueOf(result.limit()));
+        response.setHeader("X-RateLimit-Remaining", String.valueOf(result.remaining()));
+        response.setHeader("X-RateLimit-Reset", String.valueOf(result.resetEpochSeconds()));
+        if (result.exceeded()) {
+            writeError(response, ErrorCode.RATE_LIMITED);
+            return false;
+        }
+        return true;
     }
 
     private void writeError(HttpServletResponse response, ErrorCode errorCode) throws IOException {

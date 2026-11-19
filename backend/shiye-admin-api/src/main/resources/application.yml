@@ -42,6 +42,8 @@ shiye:
     admin-secret: ${ADMIN_JWT_SECRET:dev-admin-secret-change-me-32-bytes-minimum}
     admin-expire-seconds: ${ADMIN_JWT_EXPIRE_SECONDS:900}
     refresh-expire-seconds: ${REFRESH_EXPIRE_SECONDS:2592000}
+  auth:
+    rate-limit-per-minute: ${ADMIN_RATE_LIMIT_PER_MINUTE:60}
   ai:
     chat:
       base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com/v1}
