@@ -729,8 +729,8 @@ admin-web → POST /admin/api/v1/auth/login
 | `q` | string | 标题/正文关键词 |
 | `status` | string | 状态 |
 | `sourceType` | string | BOOKMARK/MANUAL/UPLOAD |
-| `tagId` | string | 标签（个人库） |
-| `folderId` | string | 书签文件夹（个人库） |
+| `tagId` | string | 标签；传 `teamId` 时为团队标签 |
+| `folderId` | string | 文件夹；传 `teamId` 时为团队文件夹 |
 | `teamId` | string | 团队资料；只能传当前用户所在团队 |
 | `from` / `to` | string | ISO 时间 |
 | `sort` | string | 默认 `updatedAt,desc` |
@@ -749,7 +749,7 @@ admin-web → POST /admin/api/v1/auth/login
 | `wordCount` | number | 字数 |
 | `chunkCount` | number | 切片数 |
 | `tags` | array | `{id,name,color}` |
-| `folders` | array | `{id,path}` |
+| `folders` | array | `{id,path,articleCount}`；团队资料对应团队文件夹 |
 | `createdAt` / `updatedAt` | string | 时间 |
 
 ---
