@@ -1784,6 +1784,8 @@ admin-web → POST /admin/api/v1/auth/login
 
 **响应**：分页审计日志。
 
+> `GET /audit-logs/export` 支持同样的 `adminId?`、`action?`、`from?`、`to?` 筛选，返回 CSV（最多 10000 条）。
+
 ---
 
 #### GET `/eval/cases`

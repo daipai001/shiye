@@ -63,4 +63,25 @@ public interface AdminAuditMapper {
                @Param("action") String action,
                @Param("from") LocalDateTime from,
                @Param("to") LocalDateTime to);
+
+    @Select("""
+            <script>
+            SELECT l.id, l.admin_id, a.email AS admin_email, l.action, l.resource_type,
+                   l.resource_id, l.detail, l.ip, l.user_agent, l.created_at
+            FROM admin_audit_logs l
+            LEFT JOIN admin_users a ON a.id = l.admin_id
+            WHERE 1 = 1
+            <if test="adminId != null"> AND l.admin_id = #{adminId}</if>
+            <if test="action != null"> AND l.action = #{action}</if>
+            <if test="from != null"> AND l.created_at &gt;= #{from}</if>
+            <if test="to != null"> AND l.created_at &lt; #{to}</if>
+            ORDER BY l.id DESC
+            LIMIT #{limit}
+            </script>
+            """)
+    List<AdminAuditLogRow> findForExport(@Param("adminId") Long adminId,
+                                         @Param("action") String action,
+                                         @Param("from") LocalDateTime from,
+                                         @Param("to") LocalDateTime to,
+                                         @Param("limit") int limit);
 }

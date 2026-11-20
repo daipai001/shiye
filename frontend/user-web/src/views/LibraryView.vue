@@ -33,6 +33,8 @@ const folders = ref<BookmarkFolder[]>([])
 const loading = ref(false)
 const uploading = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
+const folderUploading = ref(false)
+const folderUploadInput = ref<HTMLInputElement | null>(null)
 
 const imports = ref<BookmarkImportSummary[]>([])
 
@@ -153,6 +155,55 @@ function applySearch() {
 
 function chooseUpload() {
   uploadInput.value?.click()
+}
+
+function chooseFolderUpload() {
+  folderUploadInput.value?.click()
+}
+
+async function handleFolderUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+    .filter((file) => /\.(md|markdown|txt|pdf)$/i.test(file.name))
+    .slice(0, 100)
+  if (files.length === 0) {
+    ElMessage.warning('文件夹里没有可导入的 Markdown、TXT 或 PDF')
+    input.value = ''
+    return
+  }
+  folderUploading.value = true
+  let success = 0
+  let duplicate = 0
+  let failed = 0
+  try {
+    for (const file of files) {
+      if (file.size > 20 * 1024 * 1024) {
+        failed += 1
+        continue
+      }
+      const formData = new FormData()
+      formData.append('file', file)
+      try {
+        const { data } = await api.post<ApiResult<ArticleUploadResponse>>(
+          '/articles/upload',
+          formData,
+          { timeout: 180000 },
+        )
+        if (data.data.duplicate) {
+          duplicate += 1
+        } else {
+          success += 1
+        }
+      } catch {
+        failed += 1
+      }
+    }
+    ElMessage.success(`文件夹导入完成：新增 ${success}，重复 ${duplicate}，失败 ${failed}`)
+    await Promise.all([loadStats(), loadArticles()])
+  } finally {
+    folderUploading.value = false
+    input.value = ''
+  }
 }
 
 async function handleUpload(event: Event) {
@@ -340,7 +391,17 @@ onMounted(loadAll)
           class="file-input"
           @change="handleUpload"
         />
+        <input
+          ref="folderUploadInput"
+          type="file"
+          accept=".md,.markdown,.txt,.pdf"
+          class="file-input"
+          webkitdirectory
+          multiple
+          @change="handleFolderUpload"
+        />
         <el-button :loading="uploading" @click="chooseUpload">上传资料</el-button>
+        <el-button :loading="folderUploading" @click="chooseFolderUpload">导入文件夹</el-button>
         <el-button type="primary" @click="router.push('/plugin')">导入书签</el-button>
       </div>
     </div>

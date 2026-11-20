@@ -8,6 +8,7 @@ import com.shiye.admin.module.audit.domain.vo.AdminAuditLogVO;
 import com.shiye.admin.module.audit.mapper.AdminAuditMapper;
 import com.shiye.admin.module.audit.service.AdminAuditService;
 import com.shiye.common.api.PageResult;
+import com.shiye.common.util.Csv;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,28 @@ public class AdminAuditServiceImpl implements AdminAuditService {
                 .map(this::toVO)
                 .toList();
         return PageResult.of(items, total, safePage, safeSize);
+    }
+
+    @Override
+    public String exportCsv(Long adminId, String action, LocalDateTime from, LocalDateTime to) {
+        String actionFilter = action == null || action.isBlank() ? null : action.trim();
+        List<AdminAuditLogRow> rows = auditMapper.findForExport(
+                adminId, actionFilter, from, to, 10000);
+        StringBuilder csv = new StringBuilder("\uFEFF");
+        csv.append("id,createdAt,adminId,adminEmail,action,resourceType,resourceId,ip,userAgent,detail\n");
+        for (AdminAuditLogRow row : rows) {
+            csv.append(Csv.escape(row.getId())).append(',')
+                    .append(Csv.escape(row.getCreatedAt())).append(',')
+                    .append(Csv.escape(row.getAdminId())).append(',')
+                    .append(Csv.escape(row.getAdminEmail())).append(',')
+                    .append(Csv.escape(row.getAction())).append(',')
+                    .append(Csv.escape(row.getResourceType())).append(',')
+                    .append(Csv.escape(row.getResourceId())).append(',')
+                    .append(Csv.escape(row.getIp())).append(',')
+                    .append(Csv.escape(row.getUserAgent())).append(',')
+                    .append(Csv.escape(row.getDetail())).append('\n');
+        }
+        return csv.toString();
     }
 
     private AdminAuditLogVO toVO(AdminAuditLogRow row) {

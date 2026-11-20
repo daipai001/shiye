@@ -177,6 +177,8 @@ docker compose -f deploy/docker-compose.yml up -d --build
 - 跨导入按 `(user_id, url_hash)` 去重，已存在 `READY` 资料时条目标记 `SKIPPED / DUPLICATE_URL`
 - 向量写入 Redis：`kb:chunk:{chunkId}` + `kb:user:{userId}:chunks`
 - 资料 API：列表/统计/详情/切片/删除/重新索引；资料库页面支持搜索、状态/标签/文件夹筛选、详情抽屉和切片查看
+- 本地文件夹导入：选择 Markdown/TXT/PDF 文件夹批量上传，适用于 Obsidian vault 和 Markdown 导出
+- PWA：user-web 提供 `manifest.webmanifest`、图标和 service worker，可安装到桌面/移动端主屏
 - 标签手动编辑：单篇加/删标签；标签管理支持重命名、改色、删除
 - 问答取消、回答反馈、用户资料/密码、插件偏好、个人用量 CSV 导出
 - 设置页已接入账户资料、密码修改和插件默认模式/范围（指定文件夹或标签）/站点黑名单；服务端偏好会应用到悬浮球
@@ -245,7 +247,7 @@ RAG 问答闭环已打通：
 - 模型配置：展示 Chat / Embedding / Rerank，在线编辑 base URL、模型、key（留空保持）、价格和开关；保存到 `system_settings`，user-api 5 秒内生效；保留连接测试
 - 系统设置：注册开关、邀请码、默认新用户配额、全站月度预算、告警阈值、问答限流、每日 token 上限，以及 chunk 字数/重叠、topK、混合检索、rerank、强制引用；保存后 user-api 5 秒内生效
 - RAG 评测：维护评测用例、创建异步运行，复用线上检索生成回答，计算 recall@5、引用准确率、LLM-as-judge 答案正确率、延迟和成本
-- 审计日志：模型、系统设置、用户、导入、任务和评测操作的审计记录
+- 审计日志：模型、系统设置、用户、导入、任务和评测操作的审计记录；支持 CSV 导出
 
 > 模型配置已支持在线编辑并写入 `system_settings`；key 在数据库中以 JSON 存储（管理端只返回掩码），生产环境应限制数据库访问权限。Embedding provider 切换仍需重启，修改模型/维度后需重建索引。
 

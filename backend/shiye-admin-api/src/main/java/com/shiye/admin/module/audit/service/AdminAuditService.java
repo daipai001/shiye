@@ -11,4 +11,6 @@ public interface AdminAuditService {
     PageResult<com.shiye.admin.module.audit.domain.vo.AdminAuditLogVO> list(
             int page, int pageSize, Long adminId, String action,
             LocalDateTime from, LocalDateTime to);
+
+    String exportCsv(Long adminId, String action, LocalDateTime from, LocalDateTime to);
 }

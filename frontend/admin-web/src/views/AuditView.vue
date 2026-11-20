@@ -11,6 +11,7 @@ const total = ref(0)
 const page = ref(1)
 const action = ref('')
 const loading = ref(false)
+const exporting = ref(false)
 const selected = ref<AdminAuditLog | null>(null)
 const detailVisible = ref(false)
 
@@ -43,6 +44,26 @@ function applyFilter() {
   load()
 }
 
+async function exportCsv() {
+  exporting.value = true
+  try {
+    const { data } = await api.get<Blob>('/audit-logs/export', {
+      params: { action: action.value.trim() || undefined },
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'shiye-audit-logs.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    ElMessage.error('导出审计日志失败')
+  } finally {
+    exporting.value = false
+  }
+}
+
 function detailText(detail: unknown) {
   if (detail == null) return '无'
   try {
@@ -71,6 +92,7 @@ onMounted(load)
           @keyup.enter="applyFilter"
           @clear="applyFilter"
         />
+        <el-button :loading="exporting" @click="exportCsv">导出 CSV</el-button>
         <el-button :loading="loading" @click="load">刷新</el-button>
       </div>
     </div>
