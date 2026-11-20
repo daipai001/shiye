@@ -105,6 +105,8 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 ---
 
+> 已运行旧版 schema 的数据库执行 `deploy/sql/migrations/2026-11-20-team-space.sql`；新库直接执行 `deploy/sql/schema.sql`。
+
 ## 3. 表清单
 
 | 域 | 表 | 说明 | 优先级 |

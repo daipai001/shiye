@@ -1,5 +1,11 @@
 # 部署运维
 
+## 数据库迁移
+
+- 新库：执行 `deploy/sql/schema.sql`，再执行 `deploy/sql/seed.sql`。
+- 已运行旧版 schema 的库：执行 `deploy/sql/migrations/2026-11-20-team-space.sql`（团队空间、`articles.team_id`、`ai_usage.team_id`）。
+- 迁移文件按日期顺序执行；执行前先备份。
+
 ## 健康检查
 
 - user-api：`http://localhost:18080/actuator/health`
