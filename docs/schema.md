@@ -687,7 +687,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 - `idx_usage_daily_user_date (user_id, date)`
 - `idx_usage_daily_date (date)`
 
-**说明**：user-api 每日把 `ai_usage` 聚合到本表，默认回补最近 7 天；聚合任务可重复执行。
+**说明**：user-api 每日把 `ai_usage` 聚合到本表，默认回补最近 7 天；聚合任务可重复执行。管理端总览和用量明细当前仍直接查询 `ai_usage`，本表用于日级历史汇总。
 
 ---
 
