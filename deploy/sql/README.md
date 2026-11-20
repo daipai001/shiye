@@ -16,7 +16,7 @@ USE shiye;
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/schema.sql
 ```
 
-完整字段说明见 `docs/schema.md`；初始迁移为 `deploy/sql/migrations/V001__init.sql`，后续迁移（V002–V004）按版本号顺序执行。
+完整字段说明见 `docs/schema.md`；初始迁移为 `deploy/sql/migrations/V001__init.sql`，后续迁移（V002–V005）按版本号顺序执行。
 
 ## 3. 初始化管理员
 

@@ -132,6 +132,7 @@ function mount() {
           <div class="mode-switch">
             <button type="button" data-ask-mode="library" class="active">资料库</button>
             <button type="button" data-ask-mode="page">当前页</button>
+            <button type="button" data-ask-mode="general">通用</button>
           </div>
           <div class="messages"></div>
           <form class="composer">
@@ -316,7 +317,9 @@ function mount() {
                 content: pageContent,
                 question,
               }
-            : { conversationId, scope: libraryScope(), question },
+            : { conversationId, scope: askMode === 'general'
+                ? { type: 'GENERAL', id: null }
+                : libraryScope(), question },
         ),
       })
       if (!response.ok || !response.body) {
@@ -420,14 +423,19 @@ function mount() {
   }
 
   function setAskMode(mode) {
-    askMode = mode === 'page' ? 'page' : 'library'
+    askMode = mode === 'page' || mode === 'general' ? mode : 'library'
+    conversationId = null
     for (const button of modeButtons) {
       button.classList.toggle('active', button.dataset.askMode === askMode)
     }
-    textarea.placeholder = askMode === 'page' ? '问当前页面的内容…' : '问我收藏的资料…'
+    textarea.placeholder = askMode === 'page'
+      ? '问当前页面的内容…'
+      : askMode === 'general' ? '直接问模型，不检索资料库…' : '问我收藏的资料…'
     askHint.textContent = askMode === 'page'
       ? '回答只基于当前页面，不会写入资料库。'
-      : '回答基于你的资料库，并附原文引用。'
+      : askMode === 'general'
+        ? '通用问答不检索资料库，回答不带引用。'
+        : '回答基于你的资料库，并附原文引用。'
   }
 
   function isBlacklisted(settings) {
@@ -445,7 +453,9 @@ function mount() {
       host.remove()
       return
     }
-    setAskMode(serverSettings.defaultMode === 'CURRENT' ? 'page' : 'library')
+    setAskMode(serverSettings.defaultMode === 'CURRENT'
+      ? 'page'
+      : serverSettings.defaultMode === 'GENERAL' ? 'general' : 'library')
   }
 
   function libraryScope() {

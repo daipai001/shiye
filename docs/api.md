@@ -421,7 +421,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `ballEnabled` | boolean | 悬浮球开关 |
-| `defaultMode` | string | LIBRARY/CURRENT |
+| `defaultMode` | string | LIBRARY/CURRENT/GENERAL |
 | `defaultScope` | string | ALL/FOLDER/TAG |
 | `defaultScopeId` | string/null | FOLDER/TAG 范围对应的文件夹/标签 ID |
 | `shortcut` | string/null | 快捷键 |
@@ -435,7 +435,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 **请求**：同响应字段
 
-> `defaultScope=FOLDER/TAG` 时必须提供本人名下的 `defaultScopeId`；`ALL` 时忽略。`GENERAL` 模式属 P2，当前不接受。
+> `defaultScope=FOLDER/TAG` 时必须提供本人名下的 `defaultScopeId`；`ALL` 时忽略。`GENERAL` 为通用问答模式。
 
 **响应**：更新后的设置
 
@@ -920,7 +920,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 3.4 问答
 
-> **当前实现**：`POST /chat/stream` 已接入 DeepSeek SSE、混合检索和 rerank，支持 `ALL / ARTICLE / FOLDER / TAG` 范围；`POST /chat/page-stream` 支持插件当前页临时问答。
+> **当前实现**：`POST /chat/stream` 已接入 DeepSeek SSE、混合检索和 rerank，支持 `ALL / ARTICLE / FOLDER / TAG / GENERAL` 范围；`GENERAL` 不检索资料库，直接回答。检索 query 会结合最近用户问题做轻量改写，改善多轮追问。`POST /chat/page-stream` 支持插件当前页临时问答。
 > 引用、usage、会话/消息持久化已接通；默认使用联调 embedding，真实语义检索需配置 BGE-M3。
 
 #### POST `/chat/stream`
@@ -943,8 +943,8 @@ admin-web → POST /admin/api/v1/auth/login
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `conversationId` | string/null | 否 | 不传则新建会话 |
-| `scope.type` | string | 是 | ALL/ARTICLE/FOLDER/TAG/CURRENT |
-| `scope.id` | string/null | 条件 | ARTICLE/FOLDER/TAG 时必填 |
+| `scope.type` | string | 是 | ALL/ARTICLE/FOLDER/TAG/GENERAL |
+| `scope.id` | string/null | 条件 | ARTICLE/FOLDER/TAG 时必填；ALL/GENERAL 为空 |
 | `question` | string | 是 | 1~4000 字 |
 | `model` | string/null | 否 | 不传用默认 |
 

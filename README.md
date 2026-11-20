@@ -75,6 +75,7 @@ mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/seed.sql
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V002__chunk_fulltext.sql
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V003__plugin_default_scope.sql
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V004__eval_answer_details.sql
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V005__plugin_general_mode.sql
 ```
 
 - 管理员：`admin@shiye.local`
@@ -184,7 +185,8 @@ RAG 问答闭环已打通：
 
 - `POST /api/v1/chat/stream`：SSE 事件 `meta / citation / delta / usage / done / error`
 - DeepSeek 流式回答，复用本地 OfferDesk 配置（`shiye.ai.chat`，已 gitignore）
-- 问答范围 ALL / ARTICLE / FOLDER / TAG；资料库问答页支持全部、单篇、文件夹、标签选择，检索结果按 `user_id` 过滤，单篇最多 3 个切片
+- 问答范围 ALL / ARTICLE / FOLDER / TAG / GENERAL；资料库问答页支持全部、单篇、文件夹、标签和通用问答，检索结果按 `user_id` 过滤，单篇最多 3 个切片
+- 多轮追问会结合最近用户问题做轻量检索改写；通用问答不检索资料库、不返回引用
 - 混合检索：BGE-M3 向量召回 + MySQL ngram FULLTEXT 关键词召回 + RRF 融合（`migrations/V002__chunk_fulltext.sql`）
 - BGE-reranker 二次重排：对 RRF 候选池（默认最多 20 条）调用 `BAAI/bge-reranker-v2-m3`，失败或未配置 key 时自动回退 RRF；引用分数为 rerank relevance score
 - 回答引用与 `citations` 落库，包含标题、片段、分数、`charStart/charEnd`

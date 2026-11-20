@@ -7,7 +7,7 @@ import java.util.List;
 
 public record PluginSettingsUpdateRequest(
         Boolean ballEnabled,
-        @Pattern(regexp = "LIBRARY|CURRENT", message = "defaultMode 仅支持 LIBRARY / CURRENT")
+        @Pattern(regexp = "LIBRARY|CURRENT|GENERAL", message = "defaultMode 非法")
         String defaultMode,
         @Pattern(regexp = "ALL|FOLDER|TAG", message = "defaultScope 非法")
         String defaultScope,

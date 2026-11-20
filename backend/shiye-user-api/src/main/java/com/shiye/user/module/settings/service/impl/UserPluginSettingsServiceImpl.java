@@ -23,7 +23,7 @@ import java.util.Set;
 @Service
 public class UserPluginSettingsServiceImpl implements UserPluginSettingsService {
 
-    private static final Set<String> MODES = Set.of("LIBRARY", "CURRENT");
+    private static final Set<String> MODES = Set.of("LIBRARY", "CURRENT", "GENERAL");
     private static final Set<String> SCOPES = Set.of("ALL", "FOLDER", "TAG");
     private static final int MAX_BLACKLIST = 100;
 
@@ -127,7 +127,9 @@ public class UserPluginSettingsServiceImpl implements UserPluginSettingsService 
     }
 
     private PluginSettingsVO toVO(UserPluginSettingsEntity entity) {
-        String mode = "CURRENT".equals(entity.getDefaultMode()) ? "CURRENT" : "LIBRARY";
+        String mode = "CURRENT".equals(entity.getDefaultMode())
+                || "GENERAL".equals(entity.getDefaultMode())
+                ? entity.getDefaultMode() : "LIBRARY";
         String scope = "FOLDER".equals(entity.getDefaultScope())
                 || "TAG".equals(entity.getDefaultScope())
                 ? entity.getDefaultScope() : "ALL";

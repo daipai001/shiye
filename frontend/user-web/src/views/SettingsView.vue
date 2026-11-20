@@ -223,6 +223,7 @@ onMounted(load)
             <el-select v-model="plugin.defaultMode" style="width: 100%">
               <el-option label="资料库问答" value="LIBRARY" />
               <el-option label="当前页问答" value="CURRENT" />
+              <el-option label="通用问答" value="GENERAL" />
             </el-select>
           </div>
           <div class="field">

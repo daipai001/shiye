@@ -34,6 +34,7 @@ import com.shiye.user.module.chat.mapper.MessageMapper;
 import com.shiye.user.module.chat.service.ChatService;
 import com.shiye.user.module.chat.service.ChatStreamRegistry;
 import com.shiye.user.module.chat.service.ChunkRetrievalService;
+import com.shiye.user.module.chat.support.ConversationQueryRewriter;
 import com.shiye.user.module.chat.support.RetrievalResult;
 import com.shiye.user.module.chat.support.RetrievedChunk;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
@@ -217,6 +218,11 @@ public class ChatServiceImpl implements ChatService {
             String question = request.question().trim();
             Scope scope = resolveScope(request, null);
             conversation = resolveConversation(userId, request, scope, question);
+            List<MessageEntity> recentForRewrite = messageMapper.findRecent(
+                    conversation.getId(), userId, 4);
+            String retrievalQuery = ConversationQueryRewriter.rewrite(
+                    question, recentForRewrite);
+            boolean general = "GENERAL".equals(scope.type());
 
             MessageEntity userMessage = new MessageEntity();
             userMessage.setConversationId(conversation.getId());
@@ -228,8 +234,10 @@ public class ChatServiceImpl implements ChatService {
             userMessage.setStatus("SUCCESS");
             messageMapper.insert(userMessage);
 
-            RetrievalResult retrieval = retrievalService.retrieve(
-                    userId, question, scope.type(), scope.id(), null);
+            RetrievalResult retrieval = general
+                    ? RetrievalResult.withoutRerank(List.of())
+                    : retrievalService.retrieve(
+                            userId, retrievalQuery, scope.type(), scope.id(), null);
             List<RetrievedChunk> chunks = retrieval.chunks();
             recordRerankUsage(userId, source, conversation, requestId, retrieval);
 
@@ -265,7 +273,7 @@ public class ChatServiceImpl implements ChatService {
                 return;
             }
 
-            List<ChatMessage> messages = buildMessages(conversation, userId, chunks);
+            List<ChatMessage> messages = buildMessages(conversation, userId, chunks, general);
             ChatCompletionResult result = chatClient.stream(messages, delta -> {
                 if (firstTokenMs.get() < 0) {
                     firstTokenMs.set((int) (System.currentTimeMillis() - started));
@@ -515,12 +523,12 @@ public class ChatServiceImpl implements ChatService {
             return scope;
         }
         String type = request.scope().type().trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("ALL", "ARTICLE", "FOLDER", "TAG").contains(type)) {
+        if (!Set.of("ALL", "ARTICLE", "FOLDER", "TAG", "GENERAL").contains(type)) {
             throw new BizException(ErrorCode.VALIDATION_ERROR,
-                    "当前仅支持 ALL / ARTICLE / FOLDER / TAG 范围");
+                    "当前仅支持 ALL / ARTICLE / FOLDER / TAG / GENERAL 范围");
         }
         Long id = request.scope().id() == null ? null : Long.parseLong(request.scope().id());
-        if (!"ALL".equals(type) && id == null) {
+        if (!Set.of("ALL", "GENERAL").contains(type) && id == null) {
             throw new BizException(ErrorCode.VALIDATION_ERROR, "scope.id 不能为空");
         }
         scope.type = type;
@@ -529,9 +537,10 @@ public class ChatServiceImpl implements ChatService {
     }
 
     private List<ChatMessage> buildMessages(ConversationEntity conversation, long userId,
-                                            List<RetrievedChunk> chunks) {
+                                            List<RetrievedChunk> chunks, boolean general) {
         List<ChatMessage> messages = new ArrayList<>();
-        messages.add(new ChatMessage("system", systemPrompt(chunks)));
+        messages.add(new ChatMessage("system",
+                general ? generalSystemPrompt() : systemPrompt(chunks)));
         List<MessageEntity> recent = messageMapper.findRecent(
                 conversation.getId(), userId, HISTORY_MESSAGES);
         Collections.reverse(recent);
@@ -549,6 +558,11 @@ public class ChatServiceImpl implements ChatService {
             ));
         }
         return messages;
+    }
+
+    private String generalSystemPrompt() {
+        return "你是拾页的通用问答助手。直接回答用户问题，不要声称检索了用户资料库，也不要编造引用。\n"
+                + "回答要简洁、准确；不确定时明确说明，不要编造事实。";
     }
 
     private String systemPrompt(List<RetrievedChunk> chunks) {

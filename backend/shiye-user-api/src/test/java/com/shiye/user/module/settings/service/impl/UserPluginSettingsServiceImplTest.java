@@ -90,7 +90,7 @@ class UserPluginSettingsServiceImplTest {
     }
 
     @Test
-    void generalModeNormalizesToLibrary() {
+    void generalModeIsPreserved() {
         UserPluginSettingsEntity existing = new UserPluginSettingsEntity();
         existing.setUserId(10L);
         existing.setBallEnabled(true);
@@ -100,6 +100,6 @@ class UserPluginSettingsServiceImplTest {
 
         PluginSettingsVO result = service.get(10L);
 
-        assertEquals("LIBRARY", result.defaultMode());
+        assertEquals("GENERAL", result.defaultMode());
     }
 }

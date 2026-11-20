@@ -26,7 +26,7 @@ const quota = ref<Quota | null>(null)
 const messagesBox = ref<HTMLElement | null>(null)
 let abortController: AbortController | null = null
 const activeRequestId = ref<string | null>(null)
-const scopeType = ref<'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG'>('ALL')
+const scopeType = ref<'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG' | 'GENERAL'>('ALL')
 const scopeId = ref('')
 const folders = ref<BookmarkFolder[]>([])
 const tags = ref<Tag[]>([])
@@ -124,8 +124,8 @@ async function ensureArticleOption(articleId: string) {
 async function selectConversation(conversation: Conversation) {
   if (streaming.value) return
   currentId.value = conversation.id
-  const type = conversation.scopeType as 'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG'
-  scopeType.value = ['ALL', 'ARTICLE', 'FOLDER', 'TAG'].includes(type) ? type : 'ALL'
+  const type = conversation.scopeType as 'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG' | 'GENERAL'
+  scopeType.value = ['ALL', 'ARTICLE', 'FOLDER', 'TAG', 'GENERAL'].includes(type) ? type : 'ALL'
   scopeId.value = conversation.scopeId || ''
   if (scopeType.value === 'ARTICLE') {
     await ensureArticleOption(scopeId.value)
@@ -143,6 +143,12 @@ async function selectConversation(conversation: Conversation) {
   } finally {
     loadingMessages.value = false
   }
+}
+
+function onScopeChange() {
+  scopeId.value = ''
+  currentId.value = null
+  messages.value = []
 }
 
 function newConversation() {
@@ -195,7 +201,7 @@ async function send() {
     ElMessage.warning('问题最多 4000 字')
     return
   }
-  if (scopeType.value !== 'ALL' && !scopeId.value) {
+  if (scopeType.value !== 'ALL' && scopeType.value !== 'GENERAL' && !scopeId.value) {
     ElMessage.warning('请选择问答范围')
     return
   }
@@ -230,7 +236,7 @@ async function send() {
       conversationId: currentId.value,
       scope: {
         type: scopeType.value,
-        id: scopeType.value === 'ALL' ? null : scopeId.value,
+        id: scopeType.value === 'ALL' || scopeType.value === 'GENERAL' ? null : scopeId.value,
       },
       question,
     },
@@ -383,12 +389,13 @@ onBeforeUnmount(() => {
             size="small"
             style="width: 120px"
             :disabled="streaming"
-            @change="scopeId = ''"
+            @change="onScopeChange"
           >
             <el-option label="全部资料" value="ALL" />
             <el-option label="单篇资料" value="ARTICLE" />
             <el-option label="按文件夹" value="FOLDER" />
             <el-option label="按标签" value="TAG" />
+            <el-option label="通用问答" value="GENERAL" />
           </el-select>
           <el-select
             v-if="scopeType === 'ARTICLE'"
