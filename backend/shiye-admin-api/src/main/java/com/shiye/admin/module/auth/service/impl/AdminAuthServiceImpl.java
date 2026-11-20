@@ -93,9 +93,17 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
     @Override
     public AdminSummary me(long adminId) {
+        return authenticate(adminId);
+    }
+
+    @Override
+    public AdminSummary authenticate(long adminId) {
         AdminUserEntity admin = adminUserMapper.findById(adminId);
         if (admin == null) {
             throw new BizException(ErrorCode.UNAUTHORIZED);
+        }
+        if (!"ACTIVE".equals(admin.getStatus())) {
+            throw new BizException(ErrorCode.ADMIN_DISABLED);
         }
         return AdminSummary.from(admin);
     }

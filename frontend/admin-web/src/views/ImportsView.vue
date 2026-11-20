@@ -2,9 +2,11 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api/client'
+import { useAdminAuthStore } from '../stores/auth'
 import { formatUtcTime } from '../utils/time'
 import type { AdminImport, AdminImportItem, ApiResult, PageResult } from '../api/types'
 
+const auth = useAdminAuthStore()
 const imports = ref<AdminImport[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -152,10 +154,10 @@ onMounted(load)
         <span class="time">{{ formatUtcTime(item.createdAt) }}</span>
         <div class="actions">
           <el-button text @click="openDetail(item)">详情</el-button>
-          <el-button v-if="['PENDING', 'RUNNING'].includes(item.status)" text @click="action(item, 'pause')">暂停</el-button>
-          <el-button v-if="item.status === 'PAUSED'" text @click="action(item, 'resume')">继续</el-button>
-          <el-button v-if="['PENDING', 'RUNNING', 'PAUSED'].includes(item.status)" text type="danger" @click="action(item, 'cancel')">取消</el-button>
-          <el-button v-if="['DONE', 'FAILED'].includes(item.status) && item.failed > 0" text @click="action(item, 'retry')">重试</el-button>
+          <el-button v-if="auth.canWrite && ['PENDING', 'RUNNING'].includes(item.status)" text @click="action(item, 'pause')">暂停</el-button>
+          <el-button v-if="auth.canWrite && item.status === 'PAUSED'" text @click="action(item, 'resume')">继续</el-button>
+          <el-button v-if="auth.canWrite && ['PENDING', 'RUNNING', 'PAUSED'].includes(item.status)" text type="danger" @click="action(item, 'cancel')">取消</el-button>
+          <el-button v-if="auth.canWrite && ['DONE', 'FAILED'].includes(item.status) && item.failed > 0" text @click="action(item, 'retry')">重试</el-button>
         </div>
       </div>
     </div>

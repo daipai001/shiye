@@ -1,6 +1,8 @@
 package com.shiye.admin.common.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shiye.admin.module.auth.domain.vo.AdminSummary;
+import com.shiye.admin.module.auth.service.AdminAuthService;
 import com.shiye.common.api.ErrorCode;
 import com.shiye.common.api.Result;
 import com.shiye.common.exception.BizException;
@@ -22,12 +24,15 @@ public class AdminJwtAuthFilter extends OncePerRequestFilter {
     private final JwtTokenService jwtTokenService;
     private final ObjectMapper objectMapper;
     private final AdminRateLimitService rateLimitService;
+    private final AdminAuthService adminAuthService;
 
     public AdminJwtAuthFilter(JwtTokenService jwtTokenService, ObjectMapper objectMapper,
-                              AdminRateLimitService rateLimitService) {
+                              AdminRateLimitService rateLimitService,
+                              AdminAuthService adminAuthService) {
         this.jwtTokenService = jwtTokenService;
         this.objectMapper = objectMapper;
         this.rateLimitService = rateLimitService;
+        this.adminAuthService = adminAuthService;
     }
 
     @Override
@@ -52,11 +57,17 @@ public class AdminJwtAuthFilter extends OncePerRequestFilter {
         }
         try {
             JwtTokenService.JwtPrincipal principal = jwtTokenService.parse(authorization.substring(7));
-            if (!"admin".equals(principal.role()) && !"SUPER_ADMIN".equals(principal.role())) {
-                writeError(response, ErrorCode.INVALID_TOKEN_AUDIENCE);
+            AdminSummary current = adminAuthService.authenticate(principal.subjectId());
+            String role = AdminPermissions.normalize(current.role());
+            if (!AdminPermissions.isKnownRole(role)) {
+                writeError(response, ErrorCode.FORBIDDEN);
                 return;
             }
-            AdminContext.set(new AdminContext.AdminPrincipal(principal.subjectId(), principal.role()));
+            if (!AdminPermissions.allows(role, request.getMethod(), request.getRequestURI())) {
+                writeError(response, ErrorCode.FORBIDDEN);
+                return;
+            }
+            AdminContext.set(new AdminContext.AdminPrincipal(principal.subjectId(), role));
             if (!allowRequest(response, principal.subjectId())) {
                 return;
             }

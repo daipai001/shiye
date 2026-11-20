@@ -1175,7 +1175,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ## 4. 管理端 API
 
-> 前缀：`/admin/api/v1`。只接受管理员 token。
+> 前缀：`/admin/api/v1`。只接受管理员 token；除登录/刷新/健康检查外，按角色执行权限矩阵。
 
 ### 4.1 管理员认证
 
@@ -1203,6 +1203,8 @@ admin-web → POST /admin/api/v1/auth/login
 ```
 
 **错误**：40001、40101、40303
+
+> `admin.role`：`SUPER_ADMIN` / `OPERATOR` / `VIEWER`。后续请求的角色以数据库当前值为准，不信任 token 中的旧角色。
 
 ---
 
@@ -1855,6 +1857,89 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
+### 4.8 管理员账号与角色
+
+> 仅 `SUPER_ADMIN` 可访问以下接口。管理端每次请求都会从数据库读取当前角色和状态，降权或禁用立即生效。
+
+角色：
+
+| 角色 | 权限 |
+|---|---|
+| `SUPER_ADMIN` | 全部；包括管理员、模型配置、系统设置 |
+| `OPERATOR` | 总览、用量、用户、导入、任务、评测、审计的读写；不能访问管理员/模型/系统设置 |
+| `VIEWER` | 上述业务模块只读；不能执行 POST/PUT/DELETE |
+
+#### GET `/admins`
+
+**认证**：`SUPER_ADMIN`
+
+**响应**
+
+```json
+[
+  {
+    "id": "1",
+    "email": "admin@shiye.local",
+    "name": "拾页管理员",
+    "role": "SUPER_ADMIN",
+    "status": "ACTIVE",
+    "lastLoginAt": "2026-11-20T06:00:00.000Z",
+    "createdAt": "2026-10-01T08:00:00.000Z",
+    "updatedAt": "2026-11-20T06:00:00.000Z"
+  }
+]
+```
+
+---
+
+#### POST `/admins`
+
+**认证**：`SUPER_ADMIN`
+
+**请求**：`email`、`name`、`role`（SUPER_ADMIN/OPERATOR/VIEWER）、`password`（8-72 位，含字母和数字）
+
+**响应**：创建后的管理员。
+
+**错误**：40001、40901（邮箱已存在）
+
+---
+
+#### PUT `/admins/{id}`
+
+**认证**：`SUPER_ADMIN`
+
+**请求**：`name`、`role`
+
+**响应**：更新后的管理员。
+
+**错误**：40001、40401、40901（不能修改自己的角色，或移除最后一名启用中的超级管理员）
+
+---
+
+#### PUT `/admins/{id}/status`
+
+**认证**：`SUPER_ADMIN`
+
+**请求**：`status`（ACTIVE/DISABLED）
+
+**响应**：更新后的管理员。禁用会撤销该管理员全部 refresh token。
+
+**错误**：40001、40401、40901（不能禁用自己，或禁用最后一名启用中的超级管理员）
+
+---
+
+#### PUT `/admins/{id}/password`
+
+**认证**：`SUPER_ADMIN`
+
+**请求**：`newPassword`（8-72 位，含字母和数字）
+
+**响应**：`null`。会撤销该管理员全部 refresh token。
+
+**错误**：40001、40401
+
+---
+
 ## 5. 页面 ↔ API 映射
 
 | # | 页面 | 关键接口 |
@@ -1879,6 +1964,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 18 | 插件-登录授权 | `POST /auth/extension-code`、`POST /auth/extension-token` |
 | 19 | Web-插件管理 | `GET/PUT /users/me/plugin-settings`、`POST /auth/extension-code` |
 | 20 | 管理后台-登录 | `POST /admin/api/v1/auth/login` |
+| 21 | 管理后台-管理员 | `GET/POST /admin/api/v1/admins`、`PUT /admin/api/v1/admins/{id}`、`PUT /admin/api/v1/admins/{id}/status`、`PUT /admin/api/v1/admins/{id}/password` |
 
 ---
 
@@ -1898,8 +1984,10 @@ admin-web → POST /admin/api/v1/auth/login
 | `/admin/api/v1/users` | 禁止 | 允许 | — |
 | `/admin/api/v1/imports` | 禁止 | 允许 | — |
 | `/admin/api/v1/tasks` | 禁止 | 允许 | — |
-| `/admin/api/v1/models` | 禁止 | 允许 | — |
-| `/admin/api/v1/settings` | 禁止 | 允许 | — |
+| `/admin/api/v1/models` | 禁止 | 仅 `SUPER_ADMIN` | — |
+| `/admin/api/v1/settings` | 禁止 | 仅 `SUPER_ADMIN` | — |
+| `/admin/api/v1/admins` | 禁止 | 仅 `SUPER_ADMIN` | — |
+| 其他 `/admin/api/v1/*` | 禁止 | `SUPER_ADMIN` / `OPERATOR` 读写，`VIEWER` 只读 | — |
 
 ---
 

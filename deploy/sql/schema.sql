@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS `admin_users` (
   `email`         VARCHAR(190)    NOT NULL COMMENT '登录邮箱',
   `password_hash` VARCHAR(100)    NOT NULL COMMENT 'BCrypt',
   `name`          VARCHAR(64)     NOT NULL COMMENT '显示名',
-  `role`          VARCHAR(32)     NOT NULL DEFAULT 'SUPER_ADMIN' COMMENT 'V1 仅 SUPER_ADMIN',
+  `role`          VARCHAR(32)     NOT NULL DEFAULT 'SUPER_ADMIN' COMMENT 'SUPER_ADMIN / OPERATOR / VIEWER',
   `status`        VARCHAR(16)     NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / DISABLED',
   `last_login_at` DATETIME(3)     NULL DEFAULT NULL,
   `created_at`    DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

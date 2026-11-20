@@ -13,4 +13,10 @@ public interface AdminAuthService {
     void logout(long adminId, String refreshToken);
 
     AdminSummary me(long adminId);
+
+    /**
+     * 校验管理员仍然存在且启用，并返回最新角色。
+     * 禁用或删除后，已签发的 access token 会在下一次请求立即失效。
+     */
+    AdminSummary authenticate(long adminId);
 }

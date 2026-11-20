@@ -2,9 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api/client'
+import { useAdminAuthStore } from '../stores/auth'
 import { formatUtcTime } from '../utils/time'
 import type { AdminUser, ApiResult, PageResult } from '../api/types'
 
+const auth = useAdminAuthStore()
 const users = ref<AdminUser[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -206,11 +208,14 @@ onMounted(load)
         </div>
         <span class="time">{{ formatUtcTime(user.lastLoginAt) }}</span>
         <div class="actions">
-          <el-button text @click="openPassword(user)">重置密码</el-button>
-          <el-button text @click="openQuota(user)">配额</el-button>
-          <el-button text :type="user.status === 'ACTIVE' ? 'danger' : 'success'" @click="toggleStatus(user)">
-            {{ user.status === 'ACTIVE' ? '禁用' : '启用' }}
-          </el-button>
+          <template v-if="auth.canWrite">
+            <el-button text @click="openPassword(user)">重置密码</el-button>
+            <el-button text @click="openQuota(user)">配额</el-button>
+            <el-button text :type="user.status === 'ACTIVE' ? 'danger' : 'success'" @click="toggleStatus(user)">
+              {{ user.status === 'ACTIVE' ? '禁用' : '启用' }}
+            </el-button>
+          </template>
+          <span v-else class="muted">只读</span>
         </div>
       </div>
     </div>

@@ -19,6 +19,19 @@ export interface AdminSummary {
   role: string
 }
 
+export type AdminRole = 'SUPER_ADMIN' | 'OPERATOR' | 'VIEWER'
+
+export interface AdminAccount {
+  id: string
+  email: string
+  name: string
+  role: AdminRole
+  status: 'ACTIVE' | 'DISABLED'
+  lastLoginAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AdminTokenResponse {
   accessToken: string
   refreshToken: string

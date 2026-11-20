@@ -2,9 +2,11 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '../api/client'
+import { useAdminAuthStore } from '../stores/auth'
 import { formatUtcTime } from '../utils/time'
 import type { ApiResult, EvalCase, EvalRun, PageResult } from '../api/types'
 
+const auth = useAdminAuthStore()
 const loading = ref(false)
 const cases = ref<EvalCase[]>([])
 const runs = ref<EvalRun[]>([])
@@ -135,8 +137,10 @@ onMounted(load)
         <p>维护真实问题用例，异步计算 recall@5 和检索延迟。</p>
       </div>
       <div class="head-actions">
-        <el-button @click="caseDialog = true">新建用例</el-button>
-        <el-button type="primary" @click="runDialog = true">新建运行</el-button>
+        <template v-if="auth.canWrite">
+          <el-button @click="caseDialog = true">新建用例</el-button>
+          <el-button type="primary" @click="runDialog = true">新建运行</el-button>
+        </template>
         <el-button text :loading="loading" @click="load">刷新</el-button>
       </div>
     </div>

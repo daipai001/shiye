@@ -13,6 +13,8 @@ export const useAdminAuthStore = defineStore('admin-auth', () => {
   const token = ref(getAccessToken())
   const admin = ref<AdminSummary | null>(loadAdmin())
   const isLoggedIn = computed(() => Boolean(token.value))
+  const isSuperAdmin = computed(() => admin.value?.role === 'SUPER_ADMIN')
+  const canWrite = computed(() => admin.value?.role !== 'VIEWER')
 
   function setSession(payload: AdminTokenResponse) {
     saveSession(payload)
@@ -31,5 +33,14 @@ export const useAdminAuthStore = defineStore('admin-auth', () => {
     admin.value = null
   }
 
-  return { token, admin, isLoggedIn, setSession, updateAdmin, clear }
+  return {
+    token,
+    admin,
+    isLoggedIn,
+    isSuperAdmin,
+    canWrite,
+    setSession,
+    updateAdmin,
+    clear,
+  }
 })

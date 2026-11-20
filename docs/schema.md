@@ -199,7 +199,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | `email` | VARCHAR(190) | 否 | — | 登录邮箱 |
 | `password_hash` | VARCHAR(100) | 否 | — | BCrypt |
 | `name` | VARCHAR(64) | 否 | — | 显示名 |
-| `role` | VARCHAR(32) | 否 | `SUPER_ADMIN` | V1 仅 SUPER_ADMIN |
+| `role` | VARCHAR(32) | 否 | `SUPER_ADMIN` | SUPER_ADMIN / OPERATOR / VIEWER |
 | `status` | VARCHAR(16) | 否 | `ACTIVE` | ACTIVE / DISABLED |
 | `last_login_at` | DATETIME(3) | 是 | NULL | 最后登录 |
 | `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
@@ -212,9 +212,12 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 **说明**
 
-- V1 只有一个 `SUPER_ADMIN`，由 `deploy/sql/seed.sql` 初始化。
-- 不开放注册；`SUPER_ADMIN` 不可禁用。
-- 管理员如要使用产品，另注册普通 `users` 账号。
+- 初始 `SUPER_ADMIN` 由 `deploy/sql/seed.sql` 初始化；其余管理员在后台“管理员”页创建，不开放注册。
+- 角色：`SUPER_ADMIN`（全部权限）、`OPERATOR`（业务读写，不能访问管理员/模型/系统设置）、`VIEWER`（只读）。
+- 至少保留一名启用中的 `SUPER_ADMIN`；不能禁用自己；不能修改自己的角色。
+- 角色和状态在每次请求时从数据库读取，降权/禁用后旧 access token 立即失效。
+- 管理员密码只存 BCrypt；重置密码或禁用会撤销该管理员全部 refresh token。
+- 管理员如要使用普通产品，另注册 `users` 账号。
 
 ---
 

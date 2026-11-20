@@ -2,9 +2,11 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '../api/client'
+import { useAdminAuthStore } from '../stores/auth'
 import { formatUtcTime } from '../utils/time'
 import type { AdminTask, ApiResult, PageResult } from '../api/types'
 
+const auth = useAdminAuthStore()
 const tasks = ref<AdminTask[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -154,7 +156,7 @@ onMounted(() => {
         <span class="error">{{ task.errorCode || '-' }}<em v-if="task.errorMessage">{{ task.errorMessage }}</em></span>
         <span class="time">{{ formatUtcTime(task.finishedAt || task.createdAt) }}</span>
         <div class="actions">
-          <el-button v-if="task.status === 'FAILED'" text @click="retry(task)">重试</el-button>
+          <el-button v-if="auth.canWrite && task.status === 'FAILED'" text @click="retry(task)">重试</el-button>
           <span v-else class="muted">—</span>
         </div>
       </div>

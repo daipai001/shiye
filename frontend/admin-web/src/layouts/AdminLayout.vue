@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api from '../api/client'
@@ -9,6 +9,13 @@ import { useAdminAuthStore } from '../stores/auth'
 
 const router = useRouter()
 const auth = useAdminAuthStore()
+const isSuperAdmin = computed(() => auth.admin?.role === 'SUPER_ADMIN')
+const roleLabel = computed(() => {
+  if (auth.admin?.role === 'SUPER_ADMIN') return '超级管理员'
+  if (auth.admin?.role === 'OPERATOR') return '运营'
+  if (auth.admin?.role === 'VIEWER') return '只读'
+  return auth.admin?.role || 'ADMIN'
+})
 
 onMounted(async () => {
   try {
@@ -45,10 +52,13 @@ async function logout() {
         <router-link to="/users">用户与配额</router-link>
         <router-link to="/imports">书签导入</router-link>
         <router-link to="/tasks">索引任务</router-link>
-        <router-link to="/models">模型配置</router-link>
-        <router-link to="/settings">系统设置</router-link>
         <router-link to="/eval">RAG 评测</router-link>
         <router-link to="/audit">审计日志</router-link>
+        <template v-if="isSuperAdmin">
+          <router-link to="/models">模型配置</router-link>
+          <router-link to="/settings">系统设置</router-link>
+          <router-link to="/admins">管理员</router-link>
+        </template>
       </nav>
     </aside>
 
@@ -56,7 +66,7 @@ async function logout() {
       <header class="topbar">
         <strong>拾页 · 运营后台</strong>
         <span class="spacer" />
-        <span class="badge">{{ auth.admin?.role || 'ADMIN' }}</span>
+        <span class="badge">{{ roleLabel }}</span>
         <span class="muted">{{ auth.admin?.name || auth.admin?.email || '管理员' }}</span>
         <el-button text @click="logout">退出</el-button>
       </header>
