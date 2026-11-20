@@ -115,6 +115,14 @@ shiye:
     daily-token-limit: ${USAGE_DAILY_TOKEN_LIMIT:0}
   file:
     upload-dir: ${FILE_UPLOAD_DIR:./data/uploads}
+  retention:
+    enabled: ${RETENTION_ENABLED:true}
+    cron: "${RETENTION_CRON:0 30 3 * * *}"
+    refresh-token-days: ${RETENTION_REFRESH_TOKEN_DAYS:30}
+    extension-code-days: ${RETENTION_EXTENSION_CODE_DAYS:7}
+    idempotency-days: ${RETENTION_IDEMPOTENCY_DAYS:1}
+    ingest-task-days: ${RETENTION_INGEST_TASK_DAYS:30}
+    batch-limit: ${RETENTION_BATCH_LIMIT:1000}
   eval:
     worker-enabled: ${EVAL_WORKER_ENABLED:true}
     worker-delay-ms: ${EVAL_WORKER_DELAY_MS:30000}

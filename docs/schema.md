@@ -946,11 +946,11 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 管理员审计 | 保留 180 天（P2） |
 | 评测数据 | P1，保留最近 N 次运行 |
 
-**清理任务建议**
+**清理任务**
 
-- 每日：过期 refresh token、extension code、idempotency keys。
-- 每日：软删除文章超过 7 天的切片/向量/文件。
-- 每月：日汇总归档、月用量对账。
+- 已接入：过期 refresh token、extension code、idempotency key、结束超过 30 天的 ingest task。
+- 默认每天 03:30 UTC 执行，配置项 `shiye.retention.*`；分批删除，单批默认 1000。
+- 待接入：软删除文章超过 7 天的切片/向量/文件、日汇总归档、管理员审计 180 天保留。
 
 ---
 
