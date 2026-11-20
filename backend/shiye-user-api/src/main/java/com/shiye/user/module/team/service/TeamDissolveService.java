@@ -18,23 +18,27 @@ public class TeamDissolveService {
     private final TeamMemberMapper memberMapper;
     private final TeamInviteMapper inviteMapper;
     private final ArticleQueryService articleQueryService;
+    private final TeamTaxonomyService taxonomyService;
 
     public TeamDissolveService(TeamService teamService,
                                TeamMapper teamMapper,
                                TeamMemberMapper memberMapper,
                                TeamInviteMapper inviteMapper,
-                               ArticleQueryService articleQueryService) {
+                               ArticleQueryService articleQueryService,
+                               TeamTaxonomyService taxonomyService) {
         this.teamService = teamService;
         this.teamMapper = teamMapper;
         this.memberMapper = memberMapper;
         this.inviteMapper = inviteMapper;
         this.articleQueryService = articleQueryService;
+        this.taxonomyService = taxonomyService;
     }
 
     @Transactional
     public void dissolve(long userId, long teamId) {
         teamService.requireOwner(userId, teamId);
         articleQueryService.unshareAllFromTeam(teamId);
+        taxonomyService.deleteTeamTaxonomy(teamId);
         inviteMapper.deleteByTeam(teamId);
         memberMapper.deleteByTeam(teamId);
         teamMapper.softDelete(teamId);

@@ -94,6 +94,7 @@ export interface ArticleDetail extends ArticleSummary {
 export interface ArticleFolder {
   id: string
   path: string
+  articleCount?: number
 }
 
 export interface BookmarkFolder {

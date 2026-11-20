@@ -283,6 +283,16 @@ public interface ArticleMapper {
             <if test="q != null and q != ''">
               AND (a.title LIKE CONCAT('%', #{q}, '%') OR a.summary LIKE CONCAT('%', #{q}, '%'))
             </if>
+            <if test="tagId != null">
+              AND EXISTS (SELECT 1 FROM article_team_tags att
+                          WHERE att.article_id = a.id AND att.team_id = a.team_id
+                            AND att.tag_id = #{tagId})
+            </if>
+            <if test="folderId != null">
+              AND EXISTS (SELECT 1 FROM article_team_folders atf
+                          WHERE atf.article_id = a.id AND atf.team_id = a.team_id
+                            AND atf.folder_id = #{folderId})
+            </if>
             ORDER BY a.updated_at DESC, a.id DESC
             LIMIT #{limit} OFFSET #{offset}
             </script>
@@ -291,6 +301,8 @@ public interface ArticleMapper {
                                        @Param("q") String q,
                                        @Param("status") String status,
                                        @Param("sourceType") String sourceType,
+                                       @Param("tagId") Long tagId,
+                                       @Param("folderId") Long folderId,
                                        @Param("offset") int offset,
                                        @Param("limit") int limit);
 
@@ -304,12 +316,24 @@ public interface ArticleMapper {
             <if test="q != null and q != ''">
               AND (a.title LIKE CONCAT('%', #{q}, '%') OR a.summary LIKE CONCAT('%', #{q}, '%'))
             </if>
+            <if test="tagId != null">
+              AND EXISTS (SELECT 1 FROM article_team_tags att
+                          WHERE att.article_id = a.id AND att.team_id = a.team_id
+                            AND att.tag_id = #{tagId})
+            </if>
+            <if test="folderId != null">
+              AND EXISTS (SELECT 1 FROM article_team_folders atf
+                          WHERE atf.article_id = a.id AND atf.team_id = a.team_id
+                            AND atf.folder_id = #{folderId})
+            </if>
             </script>
             """)
     long countByTeam(@Param("teamId") long teamId,
                      @Param("q") String q,
                      @Param("status") String status,
-                     @Param("sourceType") String sourceType);
+                     @Param("sourceType") String sourceType,
+                     @Param("tagId") Long tagId,
+                     @Param("folderId") Long folderId);
 
     @Select("""
             SELECT COUNT(*)

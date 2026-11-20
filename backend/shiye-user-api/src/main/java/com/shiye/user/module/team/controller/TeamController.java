@@ -6,7 +6,11 @@ import com.shiye.user.module.team.domain.dto.TeamCreateRequest;
 import com.shiye.user.module.team.domain.dto.TeamInviteCreateRequest;
 import com.shiye.user.module.team.domain.dto.TeamJoinRequest;
 import com.shiye.user.module.team.domain.dto.TeamMemberAddRequest;
+import com.shiye.user.module.article.domain.vo.ArticleFolderVO;
+import com.shiye.user.module.tag.domain.vo.TagVO;
+import com.shiye.user.module.team.domain.dto.TeamFolderRequest;
 import com.shiye.user.module.team.domain.dto.TeamMemberUpdateRequest;
+import com.shiye.user.module.team.domain.dto.TeamTagRequest;
 import com.shiye.user.module.team.domain.dto.TeamTransferRequest;
 import com.shiye.user.module.team.domain.dto.TeamUpdateRequest;
 import com.shiye.user.module.team.domain.vo.TeamDetailVO;
@@ -15,6 +19,7 @@ import com.shiye.user.module.team.domain.vo.TeamMemberVO;
 import com.shiye.user.module.team.domain.vo.TeamVO;
 import com.shiye.user.module.team.service.TeamDissolveService;
 import com.shiye.user.module.team.service.TeamService;
+import com.shiye.user.module.team.service.TeamTaxonomyService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,11 +38,14 @@ public class TeamController {
 
     private final TeamService teamService;
     private final TeamDissolveService dissolveService;
+    private final TeamTaxonomyService taxonomyService;
 
     public TeamController(TeamService teamService,
-                          TeamDissolveService dissolveService) {
+                          TeamDissolveService dissolveService,
+                          TeamTaxonomyService taxonomyService) {
         this.teamService = teamService;
         this.dissolveService = dissolveService;
+        this.taxonomyService = taxonomyService;
     }
 
     @GetMapping
@@ -113,6 +121,57 @@ public class TeamController {
     @DeleteMapping("/{id}")
     public Result<Void> dissolve(@PathVariable long id) {
         dissolveService.dissolve(UserContext.requireUserId(), id);
+        return Result.ok();
+    }
+
+    @GetMapping("/{id}/tags")
+    public Result<List<TagVO>> tags(@PathVariable long id) {
+        return Result.ok(taxonomyService.tags(UserContext.requireUserId(), id));
+    }
+
+    @PostMapping("/{id}/tags")
+    public Result<TagVO> createTag(@PathVariable long id,
+                                   @Valid @RequestBody TeamTagRequest request) {
+        return Result.ok(taxonomyService.createTag(
+                UserContext.requireUserId(), id, request));
+    }
+
+    @PutMapping("/{id}/tags/{tagId}")
+    public Result<TagVO> updateTag(@PathVariable long id, @PathVariable long tagId,
+                                   @Valid @RequestBody TeamTagRequest request) {
+        return Result.ok(taxonomyService.updateTag(
+                UserContext.requireUserId(), id, tagId, request));
+    }
+
+    @DeleteMapping("/{id}/tags/{tagId}")
+    public Result<Void> deleteTag(@PathVariable long id, @PathVariable long tagId) {
+        taxonomyService.deleteTag(UserContext.requireUserId(), id, tagId);
+        return Result.ok();
+    }
+
+    @GetMapping("/{id}/folders")
+    public Result<List<ArticleFolderVO>> folders(@PathVariable long id) {
+        return Result.ok(taxonomyService.folders(UserContext.requireUserId(), id));
+    }
+
+    @PostMapping("/{id}/folders")
+    public Result<ArticleFolderVO> createFolder(@PathVariable long id,
+                                                @Valid @RequestBody TeamFolderRequest request) {
+        return Result.ok(taxonomyService.createFolder(
+                UserContext.requireUserId(), id, request));
+    }
+
+    @PutMapping("/{id}/folders/{folderId}")
+    public Result<ArticleFolderVO> updateFolder(@PathVariable long id,
+                                                @PathVariable long folderId,
+                                                @Valid @RequestBody TeamFolderRequest request) {
+        return Result.ok(taxonomyService.updateFolder(
+                UserContext.requireUserId(), id, folderId, request));
+    }
+
+    @DeleteMapping("/{id}/folders/{folderId}")
+    public Result<Void> deleteFolder(@PathVariable long id, @PathVariable long folderId) {
+        taxonomyService.deleteFolder(UserContext.requireUserId(), id, folderId);
         return Result.ok();
     }
 }

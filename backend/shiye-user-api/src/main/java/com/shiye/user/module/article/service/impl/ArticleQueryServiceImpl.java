@@ -22,6 +22,7 @@ import com.shiye.user.module.article.support.ArticleStatus;
 import com.shiye.user.module.tag.domain.vo.TagVO;
 import com.shiye.user.module.tag.service.TagService;
 import com.shiye.user.module.team.service.TeamService;
+import com.shiye.user.module.team.service.TeamTaxonomyService;
 import com.shiye.user.module.team.support.TeamAccess;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,19 +42,22 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
     private final ChunkVectorStore vectorStore;
     private final TagService tagService;
     private final TeamService teamService;
+    private final TeamTaxonomyService teamTaxonomyService;
 
     public ArticleQueryServiceImpl(ArticleMapper articleMapper,
                                    ArticleChunkMapper chunkMapper,
                                    ArticleFolderMapper folderMapper,
                                    ChunkVectorStore vectorStore,
                                    TagService tagService,
-                                   TeamService teamService) {
+                                   TeamService teamService,
+                                   TeamTaxonomyService teamTaxonomyService) {
         this.articleMapper = articleMapper;
         this.chunkMapper = chunkMapper;
         this.folderMapper = folderMapper;
         this.vectorStore = vectorStore;
         this.tagService = tagService;
         this.teamService = teamService;
+        this.teamTaxonomyService = teamTaxonomyService;
     }
 
     @Override
@@ -69,24 +73,34 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         String sourceFilter = sourceType == null || sourceType.isBlank()
                 ? null
                 : ArticleSourceType.parse(sourceType).name();
+        Long tagFilter = tagId == null || tagId <= 0 ? null : tagId;
+        Long folderFilter = folderId == null || folderId <= 0 ? null : folderId;
 
         if (teamId != null && teamId > 0) {
             teamService.requireMember(userId, teamId);
-            long teamTotal = articleMapper.countByTeam(teamId, qFilter, statusFilter, sourceFilter);
+            long teamTotal = articleMapper.countByTeam(
+                    teamId, qFilter, statusFilter, sourceFilter, tagFilter, folderFilter);
             if (teamTotal == 0) {
                 return PageResult.empty(safePage, safeSize);
             }
-            List<ArticleSummaryVO> teamItems = articleMapper
-                    .findPageByTeam(teamId, qFilter, statusFilter, sourceFilter,
-                            (safePage - 1) * safeSize, safeSize)
-                    .stream()
-                    .map(ArticleSummaryVO::from)
+            List<ArticleEntity> teamEntities = articleMapper.findPageByTeam(
+                    teamId, qFilter, statusFilter, sourceFilter, tagFilter, folderFilter,
+                    (safePage - 1) * safeSize, safeSize);
+            List<Long> teamArticleIds = teamEntities.stream()
+                    .map(ArticleEntity::getId).toList();
+            Map<Long, List<TagVO>> teamTags = teamTaxonomyService.tagsByArticleIds(
+                    userId, teamId, teamArticleIds);
+            Map<Long, List<ArticleFolderVO>> teamFolders =
+                    teamTaxonomyService.foldersByArticleIds(userId, teamId, teamArticleIds);
+            List<ArticleSummaryVO> teamItems = teamEntities.stream()
+                    .map(entity -> ArticleSummaryVO.from(
+                            entity,
+                            teamTags.getOrDefault(entity.getId(), List.of()),
+                            teamFolders.getOrDefault(entity.getId(), List.of())))
                     .toList();
             return PageResult.of(teamItems, teamTotal, safePage, safeSize);
         }
 
-        Long tagFilter = tagId == null || tagId <= 0 ? null : tagId;
-        Long folderFilter = folderId == null || folderId <= 0 ? null : folderId;
         long total = articleMapper.count(userId, qFilter, statusFilter, sourceFilter,
                 tagFilter, folderFilter);
         if (total == 0) {
@@ -112,14 +126,25 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         ArticleEntity article = findAccessible(userId, articleId);
         long ownerId = article.getUserId();
         article.setChunkCount((int) chunkMapper.countByArticle(articleId, ownerId));
-        List<TagVO> tags = article.getUserId() == userId
-                ? tagService.byArticleIds(ownerId, List.of(articleId))
-                .getOrDefault(articleId, List.of())
-                : List.of();
-        List<ArticleFolderVO> folders = article.getUserId() == userId
-                ? foldersByArticleIds(ownerId, List.of(articleId))
-                .getOrDefault(articleId, List.of())
-                : List.of();
+        List<TagVO> tags;
+        List<ArticleFolderVO> folders;
+        if (article.getTeamId() != null) {
+            tags = teamTaxonomyService.tagsByArticleIds(
+                    userId, article.getTeamId(), List.of(articleId))
+                    .getOrDefault(articleId, List.of());
+            folders = teamTaxonomyService.foldersByArticleIds(
+                    userId, article.getTeamId(), List.of(articleId))
+                    .getOrDefault(articleId, List.of());
+        } else {
+            tags = article.getUserId() == userId
+                    ? tagService.byArticleIds(ownerId, List.of(articleId))
+                    .getOrDefault(articleId, List.of())
+                    : List.of();
+            folders = article.getUserId() == userId
+                    ? foldersByArticleIds(ownerId, List.of(articleId))
+                    .getOrDefault(articleId, List.of())
+                    : List.of();
+        }
         return ArticleDetailVO.from(article, tags, folders);
     }
 
@@ -145,11 +170,11 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
     public ArticleStatsVO stats(long userId, Long teamId) {
         if (teamId != null && teamId > 0) {
             teamService.requireMember(userId, teamId);
-            long total = articleMapper.countByTeam(teamId, null, null, null);
+            long total = articleMapper.countByTeam(teamId, null, null, null, null, null);
             long ready = articleMapper.countByTeam(
-                    teamId, null, ArticleStatus.READY.name(), null);
+                    teamId, null, ArticleStatus.READY.name(), null, null, null);
             long failed = articleMapper.countByTeam(
-                    teamId, null, ArticleStatus.FAILED.name(), null);
+                    teamId, null, ArticleStatus.FAILED.name(), null, null, null);
             long processing = articleMapper.countProcessingByTeam(teamId);
             return new ArticleStatsVO(total, ready, processing, failed);
         }
@@ -178,6 +203,9 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
             if (teamId != null) {
                 vectorStore.removeFromTeam(teamId, chunk.getId());
             }
+        }
+        if (teamId != null) {
+            teamTaxonomyService.clearArticleTaxonomy(teamId, articleId);
         }
         chunkMapper.deleteByArticle(articleId, ownerId);
         folderMapper.deleteByArticle(articleId, ownerId);
@@ -252,6 +280,7 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
             throw new BizException(ErrorCode.FORBIDDEN, "需要团队管理员权限");
         }
         articleMapper.unlinkTeam(articleId, teamId);
+        teamTaxonomyService.clearArticleTaxonomy(teamId, articleId);
         for (ArticleChunkEntity chunk : chunkMapper.findByArticle(articleId, article.getUserId())) {
             vectorStore.removeFromTeam(teamId, chunk.getId());
         }

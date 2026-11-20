@@ -9,6 +9,7 @@ import type {
   ApiResult,
   ArticleChunk,
   ArticleDetail,
+  ArticleFolder,
   ArticleStats,
   ArticleSummary,
   ArticleUploadResponse,
@@ -33,6 +34,9 @@ const folderFilter = ref('')
 const teamFilter = ref('')
 const tags = ref<Tag[]>([])
 const folders = ref<BookmarkFolder[]>([])
+const teamTags = ref<Tag[]>([])
+const teamFolders = ref<ArticleFolder[]>([])
+const teamFolderToAdd = ref('')
 const loading = ref(false)
 const uploading = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
@@ -112,8 +116,8 @@ async function loadArticles() {
         pageSize,
         q: q.value.trim() || undefined,
         status: statusFilter.value || undefined,
-        tagId: teamFilter.value ? undefined : (tagFilter.value || undefined),
-        folderId: teamFilter.value ? undefined : (folderFilter.value || undefined),
+        tagId: tagFilter.value || undefined,
+        folderId: folderFilter.value || undefined,
         teamId: teamFilter.value || undefined,
       },
     })
@@ -171,11 +175,36 @@ function applySearch() {
   loadArticles()
 }
 
-function onTeamChange() {
+async function loadTeamTaxonomy() {
+  if (!teamFilter.value) {
+    teamTags.value = []
+    teamFolders.value = []
+    return
+  }
+  try {
+    const [tagResponse, folderResponse] = await Promise.all([
+      api.get<ApiResult<Tag[]>>(`/teams/${teamFilter.value}/tags`),
+      api.get<ApiResult<ArticleFolder[]>>(`/teams/${teamFilter.value}/folders`),
+    ])
+    teamTags.value = tagResponse.data.data
+    teamFolders.value = folderResponse.data.data
+  } catch {
+    teamTags.value = []
+    teamFolders.value = []
+  }
+}
+
+async function onTeamChange() {
   page.value = 1
   tagFilter.value = ''
   folderFilter.value = ''
-  void Promise.all([loadStats(), loadArticles()])
+  teamFolderToAdd.value = ''
+  await loadTeamTaxonomy()
+  await Promise.all([loadStats(), loadArticles()])
+}
+
+function folderOptionLabel(folder: BookmarkFolder | ArticleFolder) {
+  return 'folderPath' in folder ? folder.folderPath : folder.path
 }
 
 function currentTeamRole() {
@@ -357,9 +386,14 @@ async function addTag() {
     return
   }
   try {
-    await api.post(`/articles/${detail.value.id}/tags`, { name })
+    if (detail.value.teamId) {
+      await api.post(`/articles/${detail.value.id}/team-tags`, { name })
+      await Promise.all([openArticle(detail.value), loadTeamTaxonomy(), loadArticles()])
+    } else {
+      await api.post(`/articles/${detail.value.id}/tags`, { name })
+      await Promise.all([openArticle(detail.value), loadTags(), loadArticles()])
+    }
     newTag.value = ''
-    await Promise.all([openArticle(detail.value), loadTags(), loadArticles()])
   } catch {
     ElMessage.error('添加标签失败')
   }
@@ -370,10 +404,49 @@ async function removeTag(tag: Tag) {
     return
   }
   try {
-    await api.delete(`/articles/${detail.value.id}/tags/${tag.id}`)
-    await Promise.all([openArticle(detail.value), loadTags(), loadArticles()])
+    if (detail.value.teamId) {
+      await api.delete(`/articles/${detail.value.id}/team-tags/${tag.id}`)
+      await Promise.all([openArticle(detail.value), loadTeamTaxonomy(), loadArticles()])
+    } else {
+      await api.delete(`/articles/${detail.value.id}/tags/${tag.id}`)
+      await Promise.all([openArticle(detail.value), loadTags(), loadArticles()])
+    }
   } catch {
     ElMessage.error('移除标签失败')
+  }
+}
+
+async function addTeamFolder() {
+  if (!detail.value || !teamFolderToAdd.value) {
+    ElMessage.warning('请选择团队文件夹')
+    return
+  }
+  try {
+    await api.post(`/articles/${detail.value.id}/team-folders`, {
+      folderId: teamFolderToAdd.value,
+    })
+    teamFolderToAdd.value = ''
+    await Promise.all([openArticle(detail.value), loadTeamTaxonomy(), loadArticles()])
+  } catch {
+    ElMessage.error('加入团队文件夹失败')
+  }
+}
+
+async function removeTeamFolder(folder: ArticleFolder) {
+  if (!detail.value) {
+    return
+  }
+  try {
+    await api.delete(`/articles/${detail.value.id}/team-folders/${folder.id}`)
+    await Promise.all([openArticle(detail.value), loadTeamTaxonomy(), loadArticles()])
+  } catch {
+    ElMessage.error('移出团队文件夹失败')
+  }
+}
+
+function onFolderClick(folder: ArticleFolder) {
+  if (detail.value?.teamId) {
+    void removeTeamFolder(folder)
   }
 }
 
@@ -543,34 +616,32 @@ onMounted(loadAll)
             <el-option label="失败" value="FAILED" />
           </el-select>
           <el-select
-            v-if="!teamFilter"
             v-model="tagFilter"
             class="status-select"
-            placeholder="全部标签"
+            :placeholder="teamFilter ? '全部团队标签' : '全部标签'"
             clearable
             filterable
             @change="applySearch"
           >
             <el-option
-              v-for="tag in tags"
+              v-for="tag in (teamFilter ? teamTags : tags)"
               :key="tag.id"
               :label="`${tag.name} (${tag.articleCount || 0})`"
               :value="tag.id"
             />
           </el-select>
           <el-select
-            v-if="!teamFilter"
             v-model="folderFilter"
             class="folder-select"
-            placeholder="全部文件夹"
+            :placeholder="teamFilter ? '全部团队文件夹' : '全部文件夹'"
             clearable
             filterable
             @change="applySearch"
           >
             <el-option
-              v-for="folder in folders"
+              v-for="folder in (teamFilter ? teamFolders : folders)"
               :key="folder.id"
-              :label="folder.folderPath"
+              :label="folderOptionLabel(folder)"
               :value="folder.id"
             />
           </el-select>
@@ -697,9 +768,26 @@ onMounted(loadAll)
           <el-button size="small" @click="addTag">添加</el-button>
         </div>
         <div v-if="detail.folders?.length" class="folder-line detail-tags">
-          <span v-for="folder in detail.folders" :key="folder.id" class="folder-chip">
-            {{ folder.path }}
+          <span
+            v-for="folder in detail.folders"
+            :key="folder.id"
+            class="folder-chip"
+            :class="{ removable: detail.teamId }"
+            @click="onFolderClick(folder)"
+          >
+            {{ folder.path }}<b v-if="detail.teamId"> ×</b>
           </span>
+        </div>
+        <div v-if="detail.teamId" class="team-folder-editor">
+          <el-select v-model="teamFolderToAdd" size="small" placeholder="加入团队文件夹" clearable>
+            <el-option
+              v-for="folder in teamFolders"
+              :key="folder.id"
+              :label="folder.path"
+              :value="folder.id"
+            />
+          </el-select>
+          <el-button size="small" @click="addTeamFolder">加入</el-button>
         </div>
 
         <el-tabs v-model="activeTab">
@@ -953,6 +1041,20 @@ onMounted(loadAll)
   line-height: 1.6;
   color: var(--faint);
   background: #fbfbf9;
+}
+.folder-chip.removable {
+  cursor: pointer;
+}
+.folder-chip.removable b {
+  margin-left: 4px;
+  font-weight: 700;
+  opacity: 0.55;
+}
+.team-folder-editor {
+  display: flex;
+  gap: 6px;
+  margin: -6px 0 14px;
+  max-width: 360px;
 }
 .meta,
 .import-meta,

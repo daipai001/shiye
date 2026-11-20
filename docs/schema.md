@@ -121,6 +121,10 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 团队 | `team_members` | 团队成员与角色 | 已启用 |
 | 团队 | `team_usage_monthly` | 团队月用量（配额） | 已启用 |
 | 团队 | `team_invites` | 团队邀请码 | 已启用 |
+| 团队 | `team_tags` | 团队标签 | 已启用 |
+| 团队 | `article_team_tags` | 资料-团队标签关系 | 已启用 |
+| 团队 | `team_folders` | 团队文件夹 | 已启用 |
+| 团队 | `article_team_folders` | 资料-团队文件夹关系 | 已启用 |
 | 书签 | `bookmark_folders` | 用户选中的书签文件夹 | P0 |
 | 书签 | `bookmark_imports` | 导入任务 | P0 |
 | 书签 | `bookmark_items` | 导入条目 | P0 |
@@ -991,6 +995,82 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 - `idx_team_invites_team_expires (team_id, expires_at)`
 
 **说明**：邀请码单次使用，只存哈希；`ADMIN` 邀请只有 OWNER 可生成。
+
+---
+
+### 4.35 `team_tags`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `team_id` | BIGINT UNSIGNED | 否 | — | 团队 |
+| `name` | VARCHAR(64) | 否 | — | 显示名 |
+| `normalized_name` | VARCHAR(64) | 否 | — | 小写/去空格 |
+| `color` | VARCHAR(16) | 是 | NULL | 前端颜色 |
+| `created_by` | BIGINT UNSIGNED | 否 | — | 创建者 |
+| `created_at` / `updated_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 时间 |
+
+**索引**
+
+- `UNIQUE uk_team_tags_name (team_id, normalized_name)`
+- `idx_team_tags_team (team_id)`
+
+---
+
+### 4.36 `article_team_tags`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `article_id` | BIGINT UNSIGNED | 否 | — | 资料 |
+| `team_id` | BIGINT UNSIGNED | 否 | — | 团队 |
+| `tag_id` | BIGINT UNSIGNED | 否 | — | 团队标签 |
+| `created_by` | BIGINT UNSIGNED | 否 | — | 添加人 |
+| `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 时间 |
+
+**索引**
+
+- `UNIQUE uk_article_team_tags (article_id, tag_id)`
+- `idx_article_team_tags_tag (tag_id, team_id)`
+- `idx_article_team_tags_team_article (team_id, article_id)`
+
+---
+
+### 4.37 `team_folders`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `team_id` | BIGINT UNSIGNED | 否 | — | 团队 |
+| `name` | VARCHAR(64) | 否 | — | 文件夹名 |
+| `created_by` | BIGINT UNSIGNED | 否 | — | 创建者 |
+| `created_at` / `updated_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 时间 |
+
+**索引**
+
+- `UNIQUE uk_team_folders_name (team_id, name)`
+- `idx_team_folders_team (team_id)`
+
+---
+
+### 4.38 `article_team_folders`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `article_id` | BIGINT UNSIGNED | 否 | — | 资料 |
+| `team_id` | BIGINT UNSIGNED | 否 | — | 团队 |
+| `folder_id` | BIGINT UNSIGNED | 否 | — | 团队文件夹 |
+| `created_by` | BIGINT UNSIGNED | 否 | — | 添加人 |
+| `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 时间 |
+
+**索引**
+
+- `UNIQUE uk_article_team_folders (article_id, folder_id)`
+- `idx_article_team_folders_folder (folder_id, team_id)`
+- `idx_article_team_folders_team_article (team_id, article_id)`
+
+**说明**：团队标签/文件夹只作用于 `articles.team_id` 对应的团队资料；取消共享或解散团队会清理关系。
 
 ---
 

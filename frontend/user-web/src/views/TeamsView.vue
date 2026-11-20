@@ -7,6 +7,8 @@ import { useTeamStore } from '../stores/teams'
 import { formatUtcTime } from '../utils/time'
 import type {
   ApiResult,
+  ArticleFolder,
+  Tag,
   Team,
   TeamDetail,
   TeamInvite,
@@ -19,6 +21,14 @@ const teamStore = useTeamStore()
 const selectedId = ref('')
 const detail = ref<TeamDetail | null>(null)
 const detailLoading = ref(false)
+const teamTags = ref<Tag[]>([])
+const teamFolders = ref<ArticleFolder[]>([])
+
+const tagDialog = ref(false)
+const tagName = ref('')
+const tagColor = ref('#3b82f6')
+const folderDialog = ref(false)
+const folderName = ref('')
 
 const createDialog = ref(false)
 const createName = ref('')
@@ -80,6 +90,7 @@ async function loadDetail(teamId: string) {
   try {
     const { data } = await api.get<ApiResult<TeamDetail>>(`/teams/${teamId}`)
     detail.value = data.data
+    await loadTaxonomy(teamId)
   } catch {
     detail.value = null
     ElMessage.error('读取团队详情失败')
@@ -88,9 +99,111 @@ async function loadDetail(teamId: string) {
   }
 }
 
+async function loadTaxonomy(teamId: string) {
+  try {
+    const [tagResponse, folderResponse] = await Promise.all([
+      api.get<ApiResult<Tag[]>>(`/teams/${teamId}/tags`),
+      api.get<ApiResult<ArticleFolder[]>>(`/teams/${teamId}/folders`),
+    ])
+    teamTags.value = tagResponse.data.data
+    teamFolders.value = folderResponse.data.data
+  } catch {
+    teamTags.value = []
+    teamFolders.value = []
+  }
+}
+
 async function selectTeam(team: Team) {
   selectedId.value = team.id
   await loadDetail(team.id)
+}
+
+function openTagDialog() {
+  tagName.value = ''
+  tagColor.value = '#3b82f6'
+  tagDialog.value = true
+}
+
+async function createTeamTag() {
+  if (!selected.value) return
+  if (!tagName.value.trim()) {
+    ElMessage.warning('请填写标签名')
+    return
+  }
+  try {
+    await api.post(`/teams/${selected.value.id}/tags`, {
+      name: tagName.value.trim(),
+      color: tagColor.value,
+    })
+    ElMessage.success('团队标签已创建')
+    tagDialog.value = false
+    await loadTaxonomy(selected.value.id)
+  } catch {
+    ElMessage.error('创建团队标签失败')
+  }
+}
+
+async function deleteTeamTag(tag: Tag) {
+  if (!selected.value) return
+  try {
+    await ElMessageBox.confirm(
+      `删除团队标签「${tag.name}」？所有资料上的该标签关联会被移除。`,
+      '删除团队标签',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await api.delete(`/teams/${selected.value.id}/tags/${tag.id}`)
+    ElMessage.success('团队标签已删除')
+    await loadTaxonomy(selected.value.id)
+  } catch {
+    ElMessage.error('删除团队标签失败')
+  }
+}
+
+function openFolderDialog() {
+  folderName.value = ''
+  folderDialog.value = true
+}
+
+async function createTeamFolder() {
+  if (!selected.value) return
+  if (!folderName.value.trim()) {
+    ElMessage.warning('请填写文件夹名')
+    return
+  }
+  try {
+    await api.post(`/teams/${selected.value.id}/folders`, {
+      name: folderName.value.trim(),
+    })
+    ElMessage.success('团队文件夹已创建')
+    folderDialog.value = false
+    await loadTaxonomy(selected.value.id)
+  } catch {
+    ElMessage.error('创建团队文件夹失败')
+  }
+}
+
+async function deleteTeamFolder(folder: ArticleFolder) {
+  if (!selected.value) return
+  try {
+    await ElMessageBox.confirm(
+      `删除团队文件夹「${folder.path}」？资料本身不会被删除。`,
+      '删除团队文件夹',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await api.delete(`/teams/${selected.value.id}/folders/${folder.id}`)
+    ElMessage.success('团队文件夹已删除')
+    await loadTaxonomy(selected.value.id)
+  } catch {
+    ElMessage.error('删除团队文件夹失败')
+  }
 }
 
 async function submitCreate() {
@@ -436,6 +549,46 @@ onMounted(() => loadTeams())
             </div>
           </div>
         </div>
+
+        <div class="taxonomy-head">
+          <div>
+            <div class="eyebrow">TAXONOMY</div>
+            <h3>标签与文件夹</h3>
+          </div>
+          <div class="member-actions-head">
+            <el-button size="small" @click="openTagDialog">添加标签</el-button>
+            <el-button size="small" @click="openFolderDialog">添加文件夹</el-button>
+          </div>
+        </div>
+        <div class="taxonomy-group">
+          <span class="taxonomy-label">标签</span>
+          <div class="taxonomy-chips">
+            <span
+              v-for="tag in teamTags"
+              :key="tag.id"
+              class="team-tag-chip"
+              :style="{ borderColor: tag.color || '#d7d4cc' }"
+              @click="deleteTeamTag(tag)"
+            >
+              {{ tag.name }} <b>{{ tag.articleCount || 0 }}</b> <em>×</em>
+            </span>
+            <span v-if="teamTags.length === 0" class="muted">暂无团队标签</span>
+          </div>
+        </div>
+        <div class="taxonomy-group">
+          <span class="taxonomy-label">文件夹</span>
+          <div class="taxonomy-chips">
+            <span
+              v-for="folder in teamFolders"
+              :key="folder.id"
+              class="team-folder-chip"
+              @click="deleteTeamFolder(folder)"
+            >
+              {{ folder.path }} <b>{{ folder.articleCount || 0 }}</b> <em>×</em>
+            </span>
+            <span v-if="teamFolders.length === 0" class="muted">暂无团队文件夹</span>
+          </div>
+        </div>
       </section>
 
       <section v-else class="panel team-detail empty-detail">
@@ -481,6 +634,34 @@ onMounted(() => loadTeams())
         <el-button v-if="!invite" type="primary" :loading="inviteLoading" @click="createInvite">
           生成
         </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="tagDialog" title="添加团队标签" width="440px">
+      <div class="dialog-field">
+        <span>标签名</span>
+        <el-input v-model="tagName" maxlength="64" placeholder="例如：竞品调研" @keyup.enter="createTeamTag" />
+      </div>
+      <div class="dialog-field">
+        <span>颜色</span>
+        <el-color-picker v-model="tagColor" />
+      </div>
+      <p class="dialog-hint">团队成员都可以给共享资料添加标签。</p>
+      <template #footer>
+        <el-button @click="tagDialog = false">取消</el-button>
+        <el-button type="primary" @click="createTeamTag">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="folderDialog" title="添加团队文件夹" width="440px">
+      <div class="dialog-field">
+        <span>文件夹名</span>
+        <el-input v-model="folderName" maxlength="64" placeholder="例如：用户研究" @keyup.enter="createTeamFolder" />
+      </div>
+      <p class="dialog-hint">团队文件夹只用于组织共享资料，不会改变本地浏览器书签。</p>
+      <template #footer>
+        <el-button @click="folderDialog = false">取消</el-button>
+        <el-button type="primary" @click="createTeamFolder">创建</el-button>
       </template>
     </el-dialog>
 
@@ -628,6 +809,62 @@ onMounted(() => loadTeams())
   margin-top: 3px;
   color: var(--ink);
   font-size: 15px;
+}
+.taxonomy-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin: 22px 0 8px;
+}
+.taxonomy-head h3 {
+  margin: 2px 0 0;
+  font-size: 16px;
+}
+.taxonomy-group {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+.taxonomy-label {
+  flex: none;
+  width: 44px;
+  padding-top: 3px;
+  color: var(--faint);
+  font-size: 9.5px;
+}
+.taxonomy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.team-tag-chip,
+.team-folder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #d7d4cc;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 9.5px;
+  color: var(--muted);
+  background: #fff;
+  cursor: pointer;
+}
+.team-folder-chip {
+  border-radius: 6px;
+  border-style: dashed;
+  background: #fbfbf9;
+}
+.team-tag-chip b,
+.team-folder-chip b {
+  color: var(--faint);
+  font-weight: 600;
+}
+.team-tag-chip em,
+.team-folder-chip em {
+  color: var(--faint);
+  font-style: normal;
 }
 .member-head {
   display: flex;

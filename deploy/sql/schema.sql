@@ -111,6 +111,58 @@ CREATE TABLE IF NOT EXISTS `team_invites` (
   KEY `idx_team_invites_team_expires` (`team_id`, `expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='团队邀请码';
 
+CREATE TABLE IF NOT EXISTS `team_tags` (
+  `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `team_id`         BIGINT UNSIGNED NOT NULL,
+  `name`            VARCHAR(64)     NOT NULL,
+  `normalized_name` VARCHAR(64)     NOT NULL,
+  `color`           VARCHAR(16)     NULL DEFAULT NULL,
+  `created_by`      BIGINT UNSIGNED NOT NULL,
+  `created_at`      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at`      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_team_tags_name` (`team_id`, `normalized_name`),
+  KEY `idx_team_tags_team` (`team_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='团队标签';
+
+CREATE TABLE IF NOT EXISTS `article_team_tags` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `article_id` BIGINT UNSIGNED NOT NULL,
+  `team_id`    BIGINT UNSIGNED NOT NULL,
+  `tag_id`     BIGINT UNSIGNED NOT NULL,
+  `created_by` BIGINT UNSIGNED NOT NULL,
+  `created_at` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_article_team_tags` (`article_id`, `tag_id`),
+  KEY `idx_article_team_tags_tag` (`tag_id`, `team_id`),
+  KEY `idx_article_team_tags_team_article` (`team_id`, `article_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='资料-团队标签';
+
+CREATE TABLE IF NOT EXISTS `team_folders` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `team_id`    BIGINT UNSIGNED NOT NULL,
+  `name`       VARCHAR(64)     NOT NULL,
+  `created_by` BIGINT UNSIGNED NOT NULL,
+  `created_at` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_team_folders_name` (`team_id`, `name`),
+  KEY `idx_team_folders_team` (`team_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='团队文件夹';
+
+CREATE TABLE IF NOT EXISTS `article_team_folders` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `article_id` BIGINT UNSIGNED NOT NULL,
+  `team_id`    BIGINT UNSIGNED NOT NULL,
+  `folder_id`  BIGINT UNSIGNED NOT NULL,
+  `created_by` BIGINT UNSIGNED NOT NULL,
+  `created_at` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_article_team_folders` (`article_id`, `folder_id`),
+  KEY `idx_article_team_folders_folder` (`folder_id`, `team_id`),
+  KEY `idx_article_team_folders_team_article` (`team_id`, `article_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='资料-团队文件夹';
+
 CREATE TABLE IF NOT EXISTS `refresh_tokens` (
   `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `subject_type`   VARCHAR(16)     NOT NULL COMMENT 'USER / ADMIN',
