@@ -20,7 +20,7 @@ public class AdminAuditRetentionScheduler {
         this.retentionService = retentionService;
     }
 
-    @Scheduled(cron = "${shiye.audit.retention-cron:0 30 3 * * *}")
+    @Scheduled(cron = "${shiye.audit.retention-cron:0 30 3 * * *}", zone = "UTC")
     public void cleanup() {
         int deleted = retentionService.cleanup();
         if (deleted > 0) {

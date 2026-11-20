@@ -1786,7 +1786,11 @@ admin-web → POST /admin/api/v1/auth/login
 
 **响应**：分页审计日志。
 
+> `action` 常见值：模型/设置/用户/导入/任务/评测操作，以及 `ADMIN_CREATE`、`ADMIN_UPDATE`、`ADMIN_STATUS_UPDATE`、`ADMIN_PASSWORD_RESET`。
+>
 > `GET /audit-logs/export` 支持同样的 `adminId?`、`action?`、`from?`、`to?` 筛选，返回 CSV（最多 10000 条）。
+>
+> 保留策略：admin-api 每日按 `AUDIT_RETENTION_DAYS`（默认 180 天）清理旧审计日志。
 
 ---
 
