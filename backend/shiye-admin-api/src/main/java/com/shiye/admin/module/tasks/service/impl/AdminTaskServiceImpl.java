@@ -41,6 +41,22 @@ public class AdminTaskServiceImpl implements AdminTaskService {
     }
 
     @Override
+    public PageResult<AdminTaskVO> listIngest(int page, int pageSize, Long userId, String status) {
+        int safePage = Math.max(1, page);
+        int safeSize = pageSize <= 0 ? 20 : Math.min(pageSize, MAX_PAGE_SIZE);
+        String statusFilter = status == null || status.isBlank()
+                ? null : status.trim().toUpperCase(Locale.ROOT);
+        long total = taskMapper.countIngest(userId, statusFilter);
+        if (total == 0) {
+            return PageResult.empty(safePage, safeSize);
+        }
+        List<AdminTaskVO> items = taskMapper
+                .findIngestPage(userId, statusFilter, (safePage - 1) * safeSize, safeSize)
+                .stream().map(AdminTaskVO::from).toList();
+        return PageResult.of(items, total, safePage, safeSize);
+    }
+
+    @Override
     public AdminTaskVO detail(long id) {
         return AdminTaskVO.from(findTask(id));
     }

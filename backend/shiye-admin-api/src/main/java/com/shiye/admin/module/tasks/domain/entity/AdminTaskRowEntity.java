@@ -12,7 +12,10 @@ public class AdminTaskRowEntity {
     private String userEmail;
     private String title;
     private String url;
+    private String stage;
+    private String sourceType;
     private String status;
+    private Integer retryCount;
     private Long articleId;
     private String errorCode;
     private String errorMessage;

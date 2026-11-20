@@ -14,8 +14,8 @@ public interface AdminTaskMapper {
     @Select("""
             <script>
             SELECT bi.id, bi.import_id, bi.user_id, u.email AS user_email, bi.title, bi.url,
-                   bi.status, bi.article_id, bi.error_code, bi.error_message,
-                   bi.created_at, bi.updated_at
+                   bi.status AS stage, 'BOOKMARK' AS source_type, bi.status, bi.article_id,
+                   bi.error_code, bi.error_message, bi.created_at, bi.updated_at
             FROM bookmark_items bi
             LEFT JOIN users u ON u.id = bi.user_id
             WHERE 1 = 1
@@ -42,9 +42,41 @@ public interface AdminTaskMapper {
     long count(@Param("userId") Long userId, @Param("status") String status);
 
     @Select("""
+            <script>
+            SELECT t.id, t.user_id, u.email AS user_email, a.title, a.url,
+                   t.stage, t.source_type, t.status, t.retry_count, t.article_id,
+                   t.error_code, t.error_message, t.created_at,
+                   COALESCE(t.finished_at, t.updated_at) AS updated_at
+            FROM ingest_tasks t
+            LEFT JOIN users u ON u.id = t.user_id
+            LEFT JOIN articles a ON a.id = t.article_id
+            WHERE 1 = 1
+            <if test="userId != null"> AND t.user_id = #{userId}</if>
+            <if test="status != null"> AND t.status = #{status}</if>
+            ORDER BY t.updated_at DESC, t.id DESC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
+            """)
+    List<AdminTaskRowEntity> findIngestPage(@Param("userId") Long userId,
+                                            @Param("status") String status,
+                                            @Param("offset") int offset,
+                                            @Param("limit") int limit);
+
+    @Select("""
+            <script>
+            SELECT COUNT(*)
+            FROM ingest_tasks t
+            WHERE 1 = 1
+            <if test="userId != null"> AND t.user_id = #{userId}</if>
+            <if test="status != null"> AND t.status = #{status}</if>
+            </script>
+            """)
+    long countIngest(@Param("userId") Long userId, @Param("status") String status);
+
+    @Select("""
             SELECT bi.id, bi.import_id, bi.user_id, u.email AS user_email, bi.title, bi.url,
-                   bi.status, bi.article_id, bi.error_code, bi.error_message,
-                   bi.created_at, bi.updated_at
+                   bi.status AS stage, 'BOOKMARK' AS source_type, bi.status, bi.article_id,
+                   bi.error_code, bi.error_message, bi.created_at, bi.updated_at
             FROM bookmark_items bi
             LEFT JOIN users u ON u.id = bi.user_id
             WHERE bi.id = #{id}

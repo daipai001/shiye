@@ -160,7 +160,9 @@ export interface AdminTask {
   title?: string | null
   url: string
   stage: string
+  sourceType?: string | null
   status: string
+  retryCount?: number | null
   errorCode?: string | null
   errorMessage?: string | null
   createdAt: string

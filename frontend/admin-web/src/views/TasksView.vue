@@ -13,7 +13,21 @@ const statusFilter = ref('')
 const userId = ref('')
 const loading = ref(false)
 
+const ingestTasks = ref<AdminTask[]>([])
+const ingestTotal = ref(0)
+const ingestPage = ref(1)
+const ingestStatusFilter = ref('')
+const ingestLoading = ref(false)
+
 const statuses = ['PENDING', 'FETCHING', 'PARSING', 'CHUNKING', 'EMBEDDING', 'READY', 'FAILED', 'SKIPPED']
+const ingestStatuses = ['RUNNING', 'SUCCESS', 'FAILED', 'DEAD', 'PENDING']
+
+const sourceLabels: Record<string, string> = {
+  BOOKMARK: '书签',
+  MANUAL: '手动',
+  UPLOAD: '上传',
+  REINDEX: '重建索引',
+}
 
 function badgeClass(status: string) {
   return `badge ${status.toLowerCase()}`
@@ -33,15 +47,47 @@ async function load() {
     tasks.value = data.data.items
     total.value = data.data.total
   } catch {
-    ElMessage.error('读取索引任务失败')
+    ElMessage.error('读取书签索引任务失败')
   } finally {
     loading.value = false
   }
 }
 
+async function loadIngest() {
+  ingestLoading.value = true
+  try {
+    const { data } = await api.get<ApiResult<PageResult<AdminTask>>>('/ingest-tasks', {
+      params: {
+        page: ingestPage.value,
+        pageSize,
+        status: ingestStatusFilter.value || undefined,
+        userId: userId.value.trim() || undefined,
+      },
+    })
+    ingestTasks.value = data.data.items
+    ingestTotal.value = data.data.total
+  } catch {
+    ElMessage.error('读取资料入库任务失败')
+  } finally {
+    ingestLoading.value = false
+  }
+}
+
+function loadAll() {
+  page.value = 1
+  ingestPage.value = 1
+  void Promise.all([load(), loadIngest()])
+}
+
 function applyFilter() {
   page.value = 1
-  load()
+  ingestPage.value = 1
+  void Promise.all([load(), loadIngest()])
+}
+
+function applyIngestFilter() {
+  ingestPage.value = 1
+  loadIngest()
 }
 
 async function retry(task: AdminTask) {
@@ -54,7 +100,10 @@ async function retry(task: AdminTask) {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  void load()
+  void loadIngest()
+})
 </script>
 
 <template>
@@ -62,9 +111,16 @@ onMounted(load)
     <div class="page-head">
       <div>
         <h1>索引任务</h1>
-        <p>逐条查看书签导入的抓取/解析/切片/向量化状态；失败项可重试。</p>
+        <p>书签导入的抓取/解析/切片/向量化状态，以及资料入库任务。</p>
       </div>
-      <el-button text :loading="loading" @click="load">刷新</el-button>
+      <el-button text :loading="loading || ingestLoading" @click="loadAll">刷新</el-button>
+    </div>
+
+    <div class="block-head">
+      <div>
+        <h2>书签导入任务</h2>
+        <p>失败项可重新入队。</p>
+      </div>
     </div>
 
     <div class="toolbar">
@@ -114,6 +170,67 @@ onMounted(load)
         @current-change="load"
       />
     </div>
+
+    <div class="block-head ingest-head">
+      <div>
+        <h2>资料入库任务</h2>
+        <p>上传、当前页、URL 抓取和重建索引的切片/向量化/索引状态。</p>
+      </div>
+      <el-button text :loading="ingestLoading" @click="loadIngest">刷新</el-button>
+    </div>
+
+    <div class="toolbar">
+      <el-select
+        v-model="ingestStatusFilter"
+        placeholder="全部状态"
+        clearable
+        class="short"
+        @change="applyIngestFilter"
+      >
+        <el-option v-for="value in ingestStatuses" :key="value" :label="value" :value="value" />
+      </el-select>
+      <el-button type="primary" @click="applyIngestFilter">筛选</el-button>
+    </div>
+
+    <div v-if="ingestLoading && ingestTasks.length === 0" class="empty">正在加载入库任务…</div>
+    <div v-else-if="ingestTasks.length === 0" class="empty">没有资料入库任务。</div>
+    <div v-else class="ingest-list">
+      <div class="ingest-head-row">
+        <span>任务</span>
+        <span>用户</span>
+        <span>资料</span>
+        <span>来源 / 阶段</span>
+        <span>状态</span>
+        <span>错误</span>
+        <span>更新时间</span>
+      </div>
+      <div v-for="task in ingestTasks" :key="task.id" class="ingest-row">
+        <b>#{{ task.id }}</b>
+        <span class="email">{{ task.userEmail || task.userId }}</span>
+        <div class="task-article">
+          <b>{{ task.title || task.url || '未生成资料' }}</b>
+          <span>{{ task.articleId ? `article #${task.articleId}` : '—' }}</span>
+        </div>
+        <span class="ingest-stage">
+          <b>{{ sourceLabels[task.sourceType || ''] || task.sourceType || '-' }}</b>
+          <em>{{ task.stage }}</em>
+        </span>
+        <span><i :class="badgeClass(task.status)">{{ task.status }}</i></span>
+        <span class="error">{{ task.errorCode || '-' }}<em v-if="task.errorMessage">{{ task.errorMessage }}</em></span>
+        <span class="time">{{ formatUtcTime(task.finishedAt || task.createdAt) }}</span>
+      </div>
+    </div>
+
+    <div v-if="ingestTotal > pageSize" class="pager">
+      <el-pagination
+        v-model:current-page="ingestPage"
+        background
+        layout="prev, pager, next"
+        :page-size="pageSize"
+        :total="ingestTotal"
+        @current-change="loadIngest"
+      />
+    </div>
   </div>
 </template>
 
@@ -122,6 +239,70 @@ onMounted(load)
   display: flex;
   gap: 8px;
   margin-bottom: 14px;
+}
+.block-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.block-head h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+.block-head p {
+  margin: 4px 0 0;
+  color: var(--faint);
+  font-size: 10px;
+}
+.ingest-head {
+  margin-top: 24px;
+}
+.ingest-list {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ingest-head-row,
+.ingest-row {
+  display: grid;
+  grid-template-columns: 0.45fr 1.1fr 1.6fr 0.9fr 0.7fr 1.2fr 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 13px;
+  font-size: 10px;
+}
+.ingest-head-row {
+  background: #fbfbf9;
+  color: var(--faint);
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+}
+.ingest-row {
+  border-bottom: 1px solid #f1f0ec;
+  color: var(--muted);
+}
+.ingest-row:last-child {
+  border-bottom: 0;
+}
+.ingest-row > b {
+  color: var(--ink);
+  font-size: 11px;
+}
+.ingest-stage b {
+  display: block;
+  color: var(--ink);
+  font-size: 9.5px;
+  font-weight: 600;
+}
+.ingest-stage em {
+  display: block;
+  color: var(--faint);
+  font-size: 9px;
+  font-style: normal;
 }
 .short {
   width: 140px;
@@ -213,6 +394,17 @@ onMounted(load)
   color: #16794f;
   border-color: #c9efe1;
 }
+.badge.success,
+.badge.running {
+  background: #f4fbf8;
+  color: #16794f;
+  border-color: #c9efe1;
+}
+.badge.dead {
+  background: #fdf7f6;
+  color: #b3372f;
+  border-color: #eed4d1;
+}
 .badge.failed {
   background: #fdf7f6;
   color: #b3372f;
@@ -255,6 +447,14 @@ onMounted(load)
   .task-row .error,
   .task-head span:nth-child(6),
   .task-row .time {
+    display: none;
+  }
+  .ingest-head-row,
+  .ingest-row {
+    grid-template-columns: 0.5fr 1fr 1.4fr 0.9fr 0.7fr 0.8fr;
+  }
+  .ingest-head-row span:nth-child(6),
+  .ingest-row .error {
     display: none;
   }
 }

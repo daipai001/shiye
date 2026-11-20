@@ -29,6 +29,7 @@ import com.shiye.user.module.article.support.TextStats;
 import com.shiye.user.module.article.support.UploadTextExtractor;
 import com.shiye.user.module.file.domain.entity.FileAssetEntity;
 import com.shiye.user.module.file.service.FileAssetService;
+import com.shiye.user.module.ingest.service.IngestTaskService;
 import com.shiye.user.module.usage.service.UsageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +63,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
     private final UploadTextExtractor uploadTextExtractor;
     private final ArticleUploadRateLimitService uploadRateLimitService;
     private final UsageService usageService;
+    private final IngestTaskService ingestTaskService;
     private final Executor ingestExecutor;
     private final int maxTextChars;
     private final int maxUploadBytes;
@@ -79,6 +81,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                                     UploadTextExtractor uploadTextExtractor,
                                     ArticleUploadRateLimitService uploadRateLimitService,
                                     UsageService usageService,
+                                    IngestTaskService ingestTaskService,
                                     @Qualifier("ingestExecutor") Executor ingestExecutor,
                                     @Value("${shiye.article.max-text-chars:500000}") int maxTextChars,
                                     @Value("${shiye.article.max-upload-bytes:20971520}") int maxUploadBytes) {
@@ -95,6 +98,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         this.uploadTextExtractor = uploadTextExtractor;
         this.uploadRateLimitService = uploadRateLimitService;
         this.usageService = usageService;
+        this.ingestTaskService = ingestTaskService;
         this.ingestExecutor = ingestExecutor;
         this.maxTextChars = Math.max(10000, maxTextChars);
         this.maxUploadBytes = Math.max(1024, maxUploadBytes);
@@ -137,6 +141,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         }
 
         long articleId = article.getId();
+        long taskId = ingestTaskService.begin(userId, articleId, "MANUAL", "CHUNK");
         String finalTitle = title == null || title.isBlank()
                 ? normalized.host() : title.trim();
         try {
@@ -148,19 +153,24 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                     TextStats.summary(trimmed, 220),
                     trimmed,
                     TextStats.language(trimmed),
-                    TextStats.wordCount(trimmed)
+                    TextStats.wordCount(trimmed),
+                    taskId
             );
             return new IngestOutcome(articleId, false);
         } catch (IngestException ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw ex;
         } catch (EmbeddingException ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw new IngestException(ex.getCode(), ex.getMessage(), ex);
         } catch (VectorStoreException ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw new IngestException("VECTOR_STORE_UNAVAILABLE", "向量库暂不可用", ex);
         } catch (Exception ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw new IngestException("INGEST_FAILED", "入库失败", ex);
         }
@@ -205,6 +215,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         }
 
         long articleId = article.getId();
+        long taskId = ingestTaskService.begin(userId, articleId, "UPLOAD", "CHUNK");
         try {
             persistContent(
                     userId,
@@ -214,19 +225,24 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                     TextStats.summary(content, 220),
                     content,
                     TextStats.language(content),
-                    TextStats.wordCount(content)
+                    TextStats.wordCount(content),
+                    taskId
             );
             return new UploadOutcome(asset.getId(), articleId, false);
         } catch (IngestException ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw ex;
         } catch (EmbeddingException ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw new IngestException(ex.getCode(), ex.getMessage(), ex);
         } catch (VectorStoreException ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw new IngestException("VECTOR_STORE_UNAVAILABLE", "向量库暂不可用", ex);
         } catch (Exception ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw new IngestException("INGEST_FAILED", "入库失败", ex);
         }
@@ -272,10 +288,13 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
 
         long articleId = article.getId();
         linkFolder(userId, articleId, folderId, folderPath);
+        long taskId = ingestTaskService.begin(userId, articleId,
+                sourceType == null ? "MANUAL" : sourceType, "FETCH");
 
         try {
             FetchedPage page = pageFetcher.fetch(normalized.normalizedUrl());
             articleMapper.updateStatus(articleId, userId, ArticleStatus.PARSING.name());
+            ingestTaskService.advance(taskId, "PARSE");
 
             ParsedArticle parsed = articleParser.parse(
                     page.body(), page.finalUrl(), bookmarkTitle);
@@ -287,19 +306,24 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                     parsed.summary(),
                     parsed.contentText(),
                     parsed.language(),
-                    parsed.wordCount()
+                    parsed.wordCount(),
+                    taskId
             );
             return new IngestOutcome(articleId, false);
         } catch (IngestException ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw ex;
         } catch (EmbeddingException ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw new IngestException(ex.getCode(), ex.getMessage(), ex);
         } catch (VectorStoreException ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw new IngestException("VECTOR_STORE_UNAVAILABLE", "向量库暂不可用", ex);
         } catch (Exception ex) {
+            failTask(taskId, ex);
             markFailed(articleId, userId);
             throw new IngestException("INGEST_FAILED", "入库失败", ex);
         }
@@ -307,7 +331,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
 
     private void persistContent(long userId, long articleId, String title, String author,
                                 String summary, String rawContent, String language,
-                                int wordCount) {
+                                int wordCount, long taskId) {
         String content = rawContent == null ? "" : rawContent.trim();
         if (content.length() > maxTextChars) {
             content = content.substring(0, maxTextChars);
@@ -315,6 +339,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         if (content.length() < 80) {
             throw new IngestException("PARSE_EMPTY", "没有有效正文");
         }
+        ingestTaskService.advance(taskId, "CHUNK");
         String contentHash = Hashes.sha256Hex(content);
         LocalDateTime fetchedAt = LocalDateTime.now(ZoneOffset.UTC);
         articleMapper.updateParsed(
@@ -339,6 +364,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         deleteOldChunks(userId, articleId);
         List<ArticleChunkEntity> stored = insertChunks(userId, articleId, chunks);
         articleMapper.updateStatus(articleId, userId, ArticleStatus.EMBEDDING.name());
+        ingestTaskService.advance(taskId, "EMBED");
 
         long embeddingStarted = System.currentTimeMillis();
         List<float[]> vectors = embeddingService.embed(
@@ -364,6 +390,9 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         }
 
         for (int i = 0; i < stored.size(); i++) {
+            if (i == 0) {
+                ingestTaskService.advance(taskId, "INDEX");
+            }
             ArticleChunkEntity chunk = stored.get(i);
             String vectorId = "kb:chunk:" + chunk.getId();
             chunkMapper.updateVectorId(chunk.getId(), userId, vectorId);
@@ -380,6 +409,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         }
 
         articleMapper.updateStatus(articleId, userId, ArticleStatus.READY.name());
+        ingestTaskService.complete(taskId);
         log.info("ingested article {} for user {}: {} chunks, model={}",
                 articleId, userId, stored.size(), embeddingService.model());
         enrichmentService.enrichAsync(userId, articleId);
@@ -471,6 +501,20 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         } catch (RuntimeException ex) {
             log.warn("mark article {} failed: {}", articleId, ex.getMessage());
         }
+    }
+
+    private void failTask(long taskId, Exception ex) {
+        String errorCode;
+        if (ex instanceof IngestException ingestException) {
+            errorCode = ingestException.getCode();
+        } else if (ex instanceof EmbeddingException embeddingException) {
+            errorCode = embeddingException.getCode();
+        } else if (ex instanceof VectorStoreException) {
+            errorCode = "VECTOR_STORE_UNAVAILABLE";
+        } else {
+            errorCode = "INGEST_FAILED";
+        }
+        ingestTaskService.fail(taskId, errorCode, ex.getMessage());
     }
 
     private String safeFileName(String originalName) {

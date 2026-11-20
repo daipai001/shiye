@@ -1482,18 +1482,19 @@ admin-web → POST /admin/api/v1/auth/login
 
 **认证**：管理员
 
-**Query**：`page`、`pageSize`、`status?`、`stage?`、`userId?`
+**Query**：`page`、`pageSize`、`status?`、`userId?`
 
-**响应**：分页 `Task`
+**响应**：分页书签导入任务（`bookmark_items`）。
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | string | 任务 |
+| `id` | string | 书签条目 ID |
 | `articleId` | string | 资料 |
 | `userId` | string | 用户 |
-| `stage` | string | 阶段 |
+| `stage` | string | 阶段（书签任务等于导入状态） |
+| `sourceType` | string | `BOOKMARK` |
 | `status` | string | 状态 |
-| `retryCount` | number | 重试 |
+| `retryCount` | number | 重试次数 |
 | `errorCode` / `errorMessage` | string/null | 错误 |
 | `createdAt` / `finishedAt` | string | 时间 |
 
@@ -1514,6 +1515,31 @@ admin-web → POST /admin/api/v1/auth/login
 **响应**：`{ "status": "PENDING" }`
 
 **错误**：40404、40005
+
+---
+
+#### GET `/ingest-tasks`
+
+**认证**：管理员
+
+**Query**：`page`、`pageSize`、`status?`、`userId?`
+
+**响应**：分页资料入库任务（`ingest_tasks`）。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | string | 入库任务 ID |
+| `articleId` | string | 资料 |
+| `userId` | string | 用户 |
+| `title` / `url` | string/null | 资料标题和 URL |
+| `sourceType` | string | BOOKMARK / MANUAL / UPLOAD / REINDEX |
+| `stage` | string | FETCH / PARSE / CHUNK / EMBED / INDEX / DONE |
+| `status` | string | RUNNING / SUCCESS / FAILED / DEAD |
+| `retryCount` | number | 重试次数 |
+| `errorCode` / `errorMessage` | string/null | 错误 |
+| `createdAt` / `finishedAt` | string | 时间 |
+
+> 入库任务当前用于管理端排查和观测；失败重试通过重新上传或在资料库重建索引完成。
 
 ---
 
@@ -1840,7 +1866,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 08 | 管理后台-用量 | `GET /admin/api/v1/usage`、`GET /admin/api/v1/usage/export` |
 | 09 | 管理后台-用户与配额 | `GET /admin/api/v1/users`、`PUT /admin/api/v1/users/{id}/status`、`PUT /admin/api/v1/users/{id}/quota`、`PUT /admin/api/v1/users/{id}/password` |
 | 10 | 管理后台-书签导入 | `GET /admin/api/v1/imports`、`POST /admin/api/v1/imports/{id}/retry` |
-| 11 | 管理后台-索引任务 | `GET /admin/api/v1/tasks`、`POST /admin/api/v1/tasks/{id}/retry` |
+| 11 | 管理后台-索引任务 | `GET /admin/api/v1/tasks`、`POST /admin/api/v1/tasks/{id}/retry`、`GET /admin/api/v1/ingest-tasks` |
 | 12 | 管理后台-模型配置 | `GET/PUT /admin/api/v1/models`、`POST /admin/api/v1/models/test` |
 | 13 | 管理后台-系统设置 | `GET/PUT /admin/api/v1/settings`、`PUT /admin/api/v1/budget`、`POST /admin/api/v1/settings/alert-test` |
 | 14 | 管理后台-RAG 评测 | `GET/POST /admin/api/v1/eval/cases`、`GET/POST /admin/api/v1/eval/runs`、`GET /admin/api/v1/eval/runs/{id}` |

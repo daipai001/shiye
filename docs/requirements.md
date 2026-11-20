@@ -1134,7 +1134,7 @@ V1 管理端是独立的 `admin-web` + `shiye-admin-api`，不是 user-web 的 `
   → SSE 推给前端
 ```
 
-> **实现状态（2026-11-19）**：DeepSeek SSE、引用落库、会话/消息、usage/配额检查、真实 BGE-M3、向量 + MySQL FULLTEXT 关键词 + RRF 混合检索、BGE-reranker 二次重排、AI 摘要与自动标签、PDF/Markdown/TXT 上传、标签/文件夹筛选与标签管理、问答范围 ALL/ARTICLE/FOLDER/TAG、插件当前页问答、书签自动同步、插件默认模式/范围、问答取消/反馈、用户资料/密码、用量导出、邀请码注册、预算 Webhook 告警、管理端模型/系统设置/RAG 参数在线配置、用户密码重置、RAG 评测（recall/引用/正确率/延迟/成本）、审计日志和操作限流已接入；本机向量检索仍用 Redis Hash + 应用层余弦（无 RediSearch）。
+> **实现状态（2026-11-19）**：DeepSeek SSE、引用落库、会话/消息、usage/配额检查、真实 BGE-M3、向量 + MySQL FULLTEXT 关键词 + RRF 混合检索、BGE-reranker 二次重排、AI 摘要与自动标签、PDF/Markdown/TXT 上传、标签/文件夹筛选与标签管理、问答范围 ALL/ARTICLE/FOLDER/TAG、插件当前页问答、书签自动同步、插件默认模式/范围、问答取消/反馈、用户资料/密码、用量导出、邀请码注册、预算 Webhook 告警、管理端模型/系统设置/RAG 参数在线配置、用户密码重置、RAG 评测（recall/引用/正确率/延迟/成本）、ingest_tasks 入库任务、审计日志和操作限流已接入；本机向量检索仍用 Redis Hash + 应用层余弦（无 RediSearch）。
 
 ### 5.4 用量记账与配额
 

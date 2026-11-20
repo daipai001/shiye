@@ -124,7 +124,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 知识库 | `article_folders` | 资料-文件夹关系 | P0 |
 | 知识库 | `tags` | 标签 | P0 |
 | 知识库 | `article_tags` | 资料-标签关系 | P0 |
-| 知识库 | `ingest_tasks` | 异步解析/索引任务（预留，当前任务页基于 `bookmark_items`） | 预留 |
+| 知识库 | `ingest_tasks` | 解析/切片/向量化/索引任务 | 已启用 |
 | 问答 | `conversations` | 会话 | P0 |
 | 问答 | `messages` | 消息 | P0 |
 | 问答 | `citations` | 引用 | P0 |
@@ -530,7 +530,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | `user_id` | BIGINT UNSIGNED | 否 | — | 用户 |
 | `article_id` | BIGINT UNSIGNED | 是 | NULL | 资料（抓取前可空） |
 | `source_type` | VARCHAR(16) | 否 | — | BOOKMARK / MANUAL / UPLOAD / REINDEX |
-| `stage` | VARCHAR(16) | 否 | — | FETCH / PARSE / CHUNK / EMBED / INDEX / ENRICH |
+| `stage` | VARCHAR(16) | 否 | — | FETCH / PARSE / CHUNK / EMBED / INDEX / ENRICH / DONE |
 | `status` | VARCHAR(16) | 否 | `PENDING` | PENDING / RUNNING / SUCCESS / FAILED / DEAD |
 | `retry_count` | INT UNSIGNED | 否 | 0 | 已重试 |
 | `max_retries` | INT UNSIGNED | 否 | 2 | 最大重试 |
