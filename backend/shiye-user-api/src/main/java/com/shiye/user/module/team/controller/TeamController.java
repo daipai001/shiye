@@ -12,6 +12,7 @@ import com.shiye.user.module.team.domain.vo.TeamDetailVO;
 import com.shiye.user.module.team.domain.vo.TeamInviteVO;
 import com.shiye.user.module.team.domain.vo.TeamMemberVO;
 import com.shiye.user.module.team.domain.vo.TeamVO;
+import com.shiye.user.module.team.service.TeamDissolveService;
 import com.shiye.user.module.team.service.TeamService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,9 +31,12 @@ import java.util.List;
 public class TeamController {
 
     private final TeamService teamService;
+    private final TeamDissolveService dissolveService;
 
-    public TeamController(TeamService teamService) {
+    public TeamController(TeamService teamService,
+                          TeamDissolveService dissolveService) {
         this.teamService = teamService;
+        this.dissolveService = dissolveService;
     }
 
     @GetMapping
@@ -95,6 +99,12 @@ public class TeamController {
     @PostMapping("/{id}/leave")
     public Result<Void> leave(@PathVariable long id) {
         teamService.leave(UserContext.requireUserId(), id);
+        return Result.ok();
+    }
+
+    @DeleteMapping("/{id}")
+    public Result<Void> dissolve(@PathVariable long id) {
+        dissolveService.dissolve(UserContext.requireUserId(), id);
         return Result.ok();
     }
 }

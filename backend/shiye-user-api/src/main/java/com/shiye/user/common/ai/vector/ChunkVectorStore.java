@@ -10,4 +10,6 @@ public interface ChunkVectorStore {
     void addToTeam(long teamId, long chunkId);
 
     void removeFromTeam(long teamId, long chunkId);
+
+    void clearTeam(long teamId);
 }

@@ -57,4 +57,13 @@ public interface TeamMapper {
                @Param("name") String name,
                @Param("monthlyTokenQuota") long monthlyTokenQuota,
                @Param("monthlyCostQuota") BigDecimal monthlyCostQuota);
+
+    @Update("""
+            UPDATE teams
+            SET status = 'DISABLED',
+                deleted_at = UTC_TIMESTAMP(3),
+                updated_at = UTC_TIMESTAMP(3)
+            WHERE id = #{id} AND deleted_at IS NULL
+            """)
+    int softDelete(@Param("id") long id);
 }

@@ -1,6 +1,7 @@
 package com.shiye.user.module.team.mapper;
 
 import com.shiye.user.module.team.domain.entity.TeamInviteEntity;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -34,4 +35,7 @@ public interface TeamInviteMapper {
             WHERE id = #{id} AND used_at IS NULL
             """)
     int markUsed(@Param("id") long id);
+
+    @Delete("DELETE FROM team_invites WHERE team_id = #{teamId}")
+    int deleteByTeam(@Param("teamId") long teamId);
 }

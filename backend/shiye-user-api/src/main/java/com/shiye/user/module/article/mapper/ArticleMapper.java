@@ -337,4 +337,11 @@ public interface ArticleMapper {
 
     @Select("SELECT team_id FROM articles WHERE id = #{id}")
     Long findTeamId(@Param("id") long id);
+
+    @Update("""
+            UPDATE articles
+            SET team_id = NULL, updated_at = UTC_TIMESTAMP(3)
+            WHERE team_id = #{teamId} AND deleted_at IS NULL
+            """)
+    int unlinkAllFromTeam(@Param("teamId") long teamId);
 }

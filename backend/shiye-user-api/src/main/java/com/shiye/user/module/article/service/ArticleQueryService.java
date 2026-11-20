@@ -25,4 +25,6 @@ public interface ArticleQueryService {
     void shareToTeam(long userId, long articleId, long teamId);
 
     void unshareFromTeam(long userId, long articleId);
+
+    void unshareAllFromTeam(long teamId);
 }

@@ -264,6 +264,27 @@ async function removeMember(member: TeamMember) {
   }
 }
 
+async function dissolveTeam() {
+  if (!selected.value) return
+  try {
+    await ElMessageBox.confirm(
+      `解散「${selected.value.name}」？团队成员会被移除，共享资料会回到各自所有者的个人资料库，邀请码全部失效。`,
+      '解散团队',
+      { confirmButtonText: '解散团队', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await api.delete(`/teams/${selected.value.id}`)
+    ElMessage.success('团队已解散')
+    selectedId.value = ''
+    await loadTeams()
+  } catch {
+    ElMessage.error('解散团队失败')
+  }
+}
+
 async function leaveTeam() {
   if (!selected.value) return
   try {
@@ -333,6 +354,7 @@ onMounted(() => loadTeams())
           </div>
           <div class="detail-actions">
             <el-button v-if="isOwner" text @click="openEdit">编辑团队</el-button>
+            <el-button v-if="isOwner" text type="danger" @click="dissolveTeam">解散团队</el-button>
             <el-button v-if="detail.myRole !== 'OWNER'" text type="danger" @click="leaveTeam">退出团队</el-button>
           </div>
         </div>

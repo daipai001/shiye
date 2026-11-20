@@ -257,6 +257,13 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         }
     }
 
+    @Override
+    @Transactional
+    public void unshareAllFromTeam(long teamId) {
+        articleMapper.unlinkAllFromTeam(teamId);
+        vectorStore.clearTeam(teamId);
+    }
+
     private ArticleEntity findAccessible(long userId, long articleId) {
         ArticleEntity article = articleMapper.findById(articleId);
         if (article == null) {

@@ -72,6 +72,15 @@ public class RedisChunkVectorStore implements ChunkVectorStore {
     }
 
     @Override
+    public void clearTeam(long teamId) {
+        try {
+            redisTemplate.delete(teamChunksKey(teamId));
+        } catch (RuntimeException ex) {
+            log.warn("clear team {} vector set failed: {}", teamId, ex.getMessage());
+        }
+    }
+
+    @Override
     public void removeFromTeam(long teamId, long chunkId) {
         try {
             redisTemplate.opsForSet().remove(teamChunksKey(teamId), String.valueOf(chunkId));

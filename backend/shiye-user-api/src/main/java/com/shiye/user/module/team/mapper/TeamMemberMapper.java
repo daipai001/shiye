@@ -66,4 +66,7 @@ public interface TeamMemberMapper {
             WHERE team_id = #{teamId} AND user_id = #{userId}
             """)
     int delete(@Param("teamId") long teamId, @Param("userId") long userId);
+
+    @Delete("DELETE FROM team_members WHERE team_id = #{teamId}")
+    int deleteByTeam(@Param("teamId") long teamId);
 }
