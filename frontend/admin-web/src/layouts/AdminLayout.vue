@@ -21,6 +21,10 @@ onMounted(async () => {
   try {
     const { data } = await api.get<ApiResult<AdminSummary>>('/auth/me')
     auth.updateAdmin(data.data)
+    const superOnly = ['/models', '/settings', '/admins']
+    if (data.data.role !== 'SUPER_ADMIN' && superOnly.includes(router.currentRoute.value.path)) {
+      router.replace('/overview')
+    }
   } catch {
     // 401 已由 client 统一处理；其他错误保留本地缓存资料，不打断页面。
   }
