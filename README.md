@@ -257,6 +257,7 @@ RAG 问答闭环已打通：
 ## 监控与备份
 
 - 健康检查：user-api/admin-api 的 `/actuator/health`
+- 审计保留：admin-api 每日清理超过 `AUDIT_RETENTION_DAYS`（默认 180 天）的审计日志；`AUDIT_RETENTION_ENABLED=false` 可关闭
 - Prometheus：`/actuator/prometheus`，已暴露 HTTP/JVM/Hikari/Redis 指标
 - `deploy/docker-compose.yml` 含 Prometheus 与告警规则：5xx、P95、AI 错误率、Webhook 失败
 - 备份脚本：`deploy/scripts/backup.ps1` / `backup.sh`，备份 MySQL 和 Redis RDB

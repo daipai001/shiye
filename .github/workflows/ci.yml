@@ -117,7 +117,16 @@ jobs:
           mysql -h 127.0.0.1 -P 3306 -uroot -proot shiye < deploy/sql/seed.sql
       - name: Build API
         working-directory: backend
-        run: mvn -B -DskipTests package
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if mvn -B -DskipTests package; then
+              exit 0
+            fi
+            echo "Maven package failed (attempt ${attempt}); retrying..."
+            sleep 10
+          done
+          exit 1
       - name: Start user API
         run: |
           nohup java -jar backend/shiye-user-api/target/shiye-user-api-0.1.0-SNAPSHOT.jar \

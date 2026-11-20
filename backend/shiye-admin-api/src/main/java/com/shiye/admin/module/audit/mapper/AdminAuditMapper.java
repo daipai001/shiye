@@ -1,6 +1,7 @@
 package com.shiye.admin.module.audit.mapper;
 
 import com.shiye.admin.module.audit.domain.entity.AdminAuditLogRow;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -84,4 +85,7 @@ public interface AdminAuditMapper {
                                          @Param("from") LocalDateTime from,
                                          @Param("to") LocalDateTime to,
                                          @Param("limit") int limit);
+
+    @Delete("DELETE FROM admin_audit_logs WHERE created_at < #{cutoff}")
+    int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);
 }
