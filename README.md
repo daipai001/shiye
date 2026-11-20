@@ -164,6 +164,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 - URL 规范化去重（锚点、`utm_*` 等追踪参数、尾斜杠）
 - `Idempotency-Key` 幂等、Redis 创建限流（5 次/分钟/用户）
 - 插件设置页：授权码连接、书签树、包含子文件夹、分批导入、最近任务与失败原因
+- 插件 v1.0.0：专用图标、可配置 HTTPS 后端、按需 host 权限、popup 连接状态和网页端入口、打包脚本与上架说明（`docs/extension-release.md`）
 - 用户端「插件」页生成授权码；资料库页显示最近导入任务
 
 书签导入 M2b（抓取/解析/切片/向量化）已打通：
@@ -255,6 +256,7 @@ RAG 问答闭环已打通：
 - `deploy/docker-compose.yml` 含 Prometheus 与告警规则：5xx、P95、AI 错误率、Webhook 失败
 - 备份脚本：`deploy/scripts/backup.ps1` / `backup.sh`，备份 MySQL 和 Redis RDB
 - 测试与压测说明：`scripts/README.md`
+- 插件打包/上架：`docs/extension-release.md`
 
 ## 已知缺口（下一阶段）
 
@@ -264,6 +266,7 @@ RAG 问答闭环已打通：
 - 管理端模型和系统设置均已支持在线编辑；预算告警已支持 Webhook，可在管理端测试发送。
 - 邀请码注册已接入；邮箱验证尚未接入。
 - 扫描版 PDF：可选 Tesseract OCR 已接入，默认关闭；启用需要安装 tesseract 和中文语言包。
+- 插件商店上架：插件 1.0.0 包、图标和上架文档已就绪；还需要开发者账号、商店截图、隐私政策 URL 和审核。
 - RediSearch HNSW 仍待数据量上来后接入；本机向量检索仍为应用层余弦。
 - 数据清理任务已接入：过期 refresh token、授权码、幂等键和结束超过 30 天的入库任务。
 - 监控指标、告警规则、备份脚本、Playwright 登录 E2E 和 k6 压测脚本已接入；仍缺完整业务 E2E、压力基线和 Alertmanager 转发。

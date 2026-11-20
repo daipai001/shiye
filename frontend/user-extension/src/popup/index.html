@@ -8,8 +8,10 @@
   </head>
   <body>
     <div class="popup">
-      <div class="brand">拾页 <span>ShiYe</span></div>
+      <div class="brand">拾页 <span id="version">ShiYe</span></div>
       <p class="muted">把收藏夹变成可对话的知识库。</p>
+
+      <div id="userLine" class="user-line">未连接账号</div>
 
       <label class="row">
         <span>在网页显示悬浮球</span>
@@ -17,11 +19,13 @@
       </label>
 
       <div class="actions">
-        <button id="openOptions" class="primary">打开设置</button>
-        <button id="checkBackend">检查后端</button>
+        <button id="openWeb" class="primary">打开拾页</button>
+        <button id="openOptions">插件设置</button>
       </div>
 
-      <p class="hint">书签导入已可用：在设置页连接账号并选择文件夹。问答接口待接入。</p>
+      <button id="checkBackend" class="link-button">检查后端连接</button>
+
+      <p class="hint">支持书签导入、资料库问答、当前页问答和收藏当前页。</p>
     </div>
     <script src="./index.js"></script>
   </body>

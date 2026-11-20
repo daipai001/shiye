@@ -48,6 +48,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       USER_JWT_SECRET: ${USER_JWT_SECRET:-dev-user-secret-change-me-32-bytes-minimum}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:15173,http://127.0.0.1:15173,chrome-extension://*}
       AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-10}
       CHAT_RATE_LIMIT_PER_MINUTE: ${CHAT_RATE_LIMIT_PER_MINUTE:-10}
       REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-true}

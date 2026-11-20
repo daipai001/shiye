@@ -31,6 +31,18 @@ k6 run -e BASE_URL=http://localhost:18080/api/v1 -e VUS=20 -e DURATION=30s scrip
 - 请求失败率 < 1%
 - P95 < 500ms
 
+## 插件打包
+
+```powershell
+.\scripts\package-extension.ps1
+```
+
+```bash
+./scripts/package-extension.sh
+```
+
+产物在 `dist/`，上架说明见 `docs/extension-release.md`。
+
 ## 集成 smoke
 
 CI 的 `integration-smoke` job 已覆盖注册、refresh 轮换、扩展授权码、书签导入和登出。

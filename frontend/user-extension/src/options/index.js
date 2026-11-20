@@ -28,6 +28,8 @@ const els = {
   refreshImports: document.getElementById('refreshImports'),
   ballEnabled: document.getElementById('ballEnabled'),
   apiBaseUrl: document.getElementById('apiBaseUrl'),
+  openWeb: document.getElementById('openWeb'),
+  version: document.getElementById('version'),
   saveApi: document.getElementById('saveApi'),
   saveResult: document.getElementById('saveResult'),
 }
@@ -134,6 +136,7 @@ async function init() {
   els.ballEnabled.checked = settings.ballEnabled
   els.autoSync.checked = Boolean(settings.autoSyncEnabled)
   els.apiBaseUrl.value = settings.apiBaseUrl
+  els.version.textContent = chrome.runtime.getManifest().version
   state.user = settings.shiyeUser
   renderAuth(settings.shiyeUser)
   await checkBackend()
@@ -756,10 +759,36 @@ els.saveApi.addEventListener('click', async () => {
     els.saveResult.textContent = '请输入 http/https 地址'
     return
   }
+  let origin
+  try {
+    origin = new URL(value).origin + '/*'
+  } catch {
+    els.saveResult.textContent = '地址格式不正确'
+    return
+  }
+  try {
+    const granted = await chrome.permissions.request({ origins: [origin] })
+    if (!granted) {
+      els.saveResult.textContent = '未获得该域名的访问权限，无法保存'
+      return
+    }
+  } catch {
+    els.saveResult.textContent = '无法请求域名权限，请检查地址'
+    return
+  }
   await chrome.storage.local.set({ apiBaseUrl: value })
   els.saveResult.textContent = '已保存，正在检测后端…'
   await checkBackend()
   els.saveResult.textContent = '已保存'
+})
+
+els.openWeb.addEventListener('click', async () => {
+  const { apiBaseUrl } = await getSettings()
+  try {
+    window.open(new URL(apiBaseUrl).origin, '_blank', 'noopener')
+  } catch {
+    window.open('http://localhost:15173', '_blank', 'noopener')
+  }
 })
 
 init()
