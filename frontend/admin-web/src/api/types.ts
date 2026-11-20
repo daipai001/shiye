@@ -92,6 +92,21 @@ export interface AdminUser {
   createdAt: string
 }
 
+export interface AdminTeam {
+  id: string
+  name: string
+  ownerUserId: string
+  ownerEmail?: string | null
+  status: string
+  memberCount: number
+  monthlyTokenQuota: number
+  tokensUsed: number
+  monthlyCostQuota: number
+  costUsed: number
+  calls: number
+  createdAt: string
+}
+
 export interface AdminUsageGroup {
   key: string
   calls: number

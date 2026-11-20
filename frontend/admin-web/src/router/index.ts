@@ -11,6 +11,7 @@ import SettingsView from '../views/SettingsView.vue'
 import AuditView from '../views/AuditView.vue'
 import EvalView from '../views/EvalView.vue'
 import AdminsView from '../views/AdminsView.vue'
+import TeamsView from '../views/TeamsView.vue'
 import { loadAdmin } from '../api/authStorage'
 
 const router = createRouter({
@@ -25,6 +26,7 @@ const router = createRouter({
         { path: 'overview', component: OverviewView },
         { path: 'usage', component: UsageView },
         { path: 'users', component: UsersView },
+        { path: 'teams', component: TeamsView },
         { path: 'imports', component: ImportsView },
         { path: 'tasks', component: TasksView },
         { path: 'models', component: ModelsView, meta: { superAdmin: true } },

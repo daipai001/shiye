@@ -2003,6 +2003,56 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
+### 4.9 团队与配额
+
+#### GET `/admin/api/v1/teams`
+
+**认证**：管理员（所有角色可读）
+
+**Query**：`page`、`pageSize`、`q?`（团队名/所有者邮箱）、`status?`
+
+**响应**
+
+```json
+{
+  "items": [
+    {
+      "id": "1",
+      "name": "内容研究组",
+      "ownerUserId": "12",
+      "ownerEmail": "owner@example.com",
+      "status": "ACTIVE",
+      "memberCount": 4,
+      "monthlyTokenQuota": 1000000,
+      "tokensUsed": 128400,
+      "monthlyCostQuota": "20.000000",
+      "costUsed": "1.4200",
+      "calls": 36,
+      "createdAt": "2026-11-20T08:00:00.000Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "pageSize": 20
+}
+```
+
+---
+
+#### PUT `/admin/api/v1/teams/{id}/quota`
+
+**认证**：`SUPER_ADMIN` / `OPERATOR`
+
+**请求**：`monthlyTokenQuota`、`monthlyCostQuota`
+
+**响应**：更新后的团队。
+
+**错误**：40001、40401
+
+> 写入审计 `TEAM_QUOTA_UPDATE`。团队问答同时受个人、团队和全局预算限制。
+
+---
+
 ## 5. 页面 ↔ API 映射
 
 | # | 页面 | 关键接口 |
@@ -2030,6 +2080,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 21 | 管理后台-管理员 | `GET/POST /admin/api/v1/admins`、`PUT /admin/api/v1/admins/{id}`、`PUT /admin/api/v1/admins/{id}/status`、`PUT /admin/api/v1/admins/{id}/password` |
 | 22 | Web-团队 | `GET/POST /teams`、`GET/PUT/DELETE /teams/{id}`、`GET/POST /teams/{id}/members`、`PUT/DELETE /teams/{id}/members/{userId}`、`POST /teams/{id}/leave`、`POST /teams/{id}/invites`、`POST /teams/join`、`POST /teams/{id}/transfer` |
 | 23 | Web-团队资料 | `GET /articles?teamId=`、`POST/DELETE /articles/{id}/share`、`POST /chat/stream`（TEAM） |
+| 24 | 管理后台-团队与配额 | `GET /admin/api/v1/teams`、`PUT /admin/api/v1/teams/{id}/quota` |
 
 ---
 
@@ -2053,6 +2104,7 @@ admin-web → POST /admin/api/v1/auth/login
 | `/admin/api/v1/models` | 禁止 | 仅 `SUPER_ADMIN` | — |
 | `/admin/api/v1/settings` | 禁止 | 仅 `SUPER_ADMIN` | — |
 | `/admin/api/v1/admins` | 禁止 | 仅 `SUPER_ADMIN` | — |
+| `/admin/api/v1/teams` | 禁止 | 所有角色可读，`SUPER_ADMIN` / `OPERATOR` 可改配额 | — |
 | 其他 `/admin/api/v1/*` | 禁止 | `SUPER_ADMIN` / `OPERATOR` 读写，`VIEWER` 只读 | — |
 
 ---

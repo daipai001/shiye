@@ -54,6 +54,7 @@ async function logout() {
         <router-link to="/overview">总览</router-link>
         <router-link to="/usage">用量与成本</router-link>
         <router-link to="/users">用户与配额</router-link>
+        <router-link to="/teams">团队与配额</router-link>
         <router-link to="/imports">书签导入</router-link>
         <router-link to="/tasks">索引任务</router-link>
         <router-link to="/eval">RAG 评测</router-link>
