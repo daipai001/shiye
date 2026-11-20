@@ -1208,6 +1208,8 @@ admin-web → POST /admin/api/v1/auth/login
 | PUT | `/teams/{id}` | OWNER | 修改名称、token/成本配额 |
 | GET | `/teams/{id}/members` | 成员 | 成员列表 |
 | POST | `/teams/{id}/members` | OWNER/ADMIN | 按邮箱添加成员；ADMIN 只能加 MEMBER，OWNER 可加 ADMIN |
+| POST | `/teams/{id}/invites` | OWNER/ADMIN | 生成单次邀请码（7 天）；ADMIN 只能生成 MEMBER 邀请 |
+| POST | `/teams/join` | 用户 | 用邀请码加入团队；邀请码单次使用 |
 | PUT | `/teams/{id}/members/{userId}` | OWNER/ADMIN | 修改角色；ADMIN 只能管理 MEMBER |
 | DELETE | `/teams/{id}/members/{userId}` | OWNER/ADMIN | 移除成员；不能移除 OWNER |
 | POST | `/teams/{id}/leave` | 成员 | 退出团队；OWNER 不能退出 |
@@ -1218,6 +1220,8 @@ admin-web → POST /admin/api/v1/auth/login
 
 **说明**
 
+- `POST /teams/{id}/invites` 返回 `{code, role, expiresAt}`；`code` 只返回一次，数据库只存 SHA-256。
+- `POST /teams/join` 请求 `{code}`，返回团队详情；无效/过期/已使用返回 `40105`，已在团队返回 `40901`。
 - 团队问答会同时检查个人配额、团队月配额和全局预算；团队配额超限返回 `42905`。
 - `ai_usage.team_id` 和 `team_usage_monthly` 记录团队问答/RERANK 用量。
 - 资料共享/取消共享接口见 3.3。
@@ -2020,7 +2024,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 19 | Web-插件管理 | `GET/PUT /users/me/plugin-settings`、`POST /auth/extension-code` |
 | 20 | 管理后台-登录 | `POST /admin/api/v1/auth/login` |
 | 21 | 管理后台-管理员 | `GET/POST /admin/api/v1/admins`、`PUT /admin/api/v1/admins/{id}`、`PUT /admin/api/v1/admins/{id}/status`、`PUT /admin/api/v1/admins/{id}/password` |
-| 22 | Web-团队 | `GET/POST /teams`、`GET/PUT /teams/{id}`、`GET/POST /teams/{id}/members`、`PUT/DELETE /teams/{id}/members/{userId}`、`POST /teams/{id}/leave` |
+| 22 | Web-团队 | `GET/POST /teams`、`GET/PUT /teams/{id}`、`GET/POST /teams/{id}/members`、`PUT/DELETE /teams/{id}/members/{userId}`、`POST /teams/{id}/leave`、`POST /teams/{id}/invites`、`POST /teams/join` |
 | 23 | Web-团队资料 | `GET /articles?teamId=`、`POST/DELETE /articles/{id}/share`、`POST /chat/stream`（TEAM） |
 
 ---

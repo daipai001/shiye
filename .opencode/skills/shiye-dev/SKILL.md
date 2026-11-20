@@ -39,7 +39,7 @@ description: Use for any ShiYe (拾页) development task. Before coding, audit d
 - 模型：Chat DeepSeek；Embedding BGE-M3
 - 成本：全局预算 + 单用户配额 + 限流；所有 AI 调用必须记 usage
 - 视觉：v0.6 Linear / Notion 风；纸感、细边框、排版驱动，不再做重色块
-- 当前已完成：认证（含登录/注册 IP 限流、邀请码、资料/密码/插件偏好）、书签导入 M2a/M2b、资料 API/资料库 UI（标签/文件夹筛选、标签管理、单篇/文件夹/标签/通用范围问答、多轮检索改写、本地文件夹导入）、PDF/Markdown/TXT 上传（可选 Tesseract OCR）、RAG 问答（DeepSeek SSE + 引用 + 会话/消息、问答取消、反馈）、BGE-M3 + FULLTEXT + RRF 混合检索、BGE-reranker 重排、资料 AI 摘要/自动标签、当前页临时问答、用量趋势/CSV 导出、日用量汇总、reindex、ingest_tasks 入库任务与数据清理、插件悬浮球问答/收藏当前页/书签自动同步/默认模式与范围、插件 1.0.0 打包与上架文档、管理后台（总览/用户配额/用户密码重置/用量/导入/书签与入库任务/模型在线配置、系统设置/预算/RAG 参数、预算 Webhook 告警、RAG 评测 recall/引用/正确率/延迟/成本、审计日志与 CSV 导出、多管理员与 SUPER_ADMIN/OPERATOR/VIEWER 角色、团队空间/共享资料库/团队配额、操作限流）、Prometheus 指标与告警规则、备份脚本、Playwright 登录 E2E、k6 基础压测、PWA、CI/CD。邮箱验证未接入；团队后续仅缺邀请链接、团队标签/文件夹、所有权转移和解散
+- 当前已完成：认证（含登录/注册 IP 限流、邀请码、资料/密码/插件偏好）、书签导入 M2a/M2b、资料 API/资料库 UI（标签/文件夹筛选、标签管理、单篇/文件夹/标签/通用范围问答、多轮检索改写、本地文件夹导入）、PDF/Markdown/TXT 上传（可选 Tesseract OCR）、RAG 问答（DeepSeek SSE + 引用 + 会话/消息、问答取消、反馈）、BGE-M3 + FULLTEXT + RRF 混合检索、BGE-reranker 重排、资料 AI 摘要/自动标签、当前页临时问答、用量趋势/CSV 导出、日用量汇总、reindex、ingest_tasks 入库任务与数据清理、插件悬浮球问答/收藏当前页/书签自动同步/默认模式与范围、插件 1.0.0 打包与上架文档、管理后台（总览/用户配额/用户密码重置/用量/导入/书签与入库任务/模型在线配置、系统设置/预算/RAG 参数、预算 Webhook 告警、RAG 评测 recall/引用/正确率/延迟/成本、审计日志与 CSV 导出、多管理员与 SUPER_ADMIN/OPERATOR/VIEWER 角色、团队空间/共享资料库/团队配额/单次邀请码、操作限流）、Prometheus 指标与告警规则、备份脚本、Playwright 登录 E2E、k6 基础压测、PWA、CI/CD。邮箱验证未接入；团队后续仅缺邀请链接、团队标签/文件夹、所有权转移和解散
 
 ## A. 编码前：接口/数据库文档审计
 

@@ -118,6 +118,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 团队 | `teams` | 团队 | 已启用 |
 | 团队 | `team_members` | 团队成员与角色 | 已启用 |
 | 团队 | `team_usage_monthly` | 团队月用量（配额） | 已启用 |
+| 团队 | `team_invites` | 团队邀请码 | 已启用 |
 | 书签 | `bookmark_folders` | 用户选中的书签文件夹 | P0 |
 | 书签 | `bookmark_imports` | 导入任务 | P0 |
 | 书签 | `bookmark_items` | 导入条目 | P0 |
@@ -966,6 +967,28 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 - `UNIQUE uk_team_usage_monthly (team_id, month)`
 
 **说明**：团队问答/RERANK 记账时同步累加；团队配额检查读取本表。
+
+---
+
+### 4.34 `team_invites`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `team_id` | BIGINT UNSIGNED | 否 | — | 团队 |
+| `inviter_user_id` | BIGINT UNSIGNED | 否 | — | 邀请人 |
+| `token_hash` | CHAR(64) | 否 | — | SHA-256(邀请码) |
+| `role` | VARCHAR(16) | 否 | `MEMBER` | ADMIN / MEMBER |
+| `expires_at` | DATETIME(3) | 否 | — | 过期时间（7 天） |
+| `used_at` | DATETIME(3) | 是 | NULL | 使用时间 |
+| `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
+
+**索引**
+
+- `UNIQUE uk_team_invites_token (token_hash)`
+- `idx_team_invites_team_expires (team_id, expires_at)`
+
+**说明**：邀请码单次使用，只存哈希；`ADMIN` 邀请只有 OWNER 可生成。
 
 ---
 

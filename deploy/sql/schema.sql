@@ -97,6 +97,20 @@ CREATE TABLE IF NOT EXISTS `team_members` (
   KEY `idx_team_members_team_status` (`team_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='团队成员';
 
+CREATE TABLE IF NOT EXISTS `team_invites` (
+  `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `team_id`          BIGINT UNSIGNED NOT NULL,
+  `inviter_user_id`  BIGINT UNSIGNED NOT NULL,
+  `token_hash`       CHAR(64)        NOT NULL,
+  `role`             VARCHAR(16)     NOT NULL DEFAULT 'MEMBER',
+  `expires_at`       DATETIME(3)     NOT NULL,
+  `used_at`          DATETIME(3)     NULL DEFAULT NULL,
+  `created_at`       DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_team_invites_token` (`token_hash`),
+  KEY `idx_team_invites_team_expires` (`team_id`, `expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='团队邀请码';
+
 CREATE TABLE IF NOT EXISTS `refresh_tokens` (
   `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `subject_type`   VARCHAR(16)     NOT NULL COMMENT 'USER / ADMIN',

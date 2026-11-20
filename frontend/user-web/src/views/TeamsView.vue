@@ -9,6 +9,7 @@ import type {
   ApiResult,
   Team,
   TeamDetail,
+  TeamInvite,
   TeamMember,
 } from '../api/types'
 
@@ -35,6 +36,16 @@ const memberDialog = ref(false)
 const memberEmail = ref('')
 const memberRole = ref<'ADMIN' | 'MEMBER'>('MEMBER')
 const addingMember = ref(false)
+
+const joinDialog = ref(false)
+const joinCode = ref('')
+const joining = ref(false)
+
+const inviteDialog = ref(false)
+const inviteRole = ref<'ADMIN' | 'MEMBER'>('MEMBER')
+const inviteLoading = ref(false)
+const invite = ref<TeamInvite | null>(null)
+const inviteCopied = ref(false)
 
 const selected = computed(() => teamStore.teams.find((team) => team.id === selectedId.value) || null)
 const canManage = computed(() => selected.value?.myRole === 'OWNER' || selected.value?.myRole === 'ADMIN')
@@ -162,6 +173,66 @@ async function submitMember() {
   }
 }
 
+function openJoin() {
+  joinCode.value = ''
+  joinDialog.value = true
+}
+
+async function submitJoin() {
+  if (!joinCode.value.trim()) {
+    ElMessage.warning('请输入邀请码')
+    return
+  }
+  joining.value = true
+  try {
+    const { data } = await api.post<ApiResult<TeamDetail>>('/teams/join', {
+      code: joinCode.value.trim(),
+    })
+    ElMessage.success(`已加入「${data.data.name}」`)
+    joinDialog.value = false
+    await loadTeams(data.data.id)
+  } catch {
+    ElMessage.error('加入失败，邀请码可能无效、过期或已被使用')
+  } finally {
+    joining.value = false
+  }
+}
+
+function openInvite() {
+  invite.value = null
+  inviteRole.value = 'MEMBER'
+  inviteCopied.value = false
+  inviteDialog.value = true
+}
+
+async function createInvite() {
+  if (!selected.value) return
+  inviteLoading.value = true
+  try {
+    const { data } = await api.post<ApiResult<TeamInvite>>(
+      `/teams/${selected.value.id}/invites`,
+      { role: inviteRole.value },
+    )
+    invite.value = data.data
+    inviteCopied.value = false
+  } catch {
+    ElMessage.error('生成邀请码失败')
+  } finally {
+    inviteLoading.value = false
+  }
+}
+
+async function copyInvite() {
+  if (!invite.value) return
+  try {
+    await navigator.clipboard.writeText(invite.value.code)
+    inviteCopied.value = true
+    ElMessage.success('邀请码已复制')
+  } catch {
+    ElMessage.info('请手动复制邀请码')
+  }
+}
+
 async function changeRole(member: TeamMember, role: 'ADMIN' | 'MEMBER') {
   if (!selected.value) return
   try {
@@ -226,6 +297,7 @@ onMounted(() => loadTeams())
       </div>
       <div class="page-actions">
         <el-button text :loading="teamStore.loading" @click="loadTeams()">刷新</el-button>
+        <el-button @click="openJoin">加入团队</el-button>
         <el-button type="primary" @click="createDialog = true">新建团队</el-button>
       </div>
     </div>
@@ -285,9 +357,12 @@ onMounted(() => loadTeams())
             <div class="eyebrow">MEMBERS</div>
             <h3>成员</h3>
           </div>
-          <el-button v-if="canManage" size="small" type="primary" @click="openMemberDialog">
-            添加成员
-          </el-button>
+          <div v-if="canManage" class="member-actions-head">
+            <el-button size="small" @click="openInvite">邀请码</el-button>
+            <el-button size="small" type="primary" @click="openMemberDialog">
+              添加成员
+            </el-button>
+          </div>
         </div>
 
         <div class="member-list">
@@ -324,6 +399,47 @@ onMounted(() => loadTeams())
         <p>{{ detailLoading ? '正在加载团队…' : '选择左侧团队查看成员。' }}</p>
       </section>
     </div>
+
+    <el-dialog v-model="joinDialog" title="加入团队" width="440px">
+      <div class="dialog-field">
+        <span>邀请码</span>
+        <el-input v-model="joinCode" maxlength="32" placeholder="输入团队邀请码" @keyup.enter="submitJoin" />
+      </div>
+      <p class="dialog-hint">邀请码由团队所有者或管理员生成，单次使用，7 天内有效。</p>
+      <template #footer>
+        <el-button @click="joinDialog = false">取消</el-button>
+        <el-button type="primary" :loading="joining" @click="submitJoin">加入</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="inviteDialog" title="生成邀请码" width="480px">
+      <template v-if="!invite">
+        <div class="dialog-field">
+          <span>加入后的角色</span>
+          <el-select v-model="inviteRole" style="width: 100%">
+            <el-option label="成员" value="MEMBER" />
+            <el-option v-if="isOwner" label="管理员" value="ADMIN" />
+          </el-select>
+        </div>
+        <p class="dialog-hint">邀请码单次使用，7 天内有效；成员使用后自动加入团队。</p>
+      </template>
+      <template v-else>
+        <p class="dialog-hint">把下面的邀请码发给对方；使用后立即失效。</p>
+        <div class="invite-code-row">
+          <code>{{ invite.code }}</code>
+          <el-button text type="primary" @click="copyInvite">
+            {{ inviteCopied ? '已复制' : '复制' }}
+          </el-button>
+        </div>
+        <p class="dialog-hint">角色：{{ roleLabel(invite.role) }} · 过期时间：{{ formatUtcTime(invite.expiresAt) }}</p>
+      </template>
+      <template #footer>
+        <el-button @click="inviteDialog = false">关闭</el-button>
+        <el-button v-if="!invite" type="primary" :loading="inviteLoading" @click="createInvite">
+          生成
+        </el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="createDialog" title="新建团队" width="440px">
       <div class="dialog-field">
@@ -475,6 +591,26 @@ onMounted(() => loadTeams())
   justify-content: space-between;
   align-items: flex-end;
   margin-bottom: 8px;
+}
+.member-actions-head {
+  display: flex;
+  gap: 6px;
+}
+.invite-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px dashed #d7d4cc;
+  border-radius: 9px;
+  background: #fbfbf9;
+}
+.invite-code-row code {
+  flex: 1;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  color: var(--ink);
 }
 .member-head h3 {
   margin: 2px 0 0;

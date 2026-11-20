@@ -2,8 +2,10 @@ package com.shiye.user.module.team.service.impl;
 
 import com.shiye.user.module.auth.service.AuthService;
 import com.shiye.user.module.team.domain.dto.TeamMemberAddRequest;
+import com.shiye.user.module.team.domain.dto.TeamMemberUpdateRequest;
 import com.shiye.user.module.team.domain.entity.TeamEntity;
 import com.shiye.user.module.team.domain.entity.TeamMemberEntity;
+import com.shiye.user.module.team.mapper.TeamInviteMapper;
 import com.shiye.user.module.team.mapper.TeamMapper;
 import com.shiye.user.module.team.mapper.TeamMemberMapper;
 import com.shiye.common.exception.BizException;
@@ -21,9 +23,10 @@ class TeamServiceImplTest {
 
     private final TeamMapper teamMapper = mock(TeamMapper.class);
     private final TeamMemberMapper memberMapper = mock(TeamMemberMapper.class);
+    private final TeamInviteMapper inviteMapper = mock(TeamInviteMapper.class);
     private final AuthService authService = mock(AuthService.class);
     private final TeamServiceImpl service = new TeamServiceImpl(
-            teamMapper, memberMapper, authService);
+            teamMapper, memberMapper, inviteMapper, authService);
 
     @Test
     void ownerCannotLeaveTeam() {
@@ -54,6 +57,19 @@ class TeamServiceImplTest {
         assertThrows(BizException.class, () -> service.removeMember(10L, 1L, 11L));
 
         verify(memberMapper, never()).delete(1L, 11L);
+    }
+
+    @Test
+    void ownerCanPromoteMemberToAdmin() {
+        when(teamMapper.findById(1L)).thenReturn(team());
+        when(memberMapper.findActive(1L, 10L)).thenReturn(member(10L, "OWNER"));
+        when(memberMapper.findActive(1L, 11L)).thenReturn(member(11L, "MEMBER"));
+
+        var updated = service.updateMember(
+                10L, 1L, 11L, new TeamMemberUpdateRequest("ADMIN"));
+
+        assertEquals("ADMIN", updated.role());
+        verify(memberMapper).updateRole(1L, 11L, "ADMIN");
     }
 
     @Test

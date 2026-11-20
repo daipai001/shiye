@@ -4,16 +4,23 @@ import com.shiye.common.api.ErrorCode;
 import com.shiye.common.exception.BizException;
 import com.shiye.user.module.auth.domain.vo.UserSummary;
 import com.shiye.user.module.auth.service.AuthService;
+import com.shiye.common.security.Hashes;
+import com.shiye.common.security.SecureCodes;
 import com.shiye.user.module.team.domain.dto.TeamCreateRequest;
+import com.shiye.user.module.team.domain.dto.TeamInviteCreateRequest;
+import com.shiye.user.module.team.domain.dto.TeamJoinRequest;
 import com.shiye.user.module.team.domain.dto.TeamMemberAddRequest;
 import com.shiye.user.module.team.domain.dto.TeamMemberUpdateRequest;
 import com.shiye.user.module.team.domain.dto.TeamUpdateRequest;
 import com.shiye.user.module.team.domain.entity.TeamEntity;
+import com.shiye.user.module.team.domain.entity.TeamInviteEntity;
 import com.shiye.user.module.team.domain.entity.TeamMemberEntity;
 import com.shiye.user.module.team.domain.vo.TeamDetailVO;
+import com.shiye.user.module.team.domain.vo.TeamInviteVO;
 import com.shiye.user.module.team.domain.vo.TeamMemberVO;
 import com.shiye.user.module.team.domain.vo.TeamQuota;
 import com.shiye.user.module.team.domain.vo.TeamVO;
+import com.shiye.user.module.team.mapper.TeamInviteMapper;
 import com.shiye.user.module.team.mapper.TeamMapper;
 import com.shiye.user.module.team.mapper.TeamMemberMapper;
 import com.shiye.user.module.team.service.TeamService;
@@ -22,6 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -36,16 +45,20 @@ public class TeamServiceImpl implements TeamService {
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_MEMBER = "MEMBER";
     private static final String STATUS_ACTIVE = "ACTIVE";
+    private static final int INVITE_EXPIRE_DAYS = 7;
 
     private final TeamMapper teamMapper;
     private final TeamMemberMapper memberMapper;
+    private final TeamInviteMapper inviteMapper;
     private final AuthService authService;
 
     public TeamServiceImpl(TeamMapper teamMapper,
                            TeamMemberMapper memberMapper,
+                           TeamInviteMapper inviteMapper,
                            AuthService authService) {
         this.teamMapper = teamMapper;
         this.memberMapper = memberMapper;
+        this.inviteMapper = inviteMapper;
         this.authService = authService;
     }
 
@@ -137,6 +150,54 @@ public class TeamServiceImpl implements TeamService {
             throw new BizException(ErrorCode.INTERNAL_ERROR);
         }
         return TeamMemberVO.from(saved);
+    }
+
+    @Override
+    @Transactional
+    public TeamInviteVO createInvite(long userId, long teamId, TeamInviteCreateRequest request) {
+        TeamAccess access = requireManager(userId, teamId);
+        String role = normalizeRole(request.role());
+        if (ROLE_ADMIN.equals(role) && !access.isOwner()) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只有团队所有者可以邀请管理员");
+        }
+        String code = SecureCodes.code(12);
+        LocalDateTime expiresAt = LocalDateTime.now(ZoneOffset.UTC)
+                .plusDays(INVITE_EXPIRE_DAYS);
+        TeamInviteEntity invite = new TeamInviteEntity();
+        invite.setTeamId(teamId);
+        invite.setInviterUserId(userId);
+        invite.setTokenHash(Hashes.sha256Hex(code));
+        invite.setRole(role);
+        invite.setExpiresAt(expiresAt);
+        inviteMapper.insert(invite);
+        return new TeamInviteVO(code, role, expiresAt);
+    }
+
+    @Override
+    @Transactional
+    public TeamDetailVO join(long userId, TeamJoinRequest request) {
+        String code = request.code().trim().toUpperCase(Locale.ROOT);
+        TeamInviteEntity invite = inviteMapper.findActiveByHash(Hashes.sha256Hex(code));
+        if (invite == null) {
+            throw new BizException(ErrorCode.INVALID_AUTH_CODE, "邀请码无效或已过期");
+        }
+        TeamEntity team = teamMapper.findById(invite.getTeamId());
+        if (team == null || !STATUS_ACTIVE.equals(team.getStatus())) {
+            throw new BizException(ErrorCode.NOT_FOUND, "团队不存在");
+        }
+        if (memberMapper.findActive(invite.getTeamId(), userId) != null) {
+            throw new BizException(ErrorCode.CONFLICT, "你已经是团队成员");
+        }
+        TeamMemberEntity member = new TeamMemberEntity();
+        member.setTeamId(invite.getTeamId());
+        member.setUserId(userId);
+        member.setRole(invite.getRole());
+        member.setStatus(STATUS_ACTIVE);
+        memberMapper.insert(member);
+        if (inviteMapper.markUsed(invite.getId()) == 0) {
+            throw new BizException(ErrorCode.INVALID_AUTH_CODE, "邀请码已被使用");
+        }
+        return detail(userId, invite.getTeamId());
     }
 
     @Override

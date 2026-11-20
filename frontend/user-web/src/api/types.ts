@@ -177,6 +177,12 @@ export interface TeamDetail extends Team {
   members: TeamMember[]
 }
 
+export interface TeamInvite {
+  code: string
+  role: 'ADMIN' | 'MEMBER'
+  expiresAt: string
+}
+
 export interface Conversation {
   id: string
   title: string

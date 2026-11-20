@@ -3,10 +3,13 @@ package com.shiye.user.module.team.controller;
 import com.shiye.common.api.Result;
 import com.shiye.user.common.security.UserContext;
 import com.shiye.user.module.team.domain.dto.TeamCreateRequest;
+import com.shiye.user.module.team.domain.dto.TeamInviteCreateRequest;
+import com.shiye.user.module.team.domain.dto.TeamJoinRequest;
 import com.shiye.user.module.team.domain.dto.TeamMemberAddRequest;
 import com.shiye.user.module.team.domain.dto.TeamMemberUpdateRequest;
 import com.shiye.user.module.team.domain.dto.TeamUpdateRequest;
 import com.shiye.user.module.team.domain.vo.TeamDetailVO;
+import com.shiye.user.module.team.domain.vo.TeamInviteVO;
 import com.shiye.user.module.team.domain.vo.TeamMemberVO;
 import com.shiye.user.module.team.domain.vo.TeamVO;
 import com.shiye.user.module.team.service.TeamService;
@@ -62,6 +65,17 @@ public class TeamController {
     public Result<TeamMemberVO> addMember(@PathVariable long id,
                                           @Valid @RequestBody TeamMemberAddRequest request) {
         return Result.ok(teamService.addMember(UserContext.requireUserId(), id, request));
+    }
+
+    @PostMapping("/{id}/invites")
+    public Result<TeamInviteVO> createInvite(@PathVariable long id,
+                                             @Valid @RequestBody TeamInviteCreateRequest request) {
+        return Result.ok(teamService.createInvite(UserContext.requireUserId(), id, request));
+    }
+
+    @PostMapping("/join")
+    public Result<TeamDetailVO> join(@Valid @RequestBody TeamJoinRequest request) {
+        return Result.ok(teamService.join(UserContext.requireUserId(), request));
     }
 
     @PutMapping("/{id}/members/{userId}")
