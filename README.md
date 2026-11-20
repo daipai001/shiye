@@ -247,6 +247,13 @@ RAG 问答闭环已打通：
 
 前端页面只有在 dev server 运行时才能打开；API 也不在时登录会提示“无法连接后端服务”。
 
+## 监控与备份
+
+- 健康检查：user-api/admin-api 的 `/actuator/health`
+- Prometheus：`/actuator/prometheus`，已暴露 HTTP/JVM/Hikari/Redis 指标
+- 备份脚本：`deploy/scripts/backup.ps1` / `backup.sh`，备份 MySQL 和 Redis RDB
+- 使用说明见 `deploy/README.md`
+
 ## 已知缺口（下一阶段）
 
 - 仓库默认 embedding 仍是 `dev`；新环境需按上面说明配置 BGE-M3 API Key。本机已配置并验证。
@@ -256,6 +263,7 @@ RAG 问答闭环已打通：
 - 邀请码注册已接入；邮箱验证尚未接入。
 - 扫描版 PDF 未接 OCR；本机向量检索仍为应用层余弦。
 - 数据清理任务已接入：过期 refresh token、授权码、幂等键和结束超过 30 天的入库任务。
+- 监控指标和备份脚本已接入；仍缺集成/E2E/压测和告警规则。
 - 问答限流（10 次/分钟/用户）和管理端操作限流（60 次/分钟/管理员）已接入。
 
 ## 下一步
