@@ -73,6 +73,19 @@ class TeamServiceImplTest {
     }
 
     @Test
+    void ownerCanTransferOwnership() {
+        when(teamMapper.findById(1L)).thenReturn(team());
+        when(memberMapper.findActive(1L, 10L)).thenReturn(member(10L, "OWNER"));
+        when(memberMapper.findActive(1L, 11L)).thenReturn(member(11L, "MEMBER"));
+
+        service.transferOwner(10L, 1L, 11L);
+
+        verify(teamMapper).updateOwner(1L, 11L);
+        verify(memberMapper).updateRole(1L, 11L, "OWNER");
+        verify(memberMapper).updateRole(1L, 10L, "ADMIN");
+    }
+
+    @Test
     void memberCanReadTeam() {
         when(teamMapper.findById(1L)).thenReturn(team());
         when(memberMapper.findActive(1L, 10L)).thenReturn(member(10L, "MEMBER"));

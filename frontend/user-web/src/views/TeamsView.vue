@@ -264,6 +264,26 @@ async function removeMember(member: TeamMember) {
   }
 }
 
+async function transferOwner(member: TeamMember) {
+  if (!selected.value) return
+  try {
+    await ElMessageBox.confirm(
+      `将团队所有权转让给 ${member.email}？转让后你将成为管理员，只有新所有者可以解散团队。`,
+      '转让所有权',
+      { confirmButtonText: '转让', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await api.post(`/teams/${selected.value.id}/transfer`, { userId: member.userId })
+    ElMessage.success('所有权已转让')
+    await loadTeams(selected.value.id)
+  } catch {
+    ElMessage.error('转让所有权失败')
+  }
+}
+
 async function dissolveTeam() {
   if (!selected.value) return
   try {
@@ -410,6 +430,7 @@ onMounted(() => loadTeams())
                   <el-option label="管理员" value="ADMIN" />
                   <el-option label="成员" value="MEMBER" />
                 </el-select>
+                <el-button v-if="isOwner" text @click="transferOwner(member)">转让</el-button>
                 <el-button text type="danger" @click="removeMember(member)">移除</el-button>
               </template>
             </div>
@@ -686,6 +707,7 @@ onMounted(() => loadTeams())
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
 }
 .role-select {

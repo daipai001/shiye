@@ -241,6 +241,23 @@ public class TeamServiceImpl implements TeamService {
 
     @Override
     @Transactional
+    public TeamDetailVO transferOwner(long userId, long teamId, long targetUserId) {
+        requireOwner(userId, teamId);
+        if (targetUserId == userId) {
+            throw new BizException(ErrorCode.CONFLICT, "不能转让给自己");
+        }
+        TeamMemberEntity target = requireActiveMember(teamId, targetUserId);
+        if (ROLE_OWNER.equals(target.getRole())) {
+            throw new BizException(ErrorCode.CONFLICT, "该成员已经是所有者");
+        }
+        teamMapper.updateOwner(teamId, targetUserId);
+        memberMapper.updateRole(teamId, targetUserId, ROLE_OWNER);
+        memberMapper.updateRole(teamId, userId, ROLE_ADMIN);
+        return detail(userId, teamId);
+    }
+
+    @Override
+    @Transactional
     public void leave(long userId, long teamId) {
         TeamMemberEntity member = requireActiveMember(teamId, userId);
         if (ROLE_OWNER.equals(member.getRole())) {

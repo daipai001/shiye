@@ -39,6 +39,8 @@ public interface TeamService {
 
     void removeMember(long userId, long teamId, long targetUserId);
 
+    TeamDetailVO transferOwner(long userId, long teamId, long targetUserId);
+
     void leave(long userId, long teamId);
 
     TeamAccess requireMember(long userId, long teamId);

@@ -921,7 +921,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 - `idx_teams_status (status)`
 - `idx_teams_deleted (deleted_at)`
 
-**说明**：创建团队时同时写入 OWNER 成员；团队问答同时受个人配额和团队配额限制。解散时软删除团队、清空 `articles.team_id`、删除成员和邀请码。
+**说明**：创建团队时同时写入 OWNER 成员；团队问答同时受个人配额和团队配额限制。OWNER 可转让所有权（原 OWNER 变 ADMIN）；解散时软删除团队、清空 `articles.team_id`、删除成员和邀请码。
 
 ---
 

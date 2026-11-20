@@ -177,7 +177,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 - 跨导入按 `(user_id, url_hash)` 去重，已存在 `READY` 资料时条目标记 `SKIPPED / DUPLICATE_URL`
 - 向量写入 Redis：`kb:chunk:{chunkId}` + `kb:user:{userId}:chunks`；共享到团队时同时写入 `kb:team:{teamId}:chunks`
 - 资料 API：列表/统计/详情/切片/删除/重新索引；资料库页面支持搜索、状态/标签/文件夹/团队筛选、详情抽屉、切片查看和共享到团队
-- 团队空间：创建团队、按邮箱添加成员或单次邀请码加入、OWNER/ADMIN/MEMBER 角色、资料共享/取消共享、团队资料库和团队范围问答、团队解散；团队问答同时受个人配额和团队配额限制
+- 团队空间：创建团队、按邮箱添加成员或单次邀请码加入、OWNER/ADMIN/MEMBER 角色、资料共享/取消共享、团队资料库和团队范围问答、团队解散、所有权转让；团队问答同时受个人配额和团队配额限制
 - 本地文件夹导入：选择 Markdown/TXT/PDF 文件夹批量上传，适用于 Obsidian vault 和 Markdown 导出
 - PWA：user-web 提供 `manifest.webmanifest`、图标和 service worker，可安装到桌面/移动端主屏
 - 标签手动编辑：单篇加/删标签；标签管理支持重命名、改色、删除

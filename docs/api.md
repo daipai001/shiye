@@ -1213,6 +1213,7 @@ admin-web → POST /admin/api/v1/auth/login
 | PUT | `/teams/{id}/members/{userId}` | OWNER/ADMIN | 修改角色；ADMIN 只能管理 MEMBER |
 | DELETE | `/teams/{id}/members/{userId}` | OWNER/ADMIN | 移除成员；不能移除 OWNER |
 | POST | `/teams/{id}/leave` | 成员 | 退出团队；OWNER 不能退出 |
+| POST | `/teams/{id}/transfer` | OWNER | 转让所有权；目标必须是 ACTIVE 成员，原 OWNER 变为 ADMIN |
 | DELETE | `/teams/{id}` | OWNER | 解散团队；共享资料回到各自个人库，成员和邀请码清理 |
 
 **Team 字段**：`id`、`name`、`ownerUserId`、`myRole`、`status`、`memberCount`、`monthlyTokenQuota`、`monthlyCostQuota`、`createdAt`。
@@ -1223,6 +1224,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 - `POST /teams/{id}/invites` 返回 `{code, role, expiresAt}`；`code` 只返回一次，数据库只存 SHA-256。
 - `POST /teams/join` 请求 `{code}`，返回团队详情；无效/过期/已使用返回 `40105`，已在团队返回 `40901`。
+- `POST /teams/{id}/transfer` 请求 `{userId}`；转让后原 OWNER 改为 ADMIN，目标成员改为 OWNER。
 - `DELETE /teams/{id}` 仅 OWNER；解散会把 `articles.team_id` 置空，清除团队成员、邀请码和团队向量集合，团队软删除。
 - 团队问答会同时检查个人配额、团队月配额和全局预算；团队配额超限返回 `42905`。
 - `ai_usage.team_id` 和 `team_usage_monthly` 记录团队问答/RERANK 用量。
@@ -2026,7 +2028,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 19 | Web-插件管理 | `GET/PUT /users/me/plugin-settings`、`POST /auth/extension-code` |
 | 20 | 管理后台-登录 | `POST /admin/api/v1/auth/login` |
 | 21 | 管理后台-管理员 | `GET/POST /admin/api/v1/admins`、`PUT /admin/api/v1/admins/{id}`、`PUT /admin/api/v1/admins/{id}/status`、`PUT /admin/api/v1/admins/{id}/password` |
-| 22 | Web-团队 | `GET/POST /teams`、`GET/PUT/DELETE /teams/{id}`、`GET/POST /teams/{id}/members`、`PUT/DELETE /teams/{id}/members/{userId}`、`POST /teams/{id}/leave`、`POST /teams/{id}/invites`、`POST /teams/join` |
+| 22 | Web-团队 | `GET/POST /teams`、`GET/PUT/DELETE /teams/{id}`、`GET/POST /teams/{id}/members`、`PUT/DELETE /teams/{id}/members/{userId}`、`POST /teams/{id}/leave`、`POST /teams/{id}/invites`、`POST /teams/join`、`POST /teams/{id}/transfer` |
 | 23 | Web-团队资料 | `GET /articles?teamId=`、`POST/DELETE /articles/{id}/share`、`POST /chat/stream`（TEAM） |
 
 ---

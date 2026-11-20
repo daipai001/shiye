@@ -7,6 +7,7 @@ import com.shiye.user.module.team.domain.dto.TeamInviteCreateRequest;
 import com.shiye.user.module.team.domain.dto.TeamJoinRequest;
 import com.shiye.user.module.team.domain.dto.TeamMemberAddRequest;
 import com.shiye.user.module.team.domain.dto.TeamMemberUpdateRequest;
+import com.shiye.user.module.team.domain.dto.TeamTransferRequest;
 import com.shiye.user.module.team.domain.dto.TeamUpdateRequest;
 import com.shiye.user.module.team.domain.vo.TeamDetailVO;
 import com.shiye.user.module.team.domain.vo.TeamInviteVO;
@@ -94,6 +95,13 @@ public class TeamController {
     public Result<Void> removeMember(@PathVariable long id, @PathVariable long userId) {
         teamService.removeMember(UserContext.requireUserId(), id, userId);
         return Result.ok();
+    }
+
+    @PostMapping("/{id}/transfer")
+    public Result<TeamDetailVO> transfer(@PathVariable long id,
+                                         @Valid @RequestBody TeamTransferRequest request) {
+        return Result.ok(teamService.transferOwner(
+                UserContext.requireUserId(), id, request.userId()));
     }
 
     @PostMapping("/{id}/leave")

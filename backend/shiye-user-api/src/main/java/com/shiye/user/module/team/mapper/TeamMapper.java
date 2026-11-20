@@ -66,4 +66,11 @@ public interface TeamMapper {
             WHERE id = #{id} AND deleted_at IS NULL
             """)
     int softDelete(@Param("id") long id);
+
+    @Update("""
+            UPDATE teams
+            SET owner_user_id = #{userId}, updated_at = UTC_TIMESTAMP(3)
+            WHERE id = #{teamId} AND deleted_at IS NULL
+            """)
+    int updateOwner(@Param("teamId") long teamId, @Param("userId") long userId);
 }
