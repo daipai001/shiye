@@ -10,15 +10,19 @@ public interface ArticleQueryService {
 
     PageResult<ArticleSummaryVO> list(long userId, int page, int pageSize,
                                       String q, String status, String sourceType,
-                                      Long tagId, Long folderId);
+                                      Long tagId, Long folderId, Long teamId);
 
     ArticleDetailVO detail(long userId, long articleId);
 
     PageResult<ArticleChunkVO> chunks(long userId, long articleId, int page, int pageSize);
 
-    ArticleStatsVO stats(long userId);
+    ArticleStatsVO stats(long userId, Long teamId);
 
     void delete(long userId, long articleId);
 
     void deleteByUrl(long userId, String url);
+
+    void shareToTeam(long userId, long articleId, long teamId);
+
+    void unshareFromTeam(long userId, long articleId);
 }

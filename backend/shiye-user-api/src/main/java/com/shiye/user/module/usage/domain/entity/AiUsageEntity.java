@@ -10,6 +10,7 @@ public class AiUsageEntity {
     private Long id;
     private String requestId;
     private Long userId;
+    private Long teamId;
     private String source;
     private String scene;
     private String model;

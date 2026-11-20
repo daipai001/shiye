@@ -66,6 +66,37 @@ CREATE TABLE IF NOT EXISTS `admin_users` (
   KEY `idx_admin_users_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='后台管理员';
 
+CREATE TABLE IF NOT EXISTS `teams` (
+  `id`                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name`                  VARCHAR(64)     NOT NULL,
+  `owner_user_id`         BIGINT UNSIGNED NOT NULL,
+  `status`                VARCHAR(16)     NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / DISABLED',
+  `monthly_token_quota`   BIGINT UNSIGNED NOT NULL DEFAULT 1000000,
+  `monthly_cost_quota`    DECIMAL(12,6)   NOT NULL DEFAULT 20.000000,
+  `created_at`            DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at`            DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  `deleted_at`            DATETIME(3)     NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_teams_owner` (`owner_user_id`),
+  KEY `idx_teams_status` (`status`),
+  KEY `idx_teams_deleted` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='团队';
+
+CREATE TABLE IF NOT EXISTS `team_members` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `team_id`    BIGINT UNSIGNED NOT NULL,
+  `user_id`    BIGINT UNSIGNED NOT NULL,
+  `role`       VARCHAR(16)     NOT NULL DEFAULT 'MEMBER' COMMENT 'OWNER / ADMIN / MEMBER',
+  `status`     VARCHAR(16)     NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / DISABLED',
+  `joined_at`  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `created_at` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_team_members_team_user` (`team_id`, `user_id`),
+  KEY `idx_team_members_user_status` (`user_id`, `status`),
+  KEY `idx_team_members_team_status` (`team_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='团队成员';
+
 CREATE TABLE IF NOT EXISTS `refresh_tokens` (
   `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `subject_type`   VARCHAR(16)     NOT NULL COMMENT 'USER / ADMIN',
@@ -201,6 +232,7 @@ CREATE TABLE IF NOT EXISTS `file_assets` (
 CREATE TABLE IF NOT EXISTS `articles` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id`       BIGINT UNSIGNED NOT NULL,
+  `team_id`       BIGINT UNSIGNED NULL DEFAULT NULL COMMENT 'NULL=个人；非空=同时共享到团队',
   `title`         VARCHAR(512)    NOT NULL,
   `url`           VARCHAR(2048)   NULL DEFAULT NULL,
   `url_hash`      CHAR(64)        NULL DEFAULT NULL,
@@ -222,6 +254,7 @@ CREATE TABLE IF NOT EXISTS `articles` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_articles_user_url` (`user_id`, `url_hash`),
   KEY `idx_articles_user_status_updated` (`user_id`, `status`, `updated_at`),
+  KEY `idx_articles_team_status_updated` (`team_id`, `status`, `updated_at`),
   KEY `idx_articles_user_content_hash` (`user_id`, `content_hash`),
   KEY `idx_articles_user_domain` (`user_id`, `domain`),
   KEY `idx_articles_file_asset` (`file_asset_id`),
@@ -386,6 +419,7 @@ CREATE TABLE IF NOT EXISTS `ai_usage` (
   `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `request_id`        VARCHAR(64)     NOT NULL,
   `user_id`           BIGINT UNSIGNED NOT NULL,
+  `team_id`           BIGINT UNSIGNED NULL DEFAULT NULL COMMENT '团队空间调用时的团队',
   `source`            VARCHAR(16)     NOT NULL COMMENT 'WEB / EXTENSION / ADMIN / API',
   `scene`             VARCHAR(16)     NOT NULL COMMENT 'CHAT / EMBEDDING / RERANK / SUMMARY / EVAL',
   `model`             VARCHAR(64)     NOT NULL,
@@ -409,6 +443,7 @@ CREATE TABLE IF NOT EXISTS `ai_usage` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_ai_usage_request` (`request_id`),
   KEY `idx_ai_usage_user_created` (`user_id`, `created_at`),
+  KEY `idx_ai_usage_team_created` (`team_id`, `created_at`),
   KEY `idx_ai_usage_source_created` (`source`, `created_at`),
   KEY `idx_ai_usage_scene_created` (`scene`, `created_at`),
   KEY `idx_ai_usage_model_created` (`model`, `created_at`),
@@ -416,6 +451,18 @@ CREATE TABLE IF NOT EXISTS `ai_usage` (
   KEY `idx_ai_usage_conversation` (`conversation_id`),
   KEY `idx_ai_usage_article` (`article_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='AI 调用明细';
+
+CREATE TABLE IF NOT EXISTS `team_usage_monthly` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `team_id`    BIGINT UNSIGNED NOT NULL,
+  `month`      CHAR(7)         NOT NULL COMMENT 'YYYY-MM',
+  `tokens`     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `cost`       DECIMAL(14,8)   NOT NULL DEFAULT 0,
+  `calls`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `updated_at` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_team_usage_monthly` (`team_id`, `month`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='团队月度用量';
 
 CREATE TABLE IF NOT EXISTS `ai_usage_daily` (
   `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

@@ -115,6 +115,9 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 身份 | `refresh_tokens` | 刷新令牌 | P0 |
 | 身份 | `extension_auth_codes` | 插件一次性授权码 | P0 |
 | 身份 | `user_plugin_settings` | 插件/悬浮球偏好 | P0 |
+| 团队 | `teams` | 团队 | 已启用 |
+| 团队 | `team_members` | 团队成员与角色 | 已启用 |
+| 团队 | `team_usage_monthly` | 团队月用量（配额） | 已启用 |
 | 书签 | `bookmark_folders` | 用户选中的书签文件夹 | P0 |
 | 书签 | `bookmark_imports` | 导入任务 | P0 |
 | 书签 | `bookmark_items` | 导入条目 | P0 |
@@ -400,7 +403,8 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 字段 | 类型 | 空 | 默认 | 说明 |
 |---|---|---|---|---|
 | `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
-| `user_id` | BIGINT UNSIGNED | 否 | — | 用户 |
+| `user_id` | BIGINT UNSIGNED | 否 | — | 创建者/所有者 |
+| `team_id` | BIGINT UNSIGNED | 是 | NULL | 非空时同时共享到团队；个人库仍保留 |
 | `title` | VARCHAR(512) | 否 | — | 标题 |
 | `url` | VARCHAR(2048) | 是 | NULL | 原始 URL |
 | `url_hash` | CHAR(64) | 是 | NULL | SHA-256(规范化 URL) |
@@ -424,6 +428,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 - `UNIQUE uk_articles_user_url (user_id, url_hash)`
 - `idx_articles_user_status_updated (user_id, status, updated_at)`
+- `idx_articles_team_status_updated (team_id, status, updated_at)`
 - `idx_articles_user_content_hash (user_id, content_hash)`
 - `idx_articles_user_domain (user_id, domain)`
 - `idx_articles_file_asset (file_asset_id)`
@@ -435,6 +440,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 - URL 资料用 `url_hash` 去重；上传资料 `url_hash=NULL`（MySQL 唯一索引允许多个 NULL），应用层用 `content_hash` 去重。
 - `content_text` 只存清洗后正文；原始 HTML/PDF 放 `file_assets`。
 - 软删除后异步清理 chunks/vector。
+- `team_id` 非空时，团队成员可读/检索；所有者保留个人库和标签/文件夹；取消共享只清空 `team_id`，不删除资料。
 - 摘要/标签在资料进入 `READY` 后异步生成（当前由 `ArticleEnrichmentService` 调度，不单独写 `ingest_tasks.stage=ENRICH`）；失败保留抓取摘要，不阻塞入库。
 
 ---
@@ -632,6 +638,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
 | `request_id` | VARCHAR(64) | 否 | — | 请求唯一 ID |
 | `user_id` | BIGINT UNSIGNED | 否 | — | 用户 |
+| `team_id` | BIGINT UNSIGNED | 是 | NULL | 团队空间调用时的团队 |
 | `source` | VARCHAR(16) | 否 | — | WEB / EXTENSION / ADMIN / API |
 | `scene` | VARCHAR(16) | 否 | — | CHAT / EMBEDDING / RERANK / SUMMARY / EVAL |
 | `model` | VARCHAR(64) | 否 | — | 模型 |
@@ -657,6 +664,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 - `UNIQUE uk_ai_usage_request (request_id)`
 - `idx_ai_usage_user_created (user_id, created_at)`
+- `idx_ai_usage_team_created (team_id, created_at)`
 - `idx_ai_usage_source_created (source, created_at)`
 - `idx_ai_usage_scene_created (scene, created_at)`
 - `idx_ai_usage_model_created (model, created_at)`
@@ -890,6 +898,77 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 ---
 
+### 4.31 `teams`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `name` | VARCHAR(64) | 否 | — | 团队名 |
+| `owner_user_id` | BIGINT UNSIGNED | 否 | — | 所有者 `users.id` |
+| `status` | VARCHAR(16) | 否 | `ACTIVE` | ACTIVE / DISABLED |
+| `monthly_token_quota` | BIGINT UNSIGNED | 否 | 1000000 | 团队月 token 配额 |
+| `monthly_cost_quota` | DECIMAL(12,6) | 否 | 20.000000 | 团队月成本配额 |
+| `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
+| `updated_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) ON UPDATE | 更新 |
+| `deleted_at` | DATETIME(3) | 是 | NULL | 软删除 |
+
+**索引**
+
+- `idx_teams_owner (owner_user_id)`
+- `idx_teams_status (status)`
+- `idx_teams_deleted (deleted_at)`
+
+**说明**：创建团队时同时写入 OWNER 成员；团队问答同时受个人配额和团队配额限制。
+
+---
+
+### 4.32 `team_members`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `team_id` | BIGINT UNSIGNED | 否 | — | 团队 |
+| `user_id` | BIGINT UNSIGNED | 否 | — | 用户 |
+| `role` | VARCHAR(16) | 否 | `MEMBER` | OWNER / ADMIN / MEMBER |
+| `status` | VARCHAR(16) | 否 | `ACTIVE` | ACTIVE / DISABLED |
+| `joined_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 加入时间 |
+| `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
+| `updated_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) ON UPDATE | 更新 |
+
+**索引**
+
+- `UNIQUE uk_team_members_team_user (team_id, user_id)`
+- `idx_team_members_user_status (user_id, status)`
+- `idx_team_members_team_status (team_id, status)`
+
+**说明**
+
+- 每个团队只有一名 OWNER；OWNER 不能退出或移除，ADMIN 由 OWNER 管理。
+- ADMIN 可添加/移除 MEMBER；OWNER 可管理 ADMIN 和团队配额。
+- 移除成员直接删除成员行；被移除后无法访问团队资料。
+
+---
+
+### 4.33 `team_usage_monthly`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `team_id` | BIGINT UNSIGNED | 否 | — | 团队 |
+| `month` | CHAR(7) | 否 | — | YYYY-MM |
+| `tokens` | BIGINT UNSIGNED | 否 | 0 | 月 tokens |
+| `cost` | DECIMAL(14,8) | 否 | 0 | 月成本 |
+| `calls` | BIGINT UNSIGNED | 否 | 0 | 调用次数 |
+| `updated_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) ON UPDATE | 更新 |
+
+**索引**
+
+- `UNIQUE uk_team_usage_monthly (team_id, month)`
+
+**说明**：团队问答/RERANK 记账时同步累加；团队配额检查读取本表。
+
+---
+
 ## 5. 枚举字典
 
 | 域 | 字段 | 值 |
@@ -902,7 +981,10 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 导入项 | `bookmark_items.status` | `PENDING` / `FETCHING` / `PARSING` / `CHUNKING` / `EMBEDDING` / `READY` / `FAILED` / `SKIPPED` |
 | 任务 | `ingest_tasks.stage` | `FETCH` / `PARSE` / `CHUNK` / `EMBED` / `INDEX` / `ENRICH` |
 | 任务 | `ingest_tasks.status` | `PENDING` / `RUNNING` / `SUCCESS` / `FAILED` / `DEAD` |
-| 会话 | `conversations.scope_type` | `ALL` / `ARTICLE` / `FOLDER` / `TAG` / `CURRENT` |
+| 会话 | `conversations.scope_type` | `ALL` / `ARTICLE` / `FOLDER` / `TAG` / `GENERAL` / `TEAM` / `CURRENT` |
+| 团队 | `teams.status` | `ACTIVE` / `DISABLED` |
+| 团队 | `team_members.role` | `OWNER` / `ADMIN` / `MEMBER` |
+| 团队 | `team_members.status` | `ACTIVE` / `DISABLED` |
 | 消息 | `messages.role` | `USER` / `ASSISTANT` / `SYSTEM` |
 | 消息 | `messages.status` | `SUCCESS` / `FAILED` / `ABORTED` |
 | AI | `ai_usage.source` | `WEB` / `EXTENSION` / `ADMIN` / `API` |

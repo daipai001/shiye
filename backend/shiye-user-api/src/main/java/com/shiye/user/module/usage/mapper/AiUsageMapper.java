@@ -17,12 +17,12 @@ import java.util.List;
 public interface AiUsageMapper {
 
     @Insert("""
-            INSERT INTO ai_usage (request_id, user_id, source, scene, model, prompt_tokens,
+            INSERT INTO ai_usage (request_id, user_id, team_id, source, scene, model, prompt_tokens,
                                   completion_tokens, total_tokens, cached_tokens, input_price,
                                   output_price, cost, currency, latency_ms, first_token_ms,
                                   status, error_code, estimated, conversation_id, article_id,
                                   client_version)
-            VALUES (#{requestId}, #{userId}, #{source}, #{scene}, #{model}, #{promptTokens},
+            VALUES (#{requestId}, #{userId}, #{teamId}, #{source}, #{scene}, #{model}, #{promptTokens},
                     #{completionTokens}, #{totalTokens}, #{cachedTokens}, #{inputPrice},
                     #{outputPrice}, #{cost}, #{currency}, #{latencyMs}, #{firstTokenMs},
                     #{status}, #{errorCode}, #{estimated}, #{conversationId}, #{articleId},

@@ -60,12 +60,37 @@ public class RedisChunkVectorStore implements ChunkVectorStore {
         }
     }
 
+    @Override
+    public void addToTeam(long teamId, long chunkId) {
+        try {
+            redisTemplate.opsForSet().add(teamChunksKey(teamId), String.valueOf(chunkId));
+        } catch (RuntimeException ex) {
+            log.warn("add vector to team {} failed for chunk {}: {}",
+                    teamId, chunkId, ex.getMessage());
+            throw new VectorStoreException("团队向量索引写入失败", ex);
+        }
+    }
+
+    @Override
+    public void removeFromTeam(long teamId, long chunkId) {
+        try {
+            redisTemplate.opsForSet().remove(teamChunksKey(teamId), String.valueOf(chunkId));
+        } catch (RuntimeException ex) {
+            log.warn("remove vector from team {} failed for chunk {}: {}",
+                    teamId, chunkId, ex.getMessage());
+        }
+    }
+
     private String chunkKey(long chunkId) {
         return "kb:chunk:" + chunkId;
     }
 
     private String userChunksKey(long userId) {
         return "kb:user:" + userId + ":chunks";
+    }
+
+    private String teamChunksKey(long teamId) {
+        return "kb:team:" + teamId + ":chunks";
     }
 
     private String encode(float[] vector) {

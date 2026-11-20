@@ -175,8 +175,9 @@ docker compose -f deploy/docker-compose.yml up -d --build
 - `charStart/charEnd` 保存到切片，供引用跳转
 - SSRF 校验（协议/内网 IP/DNS）、超时、重定向上限、页面大小和正文长度限制
 - 跨导入按 `(user_id, url_hash)` 去重，已存在 `READY` 资料时条目标记 `SKIPPED / DUPLICATE_URL`
-- 向量写入 Redis：`kb:chunk:{chunkId}` + `kb:user:{userId}:chunks`
-- 资料 API：列表/统计/详情/切片/删除/重新索引；资料库页面支持搜索、状态/标签/文件夹筛选、详情抽屉和切片查看
+- 向量写入 Redis：`kb:chunk:{chunkId}` + `kb:user:{userId}:chunks`；共享到团队时同时写入 `kb:team:{teamId}:chunks`
+- 资料 API：列表/统计/详情/切片/删除/重新索引；资料库页面支持搜索、状态/标签/文件夹/团队筛选、详情抽屉、切片查看和共享到团队
+- 团队空间：创建团队、按邮箱添加成员、OWNER/ADMIN/MEMBER 角色、资料共享/取消共享、团队资料库和团队范围问答；团队问答同时受个人配额和团队配额限制
 - 本地文件夹导入：选择 Markdown/TXT/PDF 文件夹批量上传，适用于 Obsidian vault 和 Markdown 导出
 - PWA：user-web 提供 `manifest.webmanifest`、图标和 service worker，可安装到桌面/移动端主屏
 - 标签手动编辑：单篇加/删标签；标签管理支持重命名、改色、删除
@@ -187,7 +188,7 @@ RAG 问答闭环已打通：
 
 - `POST /api/v1/chat/stream`：SSE 事件 `meta / citation / delta / usage / done / error`
 - DeepSeek 流式回答，复用本地 OfferDesk 配置（`shiye.ai.chat`，已 gitignore）
-- 问答范围 ALL / ARTICLE / FOLDER / TAG / GENERAL；资料库问答页支持全部、单篇、文件夹、标签和通用问答，检索结果按 `user_id` 过滤，单篇最多 3 个切片
+- 问答范围 ALL / ARTICLE / FOLDER / TAG / GENERAL / TEAM；资料库问答页支持全部、单篇、文件夹、标签、通用问答和团队资料库，个人检索按 `user_id` 过滤，团队检索按 `team_id` 和成员校验后过滤，单篇最多 3 个切片
 - 多轮追问会结合最近用户问题做轻量检索改写；通用问答不检索资料库、不返回引用
 - 混合检索：BGE-M3 向量召回 + MySQL ngram FULLTEXT 关键词召回 + RRF 融合（`migrations/V002__chunk_fulltext.sql`）
 - BGE-reranker 二次重排：对 RRF 候选池（默认最多 20 条）调用 `BAAI/bge-reranker-v2-m3`，失败或未配置 key 时自动回退 RRF；引用分数为 rerank relevance score

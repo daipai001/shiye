@@ -8,6 +8,7 @@ import java.util.List;
 
 public record ArticleSummaryVO(
         String id,
+        String teamId,
         String title,
         String domain,
         String url,
@@ -31,6 +32,7 @@ public record ArticleSummaryVO(
                                         List<ArticleFolderVO> folders) {
         return new ArticleSummaryVO(
                 String.valueOf(entity.getId()),
+                entity.getTeamId() == null ? null : String.valueOf(entity.getTeamId()),
                 entity.getTitle(),
                 entity.getDomain(),
                 entity.getUrl(),

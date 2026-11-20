@@ -57,7 +57,7 @@ public class ChatController {
                              HttpServletResponse response) {
         long userId = UserContext.requireUserId();
         applyRateLimit(response, userId);
-        usageService.assertCanChat(userId);
+        usageService.assertCanChat(userId, teamId(request.scope()));
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("X-Accel-Buffering", "no");
         SseEmitter emitter = new SseEmitter(180_000L);
@@ -68,6 +68,16 @@ public class ChatController {
     @PostMapping("/{requestId}/cancel")
     public Result<ChatCancelVO> cancel(@PathVariable String requestId) {
         return Result.ok(chatService.cancel(UserContext.requireUserId(), requestId));
+    }
+
+    private Long teamId(ChatStreamRequest.Scope scope) {
+        if (scope == null || !"TEAM".equalsIgnoreCase(scope.type())) {
+            return null;
+        }
+        if (scope.id() == null || !scope.id().matches("\\d+")) {
+            throw new BizException(ErrorCode.VALIDATION_ERROR, "TEAM 范围需要 teamId");
+        }
+        return Long.parseLong(scope.id());
     }
 
     private void applyRateLimit(HttpServletResponse response, long userId) {

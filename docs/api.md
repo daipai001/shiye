@@ -166,6 +166,7 @@
 | 42902 | 429 | USER_QUOTA_EXCEEDED | 用户配额超限 |
 | 42903 | 429 | GLOBAL_BUDGET_EXCEEDED | 全局预算超限 |
 | 42904 | 429 | DAILY_TOKEN_LIMIT | 用户日 token 超限 |
+| 42905 | 429 | TEAM_QUOTA_EXCEEDED | 团队配额超限 |
 | 50000 | 500 | INTERNAL_ERROR | 未知错误 |
 | 50001 | 500 | DB_ERROR | 数据库错误 |
 | 50002 | 500 | QUEUE_ERROR | 队列错误 |
@@ -728,8 +729,9 @@ admin-web → POST /admin/api/v1/auth/login
 | `q` | string | 标题/正文关键词 |
 | `status` | string | 状态 |
 | `sourceType` | string | BOOKMARK/MANUAL/UPLOAD |
-| `tagId` | string | 标签 |
-| `folderId` | string | 书签文件夹 |
+| `tagId` | string | 标签（个人库） |
+| `folderId` | string | 书签文件夹（个人库） |
+| `teamId` | string | 团队资料；只能传当前用户所在团队 |
 | `from` / `to` | string | ISO 时间 |
 | `sort` | string | 默认 `updatedAt,desc` |
 
@@ -738,6 +740,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `id` | string | ID |
+| `teamId` | string/null | 共享到的团队；个人未共享为空 |
 | `title` | string | 标题 |
 | `url` / `domain` | string | 来源 |
 | `sourceType` | string | 来源类型 |
@@ -754,6 +757,8 @@ admin-web → POST /admin/api/v1/auth/login
 #### GET `/articles/stats`
 
 **认证**：用户
+
+**Query**：`teamId?`；传团队 ID 时返回团队资料统计。
 
 **响应 `data`**
 
@@ -822,9 +827,27 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
+#### POST `/articles/{id}/share`
+
+**认证**：资料所有者
+
+**请求**：`{"teamId":"1"}`
+
+**响应**：`null`。把个人资料共享到团队；团队问答可检索，个人库保留副本。已共享到其他团队返回 40901。
+
+---
+
+#### DELETE `/articles/{id}/share`
+
+**认证**：资料所有者或团队 OWNER/ADMIN
+
+**响应**：`null`。取消团队共享，保留个人资料。
+
+---
+
 #### POST `/articles/{id}/reindex`
 
-**认证**：用户
+**认证**：用户（资料所有者）
 
 **响应**
 
@@ -920,7 +943,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 3.4 问答
 
-> **当前实现**：`POST /chat/stream` 已接入 DeepSeek SSE、混合检索和 rerank，支持 `ALL / ARTICLE / FOLDER / TAG / GENERAL` 范围；`GENERAL` 不检索资料库，直接回答。检索 query 会结合最近用户问题做轻量改写，改善多轮追问。`POST /chat/page-stream` 支持插件当前页临时问答。
+> **当前实现**：`POST /chat/stream` 已接入 DeepSeek SSE、混合检索和 rerank，支持 `ALL / ARTICLE / FOLDER / TAG / GENERAL / TEAM` 范围；`GENERAL` 不检索资料库，直接回答，`TEAM` 只检索指定团队资料。检索 query 会结合最近用户问题做轻量改写，改善多轮追问。`POST /chat/page-stream` 支持插件当前页临时问答。
 > 引用、usage、会话/消息持久化已接通；默认使用联调 embedding，真实语义检索需配置 BGE-M3。
 
 #### POST `/chat/stream`
@@ -943,14 +966,14 @@ admin-web → POST /admin/api/v1/auth/login
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `conversationId` | string/null | 否 | 不传则新建会话 |
-| `scope.type` | string | 是 | ALL/ARTICLE/FOLDER/TAG/GENERAL |
-| `scope.id` | string/null | 条件 | ARTICLE/FOLDER/TAG 时必填；ALL/GENERAL 为空 |
+| `scope.type` | string | 是 | ALL/ARTICLE/FOLDER/TAG/GENERAL/TEAM |
+| `scope.id` | string/null | 条件 | ARTICLE/FOLDER/TAG/TEAM 时必填；ALL/GENERAL 为空 |
 | `question` | string | 是 | 1~4000 字 |
 | `model` | string/null | 否 | 不传用默认 |
 
 **响应**：SSE，事件见 1.9。
 
-**错误（流开始前）**：40001、40101、40302、42902、42903、42904
+**错误（流开始前）**：40001、40101、40302、42902、42903、42904、42905
 
 **错误（流开始后）**：`error` 事件，`retryable` 表示是否可重试。
 
@@ -1170,6 +1193,34 @@ admin-web → POST /admin/api/v1/auth/login
 **Query**：同 `/usage/records`
 
 **响应**：`text/csv`，`Content-Disposition: attachment`。
+
+---
+
+### 3.6 团队
+
+> 团队资料通过 `articles.team_id` 共享；团队问答使用 `scope.type=TEAM`。团队配额与个人配额同时生效。
+
+| 方法 | 路径 | 认证 | 说明 |
+|---|---|---|---|
+| GET | `/teams` | 用户 | 我加入的团队 |
+| POST | `/teams` | 用户 | 创建团队，创建者为 OWNER |
+| GET | `/teams/{id}` | 成员 | 团队详情 + 成员 |
+| PUT | `/teams/{id}` | OWNER | 修改名称、token/成本配额 |
+| GET | `/teams/{id}/members` | 成员 | 成员列表 |
+| POST | `/teams/{id}/members` | OWNER/ADMIN | 按邮箱添加成员；ADMIN 只能加 MEMBER，OWNER 可加 ADMIN |
+| PUT | `/teams/{id}/members/{userId}` | OWNER/ADMIN | 修改角色；ADMIN 只能管理 MEMBER |
+| DELETE | `/teams/{id}/members/{userId}` | OWNER/ADMIN | 移除成员；不能移除 OWNER |
+| POST | `/teams/{id}/leave` | 成员 | 退出团队；OWNER 不能退出 |
+
+**Team 字段**：`id`、`name`、`ownerUserId`、`myRole`、`status`、`memberCount`、`monthlyTokenQuota`、`monthlyCostQuota`、`createdAt`。
+
+**TeamMember 字段**：`userId`、`email`、`displayName`、`role`、`status`、`joinedAt`。
+
+**说明**
+
+- 团队问答会同时检查个人配额、团队月配额和全局预算；团队配额超限返回 `42905`。
+- `ai_usage.team_id` 和 `team_usage_monthly` 记录团队问答/RERANK 用量。
+- 资料共享/取消共享接口见 3.3。
 
 ---
 
@@ -1969,6 +2020,8 @@ admin-web → POST /admin/api/v1/auth/login
 | 19 | Web-插件管理 | `GET/PUT /users/me/plugin-settings`、`POST /auth/extension-code` |
 | 20 | 管理后台-登录 | `POST /admin/api/v1/auth/login` |
 | 21 | 管理后台-管理员 | `GET/POST /admin/api/v1/admins`、`PUT /admin/api/v1/admins/{id}`、`PUT /admin/api/v1/admins/{id}/status`、`PUT /admin/api/v1/admins/{id}/password` |
+| 22 | Web-团队 | `GET/POST /teams`、`GET/PUT /teams/{id}`、`GET/POST /teams/{id}/members`、`PUT/DELETE /teams/{id}/members/{userId}`、`POST /teams/{id}/leave` |
+| 23 | Web-团队资料 | `GET /articles?teamId=`、`POST/DELETE /articles/{id}/share`、`POST /chat/stream`（TEAM） |
 
 ---
 
@@ -1982,6 +2035,7 @@ admin-web → POST /admin/api/v1/auth/login
 | `/api/v1/articles/*` | 允许 | 禁止 | user_id |
 | `/api/v1/chat/*` | 允许 | 禁止 | user_id |
 | `/api/v1/usage/*` | 允许 | 禁止 | user_id |
+| `/api/v1/teams/*` | 允许 | 禁止 | 团队成员 + 角色 |
 | `/admin/api/v1/auth/*` | 禁止 | 部分公开 | — |
 | `/admin/api/v1/overview` | 禁止 | 允许 | — |
 | `/admin/api/v1/usage` | 禁止 | 允许 | — |

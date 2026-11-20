@@ -42,6 +42,7 @@ async function logout() {
       <nav class="nav">
         <router-link to="/library">资料库</router-link>
         <router-link to="/chat">问答</router-link>
+        <router-link to="/teams">团队</router-link>
         <router-link to="/usage">用量</router-link>
         <router-link to="/settings">设置</router-link>
         <router-link to="/plugin">插件</router-link>

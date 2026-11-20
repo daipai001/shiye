@@ -196,6 +196,12 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public UserSummary findByEmail(String email) {
+        UserEntity user = userMapper.findByEmail(normalizeEmail(email));
+        return user == null ? null : UserSummary.from(user);
+    }
+
+    @Override
     @Transactional
     public UserSummary updateProfile(long userId, UserProfileUpdateRequest request) {
         UserEntity user = requireActiveUser(userId);

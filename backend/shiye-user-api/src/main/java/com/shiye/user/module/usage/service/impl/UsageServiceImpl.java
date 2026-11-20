@@ -11,6 +11,7 @@ import com.shiye.user.module.auth.service.AuthService;
 import com.shiye.user.module.usage.domain.entity.AiUsageEntity;
 import com.shiye.user.module.usage.domain.entity.UsageBreakdownRow;
 import com.shiye.user.module.usage.domain.entity.UsageDailyRow;
+import com.shiye.user.module.usage.domain.entity.TeamUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.entity.UsageRangeTotalsRow;
 import com.shiye.user.module.usage.domain.entity.UserUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.vo.QuotaVO;
@@ -21,8 +22,11 @@ import com.shiye.user.module.usage.domain.vo.UsageRecordVO;
 import com.shiye.user.module.usage.domain.vo.UsageSummaryVO;
 import com.shiye.user.module.usage.domain.vo.UsageTotals;
 import com.shiye.user.module.usage.mapper.AiUsageMapper;
+import com.shiye.user.module.usage.mapper.TeamUsageMonthlyMapper;
 import com.shiye.user.module.usage.mapper.UserUsageMonthlyMapper;
 import com.shiye.user.module.usage.service.UsageService;
+import com.shiye.user.module.team.domain.vo.TeamQuota;
+import com.shiye.user.module.team.service.TeamService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
@@ -47,6 +51,8 @@ public class UsageServiceImpl implements UsageService {
     private final AuthService authService;
     private final AiUsageMapper aiUsageMapper;
     private final UserUsageMonthlyMapper monthlyMapper;
+    private final TeamUsageMonthlyMapper teamUsageMapper;
+    private final TeamService teamService;
     private final RuntimeSystemSettingsService systemSettingsService;
     private final Counter chatSuccess;
     private final Counter chatFailed;
@@ -55,11 +61,15 @@ public class UsageServiceImpl implements UsageService {
             AuthService authService,
             AiUsageMapper aiUsageMapper,
             UserUsageMonthlyMapper monthlyMapper,
+            TeamUsageMonthlyMapper teamUsageMapper,
+            TeamService teamService,
             RuntimeSystemSettingsService systemSettingsService,
             MeterRegistry meterRegistry) {
         this.authService = authService;
         this.aiUsageMapper = aiUsageMapper;
         this.monthlyMapper = monthlyMapper;
+        this.teamUsageMapper = teamUsageMapper;
+        this.teamService = teamService;
         this.systemSettingsService = systemSettingsService;
         this.chatSuccess = Counter.builder("shiye.ai.calls")
                 .tag("scene", "CHAT").tag("status", "SUCCESS").register(meterRegistry);
@@ -104,6 +114,11 @@ public class UsageServiceImpl implements UsageService {
 
     @Override
     public void assertCanChat(long userId) {
+        assertCanChat(userId, null);
+    }
+
+    @Override
+    public void assertCanChat(long userId, Long teamId) {
         SystemSettings settings = systemSettingsService.current();
         QuotaVO quota = quota(userId);
         if (quota.tokenRemaining() <= 0) {
@@ -117,6 +132,21 @@ public class UsageServiceImpl implements UsageService {
             long todayTokens = aiUsageMapper.sumTokensSince(userId, todayStart);
             if (todayTokens >= settings.dailyTokenLimit()) {
                 throw new BizException(ErrorCode.DAILY_TOKEN_LIMIT, "今日 token 已用完");
+            }
+        }
+        if (teamId != null) {
+            teamService.requireMember(userId, teamId);
+            TeamQuota teamQuota = teamService.quota(teamId);
+            TeamUsageMonthlyEntity teamUsage = teamUsageMapper.find(teamId, currentMonth());
+            long teamTokens = teamUsage == null || teamUsage.getTokens() == null
+                    ? 0 : teamUsage.getTokens();
+            BigDecimal teamCost = teamUsage == null || teamUsage.getCost() == null
+                    ? BigDecimal.ZERO : teamUsage.getCost();
+            if (teamTokens >= teamQuota.tokenQuota()) {
+                throw new BizException(ErrorCode.TEAM_QUOTA_EXCEEDED, "团队本月 token 配额已用完");
+            }
+            if (teamCost.compareTo(teamQuota.costQuota()) >= 0) {
+                throw new BizException(ErrorCode.TEAM_QUOTA_EXCEEDED, "团队本月成本配额已用完");
             }
         }
 
@@ -137,7 +167,7 @@ public class UsageServiceImpl implements UsageService {
                                     int promptTokens, int completionTokens,
                                     BigDecimal inputPrice, BigDecimal outputPrice,
                                     int latencyMs, Integer firstTokenMs,
-                                    boolean estimated, Long conversationId) {
+                                    boolean estimated, Long conversationId, Long teamId) {
         int totalTokens = promptTokens + completionTokens;
         BigDecimal safeInput = inputPrice == null ? BigDecimal.ZERO : inputPrice;
         BigDecimal safeOutput = outputPrice == null ? BigDecimal.ZERO : outputPrice;
@@ -146,6 +176,7 @@ public class UsageServiceImpl implements UsageService {
         AiUsageEntity entity = new AiUsageEntity();
         entity.setRequestId(requestId);
         entity.setUserId(userId);
+        entity.setTeamId(teamId);
         entity.setSource(source);
         entity.setScene("CHAT");
         entity.setModel(model);
@@ -165,6 +196,9 @@ public class UsageServiceImpl implements UsageService {
         aiUsageMapper.insert(entity);
 
         monthlyMapper.increment(userId, currentMonth(), totalTokens, cost);
+        if (teamId != null) {
+            teamUsageMapper.increment(teamId, currentMonth(), totalTokens, cost);
+        }
         chatSuccess.increment();
         return new RecordedUsage(promptTokens, completionTokens, totalTokens, cost, "CNY", estimated);
     }
@@ -216,10 +250,11 @@ public class UsageServiceImpl implements UsageService {
     @Override
     @Transactional
     public void recordFailedChat(long userId, String requestId, String source, String model,
-                                 String errorCode, int latencyMs, Long conversationId) {
+                                 String errorCode, int latencyMs, Long conversationId, Long teamId) {
         AiUsageEntity entity = new AiUsageEntity();
         entity.setRequestId(requestId);
         entity.setUserId(userId);
+        entity.setTeamId(teamId);
         entity.setSource(source);
         entity.setScene("CHAT");
         entity.setModel(model);
@@ -238,16 +273,20 @@ public class UsageServiceImpl implements UsageService {
         entity.setConversationId(conversationId);
         aiUsageMapper.insert(entity);
         monthlyMapper.increment(userId, currentMonth(), 0, BigDecimal.ZERO);
+        if (teamId != null) {
+            teamUsageMapper.increment(teamId, currentMonth(), 0, BigDecimal.ZERO);
+        }
         chatFailed.increment();
     }
 
     @Override
     @Transactional
     public void recordRerank(long userId, String requestId, String source, String model,
-                             int tokens, int latencyMs, long conversationId) {
+                             int tokens, int latencyMs, long conversationId, Long teamId) {
         AiUsageEntity entity = new AiUsageEntity();
         entity.setRequestId(requestId);
         entity.setUserId(userId);
+        entity.setTeamId(teamId);
         entity.setSource(source);
         entity.setScene("RERANK");
         entity.setModel(model);
@@ -265,6 +304,9 @@ public class UsageServiceImpl implements UsageService {
         entity.setConversationId(conversationId);
         aiUsageMapper.insert(entity);
         monthlyMapper.increment(userId, currentMonth(), Math.max(0, tokens), BigDecimal.ZERO);
+        if (teamId != null) {
+            teamUsageMapper.increment(teamId, currentMonth(), Math.max(0, tokens), BigDecimal.ZERO);
+        }
     }
 
     @Override

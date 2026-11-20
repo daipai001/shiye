@@ -6,6 +6,7 @@ import ChatView from '../views/ChatView.vue'
 import UsageView from '../views/UsageView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import PluginView from '../views/PluginView.vue'
+import TeamsView from '../views/TeamsView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -18,6 +19,7 @@ const router = createRouter({
       children: [
         { path: 'library', component: LibraryView },
         { path: 'chat', component: ChatView },
+        { path: 'teams', component: TeamsView },
         { path: 'usage', component: UsageView },
         { path: 'settings', component: SettingsView },
         { path: 'plugin', component: PluginView },

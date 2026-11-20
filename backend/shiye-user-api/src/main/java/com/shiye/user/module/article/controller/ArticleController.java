@@ -7,6 +7,7 @@ import com.shiye.common.exception.BizException;
 import com.shiye.user.common.security.UserContext;
 import com.shiye.user.module.article.domain.dto.ArticleCollectRequest;
 import com.shiye.user.module.article.domain.dto.ArticleDeleteByUrlRequest;
+import com.shiye.user.module.article.domain.dto.ArticleShareRequest;
 import com.shiye.user.module.article.domain.vo.ArticleChunkVO;
 import com.shiye.user.module.article.domain.vo.ArticleCollectResponse;
 import com.shiye.user.module.article.domain.vo.ArticleDetailVO;
@@ -52,15 +53,16 @@ public class ArticleController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String sourceType,
             @RequestParam(required = false) Long tagId,
-            @RequestParam(required = false) Long folderId) {
+            @RequestParam(required = false) Long folderId,
+            @RequestParam(required = false) Long teamId) {
         return Result.ok(articleQueryService.list(
                 UserContext.requireUserId(), page, pageSize, q, status, sourceType,
-                tagId, folderId));
+                tagId, folderId, teamId));
     }
 
     @GetMapping("/stats")
-    public Result<ArticleStatsVO> stats() {
-        return Result.ok(articleQueryService.stats(UserContext.requireUserId()));
+    public Result<ArticleStatsVO> stats(@RequestParam(required = false) Long teamId) {
+        return Result.ok(articleQueryService.stats(UserContext.requireUserId(), teamId));
     }
 
     @GetMapping("/{id}")
@@ -142,6 +144,20 @@ public class ArticleController {
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable long id) {
         articleQueryService.delete(UserContext.requireUserId(), id);
+        return Result.ok();
+    }
+
+    @PostMapping("/{id}/share")
+    public Result<Void> share(@PathVariable long id,
+                              @Valid @RequestBody ArticleShareRequest request) {
+        articleQueryService.shareToTeam(
+                UserContext.requireUserId(), id, request.teamId());
+        return Result.ok();
+    }
+
+    @DeleteMapping("/{id}/share")
+    public Result<Void> unshare(@PathVariable long id) {
+        articleQueryService.unshareFromTeam(UserContext.requireUserId(), id);
         return Result.ok();
     }
 }

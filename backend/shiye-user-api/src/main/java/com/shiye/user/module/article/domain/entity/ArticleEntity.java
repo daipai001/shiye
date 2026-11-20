@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class ArticleEntity {
     private Long id;
     private Long userId;
+    private Long teamId;
     private String title;
     private String url;
     private String urlHash;

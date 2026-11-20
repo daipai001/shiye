@@ -16,6 +16,7 @@ import com.shiye.user.module.article.mapper.ArticleMapper;
 import com.shiye.user.module.chat.support.RetrievalResult;
 import com.shiye.user.module.chat.support.RetrievedChunk;
 import com.shiye.user.module.tag.service.TagService;
+import com.shiye.user.module.team.service.TeamService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,6 +56,7 @@ public class ChunkRetrievalService {
     private final RerankService rerankService;
     private final RuntimeSystemSettingsService systemSettingsService;
     private final TagService tagService;
+    private final TeamService teamService;
     private final int maxPerArticle;
     private final double minScore;
     private final int maxScanChunks;
@@ -72,6 +74,7 @@ public class ChunkRetrievalService {
             RerankService rerankService,
             RuntimeSystemSettingsService systemSettingsService,
             TagService tagService,
+            TeamService teamService,
             @Value("${shiye.ai.retrieval.max-per-article:3}") int maxPerArticle,
             @Value("${shiye.ai.retrieval.min-score:0.2}") double minScore,
             @Value("${shiye.ai.retrieval.max-scan-chunks:5000}") int maxScanChunks,
@@ -87,6 +90,7 @@ public class ChunkRetrievalService {
         this.rerankService = rerankService;
         this.systemSettingsService = systemSettingsService;
         this.tagService = tagService;
+        this.teamService = teamService;
         this.maxPerArticle = Math.max(1, maxPerArticle);
         this.minScore = minScore;
         this.maxScanChunks = Math.max(100, maxScanChunks);
@@ -106,7 +110,8 @@ public class ChunkRetrievalService {
         String scope = scopeType == null || scopeType.isBlank()
                 ? "ALL"
                 : scopeType.trim().toUpperCase(Locale.ROOT);
-        Set<Long> allowedArticleIds = resolveScope(userId, scope, scopeId);
+        ScopeResolution resolution = resolveScope(userId, scope, scopeId);
+        Set<Long> allowedArticleIds = resolution.articleIds();
         if (allowedArticleIds != null && allowedArticleIds.isEmpty()) {
             return RetrievalResult.withoutRerank(List.of());
         }
@@ -116,9 +121,11 @@ public class ChunkRetrievalService {
         boolean rerankEnabled = rerankOverride != null
                 ? rerankOverride : Boolean.TRUE.equals(settings.ragRerankEnabled());
 
-        List<Candidate> vectorResults = vectorCandidates(userId, query, allowedArticleIds);
+        List<Candidate> vectorResults = vectorCandidates(
+                userId, resolution.teamId(), query, allowedArticleIds);
         List<Candidate> keywordResults = hybridEnabled
-                ? keywordCandidates(userId, query, scope, scopeId, allowedArticleIds)
+                ? keywordCandidates(userId, query, scope, scopeId, allowedArticleIds,
+                resolution.teamId())
                 : List.of();
         if (vectorResults.isEmpty() && keywordResults.isEmpty()) {
             return RetrievalResult.withoutRerank(List.of());
@@ -141,7 +148,10 @@ public class ChunkRetrievalService {
                 .distinct()
                 .toList();
         Map<Long, ArticleEntity> articles = new HashMap<>();
-        for (ArticleEntity article : articleMapper.findByIdsAndUser(userId, articleIds)) {
+        List<ArticleEntity> loaded = resolution.teamId() != null
+                ? articleMapper.findByIdsAndTeam(resolution.teamId(), articleIds)
+                : articleMapper.findByIdsAndUser(userId, articleIds);
+        for (ArticleEntity article : loaded) {
             articles.put(article.getId(), article);
         }
 
@@ -169,14 +179,16 @@ public class ChunkRetrievalService {
                 rerankResult.inputTokens(), rerankResult.latencyMs());
     }
 
-    private List<Candidate> vectorCandidates(long userId, String query, Set<Long> allowedArticleIds) {
+    private List<Candidate> vectorCandidates(long userId, Long teamId, String query,
+                                             Set<Long> allowedArticleIds) {
         List<float[]> queryVectors = embeddingService.embed(List.of(query));
         if (queryVectors.isEmpty()) {
             return List.of();
         }
         float[] queryVector = queryVectors.get(0);
         String model = embeddingService.model();
-        Set<String> chunkIds = redisTemplate.opsForSet().members(userKey(userId));
+        Set<String> chunkIds = redisTemplate.opsForSet().members(
+                teamId == null ? userKey(userId) : teamKey(teamId));
         if (chunkIds == null || chunkIds.isEmpty()) {
             return List.of();
         }
@@ -227,14 +239,22 @@ public class ChunkRetrievalService {
     }
 
     private List<Candidate> keywordCandidates(long userId, String query, String scope,
-                                              Long scopeId, Set<Long> allowedArticleIds) {
+                                              Long scopeId, Set<Long> allowedArticleIds,
+                                              Long teamId) {
         try {
-            Long articleId = "ARTICLE".equals(scope) ? scopeId : null;
-            List<Long> articleIds = allowedArticleIds != null
-                    ? new ArrayList<>(allowedArticleIds)
-                    : null;
-            List<ArticleChunkSearchRow> rows = chunkMapper.searchKeyword(
-                    userId, query, articleId, articleIds, keywordCandidates);
+            List<ArticleChunkSearchRow> rows;
+            if (teamId != null || allowedArticleIds != null) {
+                List<Long> articleIds = allowedArticleIds == null
+                        ? List.of() : new ArrayList<>(allowedArticleIds);
+                rows = articleIds.isEmpty()
+                        ? List.of()
+                        : chunkMapper.searchKeywordByArticleIds(
+                        query, articleIds, keywordCandidates);
+            } else {
+                Long articleId = "ARTICLE".equals(scope) ? scopeId : null;
+                rows = chunkMapper.searchKeyword(
+                        userId, query, articleId, null, keywordCandidates);
+            }
             List<Candidate> candidates = new ArrayList<>(rows.size());
             for (ArticleChunkSearchRow row : rows) {
                 Candidate candidate = new Candidate(
@@ -398,27 +418,53 @@ public class ChunkRetrievalService {
         return selected;
     }
 
-    private Set<Long> resolveScope(long userId, String scope, Long scopeId) {
+    private ScopeResolution resolveScope(long userId, String scope, Long scopeId) {
         if ("ALL".equals(scope)) {
-            return null;
+            return new ScopeResolution(null, null);
         }
         if (scopeId == null) {
             throw new BizException(ErrorCode.VALIDATION_ERROR, "scope.id 不能为空");
         }
+        if ("TEAM".equals(scope)) {
+            teamService.requireMember(userId, scopeId);
+            return new ScopeResolution(
+                    new HashSet<>(articleMapper.findReadyIdsByTeam(scopeId)), scopeId);
+        }
         if ("ARTICLE".equals(scope)) {
-            return Set.of(scopeId);
+            ArticleEntity article = articleMapper.findById(scopeId);
+            if (article == null) {
+                throw new BizException(ErrorCode.ARTICLE_NOT_FOUND);
+            }
+            if (article.getTeamId() != null) {
+                teamService.requireMember(userId, article.getTeamId());
+                return new ScopeResolution(Set.of(scopeId), article.getTeamId());
+            }
+            if (article.getUserId() != userId) {
+                throw new BizException(ErrorCode.ARTICLE_NOT_FOUND);
+            }
+            return new ScopeResolution(Set.of(scopeId), null);
         }
         if ("FOLDER".equals(scope)) {
-            return new HashSet<>(folderMapper.findArticleIdsByFolder(userId, scopeId));
+            return new ScopeResolution(
+                    new HashSet<>(folderMapper.findArticleIdsByFolder(userId, scopeId)), null);
         }
         if ("TAG".equals(scope)) {
-            return new HashSet<>(tagService.findArticleIdsByTag(userId, scopeId));
+            return new ScopeResolution(
+                    new HashSet<>(tagService.findArticleIdsByTag(userId, scopeId)), null);
         }
-        throw new BizException(ErrorCode.VALIDATION_ERROR, "当前仅支持 ALL / ARTICLE / FOLDER / TAG 范围");
+        throw new BizException(ErrorCode.VALIDATION_ERROR,
+                "当前仅支持 ALL / ARTICLE / FOLDER / TAG / TEAM 范围");
     }
 
     private String userKey(long userId) {
         return "kb:user:" + userId + ":chunks";
+    }
+
+    private String teamKey(long teamId) {
+        return "kb:team:" + teamId + ":chunks";
+    }
+
+    private record ScopeResolution(Set<Long> articleIds, Long teamId) {
     }
 
     private String chunkKey(String chunkId) {

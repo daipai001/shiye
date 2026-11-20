@@ -8,6 +8,7 @@ import java.util.List;
 
 public record ArticleDetailVO(
         String id,
+        String teamId,
         String title,
         String domain,
         String url,
@@ -36,6 +37,7 @@ public record ArticleDetailVO(
                                        List<ArticleFolderVO> folders) {
         return new ArticleDetailVO(
                 String.valueOf(entity.getId()),
+                entity.getTeamId() == null ? null : String.valueOf(entity.getTeamId()),
                 entity.getTitle(),
                 entity.getDomain(),
                 entity.getUrl(),

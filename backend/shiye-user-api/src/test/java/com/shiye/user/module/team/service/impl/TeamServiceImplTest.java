@@ -1,0 +1,84 @@
+package com.shiye.user.module.team.service.impl;
+
+import com.shiye.user.module.auth.service.AuthService;
+import com.shiye.user.module.team.domain.dto.TeamMemberAddRequest;
+import com.shiye.user.module.team.domain.entity.TeamEntity;
+import com.shiye.user.module.team.domain.entity.TeamMemberEntity;
+import com.shiye.user.module.team.mapper.TeamMapper;
+import com.shiye.user.module.team.mapper.TeamMemberMapper;
+import com.shiye.common.exception.BizException;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+class TeamServiceImplTest {
+
+    private final TeamMapper teamMapper = mock(TeamMapper.class);
+    private final TeamMemberMapper memberMapper = mock(TeamMemberMapper.class);
+    private final AuthService authService = mock(AuthService.class);
+    private final TeamServiceImpl service = new TeamServiceImpl(
+            teamMapper, memberMapper, authService);
+
+    @Test
+    void ownerCannotLeaveTeam() {
+        when(memberMapper.findActive(1L, 10L)).thenReturn(member(10L, "OWNER"));
+
+        assertThrows(BizException.class, () -> service.leave(10L, 1L));
+
+        verify(memberMapper, never()).delete(1L, 10L);
+    }
+
+    @Test
+    void adminCannotAddAnotherAdmin() {
+        when(teamMapper.findById(1L)).thenReturn(team());
+        when(memberMapper.findActive(1L, 10L)).thenReturn(member(10L, "ADMIN"));
+
+        assertThrows(BizException.class, () -> service.addMember(
+                10L, 1L, new TeamMemberAddRequest("other@example.com", "ADMIN")));
+
+        verify(memberMapper, never()).insert(any());
+    }
+
+    @Test
+    void adminCannotRemoveAnotherAdmin() {
+        when(teamMapper.findById(1L)).thenReturn(team());
+        when(memberMapper.findActive(1L, 10L)).thenReturn(member(10L, "ADMIN"));
+        when(memberMapper.findActive(1L, 11L)).thenReturn(member(11L, "ADMIN"));
+
+        assertThrows(BizException.class, () -> service.removeMember(10L, 1L, 11L));
+
+        verify(memberMapper, never()).delete(1L, 11L);
+    }
+
+    @Test
+    void memberCanReadTeam() {
+        when(teamMapper.findById(1L)).thenReturn(team());
+        when(memberMapper.findActive(1L, 10L)).thenReturn(member(10L, "MEMBER"));
+
+        assertEquals("MEMBER", service.requireMember(10L, 1L).role());
+    }
+
+    private TeamEntity team() {
+        TeamEntity team = new TeamEntity();
+        team.setId(1L);
+        team.setName("团队");
+        team.setOwnerUserId(10L);
+        team.setStatus("ACTIVE");
+        return team;
+    }
+
+    private TeamMemberEntity member(long userId, String role) {
+        TeamMemberEntity member = new TeamMemberEntity();
+        member.setTeamId(1L);
+        member.setUserId(userId);
+        member.setRole(role);
+        member.setStatus("ACTIVE");
+        return member;
+    }
+}

@@ -40,6 +40,7 @@ public enum ErrorCode {
     USER_QUOTA_EXCEEDED(42902, "个人配额已用完", 429),
     GLOBAL_BUDGET_EXCEEDED(42903, "全局预算已用完", 429),
     DAILY_TOKEN_LIMIT(42904, "今日 token 已用完", 429),
+    TEAM_QUOTA_EXCEEDED(42905, "团队配额已用完", 429),
 
     INTERNAL_ERROR(50000, "服务异常", 500),
     DB_ERROR(50001, "数据库异常", 500),

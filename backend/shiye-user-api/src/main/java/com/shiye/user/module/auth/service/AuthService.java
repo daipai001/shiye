@@ -25,6 +25,8 @@ public interface AuthService {
 
     UserSummary me(long userId);
 
+    UserSummary findByEmail(String email);
+
     UserSummary updateProfile(long userId, UserProfileUpdateRequest request);
 
     void changePassword(long userId, UserPasswordUpdateRequest request);

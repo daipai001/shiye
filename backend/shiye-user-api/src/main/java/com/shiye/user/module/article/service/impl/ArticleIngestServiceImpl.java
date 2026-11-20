@@ -389,6 +389,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
             log.warn("record embedding usage failed: {}", ex.getMessage());
         }
 
+        Long teamId = articleMapper.findTeamId(articleId);
         for (int i = 0; i < stored.size(); i++) {
             if (i == 0) {
                 ingestTaskService.advance(taskId, "INDEX");
@@ -406,6 +407,9 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                     chunk.getCharEnd(),
                     vectors.get(i)
             );
+            if (teamId != null) {
+                vectorStore.addToTeam(teamId, chunk.getId());
+            }
         }
 
         articleMapper.updateStatus(articleId, userId, ArticleStatus.READY.name());
@@ -481,9 +485,13 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
     }
 
     private void deleteOldChunks(long userId, long articleId) {
+        Long teamId = articleMapper.findTeamId(articleId);
         List<ArticleChunkEntity> oldChunks = chunkMapper.findByArticle(articleId, userId);
         for (ArticleChunkEntity old : oldChunks) {
             vectorStore.delete(userId, old.getId());
+            if (teamId != null) {
+                vectorStore.removeFromTeam(teamId, old.getId());
+            }
         }
         chunkMapper.deleteByArticle(articleId, userId);
     }

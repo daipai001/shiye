@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api/client'
+import { useTeamStore } from '../stores/teams'
 import { formatUtcTime } from '../utils/time'
 import type {
   ApiResult,
@@ -18,6 +19,7 @@ import type {
 } from '../api/types'
 
 const router = useRouter()
+const teamStore = useTeamStore()
 const pageSize = 10
 
 const stats = ref<ArticleStats>({ total: 0, ready: 0, processing: 0, failed: 0 })
@@ -28,6 +30,7 @@ const q = ref('')
 const statusFilter = ref('')
 const tagFilter = ref('')
 const folderFilter = ref('')
+const teamFilter = ref('')
 const tags = ref<Tag[]>([])
 const folders = ref<BookmarkFolder[]>([])
 const loading = ref(false)
@@ -47,6 +50,11 @@ const newTag = ref('')
 const tagDialog = ref(false)
 const tagDrafts = ref<Array<{ id: string; name: string; color: string; count: number }>>([])
 const savingTagIds = ref<string[]>([])
+
+const shareDialog = ref(false)
+const shareArticle = ref<ArticleSummary | null>(null)
+const shareTeamId = ref('')
+const sharing = ref(false)
 
 const statusText: Record<string, string> = {
   PENDING: '排队中',
@@ -86,7 +94,9 @@ function tagStyle(tag: Tag) {
 
 async function loadStats() {
   try {
-    const { data } = await api.get<ApiResult<ArticleStats>>('/articles/stats')
+    const { data } = await api.get<ApiResult<ArticleStats>>('/articles/stats', {
+      params: { teamId: teamFilter.value || undefined },
+    })
     stats.value = data.data
   } catch {
     // 静默失败，列表仍可单独使用
@@ -102,8 +112,9 @@ async function loadArticles() {
         pageSize,
         q: q.value.trim() || undefined,
         status: statusFilter.value || undefined,
-        tagId: tagFilter.value || undefined,
-        folderId: folderFilter.value || undefined,
+        tagId: teamFilter.value ? undefined : (tagFilter.value || undefined),
+        folderId: teamFilter.value ? undefined : (folderFilter.value || undefined),
+        teamId: teamFilter.value || undefined,
       },
     })
     articles.value = data.data.items
@@ -145,12 +156,86 @@ async function loadFolders() {
 }
 
 async function loadAll() {
-  await Promise.all([loadStats(), loadArticles(), loadImports(), loadTags(), loadFolders()])
+  await Promise.all([
+    teamStore.load(),
+    loadStats(),
+    loadArticles(),
+    loadImports(),
+    loadTags(),
+    loadFolders(),
+  ])
 }
 
 function applySearch() {
   page.value = 1
   loadArticles()
+}
+
+function onTeamChange() {
+  page.value = 1
+  tagFilter.value = ''
+  folderFilter.value = ''
+  void Promise.all([loadStats(), loadArticles()])
+}
+
+function currentTeamRole() {
+  return teamStore.teams.find((team) => team.id === teamFilter.value)?.myRole
+}
+
+function canDeleteArticle() {
+  if (!teamFilter.value) return true
+  return currentTeamRole() === 'OWNER' || currentTeamRole() === 'ADMIN'
+}
+
+function openShare(article: ArticleSummary) {
+  shareArticle.value = article
+  shareTeamId.value = teamStore.teams[0]?.id || ''
+  shareDialog.value = true
+}
+
+async function submitShare() {
+  if (!shareArticle.value || !shareTeamId.value) {
+    ElMessage.warning('请选择团队')
+    return
+  }
+  sharing.value = true
+  try {
+    await api.post(`/articles/${shareArticle.value.id}/share`, {
+      teamId: shareTeamId.value,
+    })
+    ElMessage.success('已共享到团队')
+    shareDialog.value = false
+    await Promise.all([loadStats(), loadArticles()])
+    if (drawer.value && detail.value) {
+      await reloadDetail(detail.value.id)
+    }
+  } catch {
+    ElMessage.error('共享失败，资料可能已经共享到其他团队')
+  } finally {
+    sharing.value = false
+  }
+}
+
+async function unshareArticle(article: ArticleSummary) {
+  try {
+    await ElMessageBox.confirm(
+      `取消《${article.title}》在团队中的共享？团队成员将不能再检索这篇资料。`,
+      '取消共享',
+      { confirmButtonText: '取消共享', cancelButtonText: '返回', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await api.delete(`/articles/${article.id}/share`)
+    ElMessage.success('已取消共享')
+    await Promise.all([loadStats(), loadArticles()])
+    if (drawer.value && detail.value) {
+      await reloadDetail(detail.value.id)
+    }
+  } catch {
+    ElMessage.error('取消共享失败')
+  }
 }
 
 function chooseUpload() {
@@ -234,6 +319,11 @@ async function handleUpload(event: Event) {
     uploading.value = false
     input.value = ''
   }
+}
+
+async function reloadDetail(articleId: string) {
+  const { data } = await api.get<ApiResult<ArticleDetail>>(`/articles/${articleId}`)
+  detail.value = data.data
 }
 
 async function openArticle(article: ArticleSummary) {
@@ -383,26 +473,28 @@ onMounted(loadAll)
         <p>收藏的网页会在这里变成可检索的资料：抓正文、切片、向量化。</p>
       </div>
       <div class="page-actions">
-        <el-button text @click="openTagManager">标签管理</el-button>
-        <input
-          ref="uploadInput"
-          type="file"
-          accept=".md,.markdown,.txt,.pdf"
-          class="file-input"
-          @change="handleUpload"
-        />
-        <input
-          ref="folderUploadInput"
-          type="file"
-          accept=".md,.markdown,.txt,.pdf"
-          class="file-input"
-          webkitdirectory
-          multiple
-          @change="handleFolderUpload"
-        />
-        <el-button :loading="uploading" @click="chooseUpload">上传资料</el-button>
-        <el-button :loading="folderUploading" @click="chooseFolderUpload">导入文件夹</el-button>
-        <el-button type="primary" @click="router.push('/plugin')">导入书签</el-button>
+        <template v-if="!teamFilter">
+          <el-button text @click="openTagManager">标签管理</el-button>
+          <input
+            ref="uploadInput"
+            type="file"
+            accept=".md,.markdown,.txt,.pdf"
+            class="file-input"
+            @change="handleUpload"
+          />
+          <input
+            ref="folderUploadInput"
+            type="file"
+            accept=".md,.markdown,.txt,.pdf"
+            class="file-input"
+            webkitdirectory
+            multiple
+            @change="handleFolderUpload"
+          />
+          <el-button :loading="uploading" @click="chooseUpload">上传资料</el-button>
+          <el-button :loading="folderUploading" @click="chooseFolderUpload">导入文件夹</el-button>
+          <el-button type="primary" @click="router.push('/plugin')">导入书签</el-button>
+        </template>
       </div>
     </div>
 
@@ -420,6 +512,20 @@ onMounted(loadAll)
           <h2>资料</h2>
         </div>
         <div class="filters">
+          <el-select
+            v-model="teamFilter"
+            class="folder-select"
+            placeholder="个人资料"
+            @change="onTeamChange"
+          >
+            <el-option label="个人资料" value="" />
+            <el-option
+              v-for="team in teamStore.teams"
+              :key="team.id"
+              :label="`团队：${team.name}`"
+              :value="team.id"
+            />
+          </el-select>
           <el-input
             v-model="q"
             class="search"
@@ -437,6 +543,7 @@ onMounted(loadAll)
             <el-option label="失败" value="FAILED" />
           </el-select>
           <el-select
+            v-if="!teamFilter"
             v-model="tagFilter"
             class="status-select"
             placeholder="全部标签"
@@ -452,6 +559,7 @@ onMounted(loadAll)
             />
           </el-select>
           <el-select
+            v-if="!teamFilter"
             v-model="folderFilter"
             class="folder-select"
             placeholder="全部文件夹"
@@ -502,8 +610,11 @@ onMounted(loadAll)
             </div>
           </div>
           <div class="article-actions">
+            <span v-if="item.teamId && !teamFilter" class="shared-chip">已共享</span>
             <el-button text @click="openArticle(item)">查看</el-button>
-            <el-button text type="danger" @click="deleteArticle(item)">删除</el-button>
+            <el-button v-if="!teamFilter && !item.teamId" text @click="openShare(item)">共享</el-button>
+            <el-button v-if="!teamFilter && item.teamId" text @click="unshareArticle(item)">取消共享</el-button>
+            <el-button v-if="canDeleteArticle()" text type="danger" @click="deleteArticle(item)">删除</el-button>
           </div>
         </article>
       </div>
@@ -608,10 +719,31 @@ onMounted(loadAll)
         </el-tabs>
 
         <div class="detail-actions">
-          <el-button type="danger" plain @click="deleteArticle(detail)">删除这篇资料</el-button>
+          <el-button v-if="canDeleteArticle()" type="danger" plain @click="deleteArticle(detail)">
+            删除这篇资料
+          </el-button>
         </div>
       </div>
     </el-drawer>
+
+    <el-dialog v-model="shareDialog" title="共享到团队" width="440px">
+      <div class="dialog-field">
+        <span>选择团队</span>
+        <el-select v-model="shareTeamId" placeholder="选择团队" style="width: 100%">
+          <el-option
+            v-for="team in teamStore.teams"
+            :key="team.id"
+            :label="team.name"
+            :value="team.id"
+          />
+        </el-select>
+      </div>
+      <p class="dialog-hint">共享后团队成员可以在团队资料库和团队问答中检索这篇资料；你仍然保留个人副本。</p>
+      <template #footer>
+        <el-button @click="shareDialog = false">取消</el-button>
+        <el-button type="primary" :loading="sharing" @click="submitShare">共享</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="tagDialog" title="标签管理" width="580px">
       <p class="tag-manager-hint">重命名、改色或删除标签；删除会同时移除资料上的标签关联。</p>
@@ -703,6 +835,7 @@ onMounted(loadAll)
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .search {
   width: 220px;
@@ -835,8 +968,33 @@ onMounted(loadAll)
 .article-actions {
   display: flex;
   align-items: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 2px;
   flex: none;
+}
+.shared-chip {
+  align-self: center;
+  border-radius: 999px;
+  background: #f4f7fb;
+  color: #2f5d8a;
+  padding: 1px 7px;
+  font-size: 8.5px;
+}
+.dialog-field {
+  margin-bottom: 14px;
+}
+.dialog-field > span {
+  display: block;
+  font-size: 11px;
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+.dialog-hint {
+  color: var(--faint);
+  font-size: 10px;
+  margin: 4px 0 0;
+  line-height: 1.6;
 }
 .badge {
   border: 1px solid var(--line);

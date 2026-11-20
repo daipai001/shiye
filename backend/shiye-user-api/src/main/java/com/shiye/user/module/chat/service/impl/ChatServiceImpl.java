@@ -213,10 +213,12 @@ public class ChatServiceImpl implements ChatService {
         MessageEntity assistant = null;
         StringBuilder answer = new StringBuilder();
         AtomicInteger firstTokenMs = new AtomicInteger(-1);
+        Long teamId = null;
 
         try {
             String question = request.question().trim();
             Scope scope = resolveScope(request, null);
+            teamId = "TEAM".equals(scope.type()) ? scope.id() : null;
             conversation = resolveConversation(userId, request, scope, question);
             List<MessageEntity> recentForRewrite = messageMapper.findRecent(
                     conversation.getId(), userId, 4);
@@ -239,7 +241,7 @@ public class ChatServiceImpl implements ChatService {
                     : retrievalService.retrieve(
                             userId, retrievalQuery, scope.type(), scope.id(), null);
             List<RetrievedChunk> chunks = retrieval.chunks();
-            recordRerankUsage(userId, source, conversation, requestId, retrieval);
+            recordRerankUsage(userId, source, conversation, requestId, retrieval, teamId);
 
             assistant = new MessageEntity();
             assistant.setConversationId(conversation.getId());
@@ -299,7 +301,7 @@ public class ChatServiceImpl implements ChatService {
                     result.promptTokens(), result.completionTokens(),
                     chatClient.inputPrice(), chatClient.outputPrice(),
                     latency, nullableFirstToken(firstTokenMs),
-                    result.estimated(), conversation.getId()
+                    result.estimated(), conversation.getId(), teamId
             );
             send(emitter, "usage", new ChatSseUsage(
                     usage.promptTokens(),
@@ -313,16 +315,17 @@ public class ChatServiceImpl implements ChatService {
                     result.finishReason() == null ? "stop" : result.finishReason()));
         } catch (ChatException ex) {
             handleFailure(userId, source, conversation, assistant, answer, requestId,
-                    started, firstTokenMs, ex.getCode(), ex.getMessage(), emitter, cancelled, ex);
+                    started, firstTokenMs, ex.getCode(), ex.getMessage(), emitter, cancelled,
+                    ex, teamId);
         } catch (BizException ex) {
             handleFailure(userId, source, conversation, assistant, answer, requestId,
                     started, firstTokenMs, ex.getErrorCode().name(), ex.getMessage(),
-                    emitter, cancelled, ex);
+                    emitter, cancelled, ex, teamId);
         } catch (RuntimeException ex) {
             log.error("chat stream failed: {}", ex.getMessage(), ex);
             handleFailure(userId, source, conversation, assistant, answer, requestId,
                     started, firstTokenMs, "AI_UNAVAILABLE", "问答服务暂不可用",
-                    emitter, cancelled, ex);
+                    emitter, cancelled, ex, teamId);
         } finally {
             streamRegistry.unregister(requestId);
             safeComplete(emitter);
@@ -429,7 +432,7 @@ public class ChatServiceImpl implements ChatService {
                                MessageEntity assistant, StringBuilder answer, String requestId,
                                long started, AtomicInteger firstTokenMs,
                                String code, String message, SseEmitter emitter,
-                               AtomicBoolean cancelled, Exception cause) {
+                               AtomicBoolean cancelled, Exception cause, Long teamId) {
         if (conversation == null) {
             safeSend(emitter, "error", new ChatSseError(code, message, true));
             return;
@@ -451,7 +454,7 @@ public class ChatServiceImpl implements ChatService {
             try {
                 usageService.recordFailedChat(
                         userId, requestId, source, chatClient.model(), code,
-                        (int) (System.currentTimeMillis() - started), conversation.getId());
+                        (int) (System.currentTimeMillis() - started), conversation.getId(), teamId);
             } catch (RuntimeException ex) {
                 log.warn("record failed chat usage: {}", ex.getMessage());
             }
@@ -482,7 +485,7 @@ public class ChatServiceImpl implements ChatService {
     }
 
     private void recordRerankUsage(long userId, String source, ConversationEntity conversation,
-                                   String requestId, RetrievalResult retrieval) {
+                                   String requestId, RetrievalResult retrieval, Long teamId) {
         if (!retrieval.reranked()) {
             return;
         }
@@ -490,7 +493,7 @@ public class ChatServiceImpl implements ChatService {
             usageService.recordRerank(
                     userId, requestId + "-rr", source, retrieval.rerankModel(),
                     retrieval.rerankTokens(), retrieval.rerankLatencyMs(),
-                    conversation.getId());
+                    conversation.getId(), teamId);
         } catch (RuntimeException ex) {
             log.warn("record rerank usage failed: {}", ex.getMessage());
         }
@@ -523,9 +526,9 @@ public class ChatServiceImpl implements ChatService {
             return scope;
         }
         String type = request.scope().type().trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("ALL", "ARTICLE", "FOLDER", "TAG", "GENERAL").contains(type)) {
+        if (!Set.of("ALL", "ARTICLE", "FOLDER", "TAG", "GENERAL", "TEAM").contains(type)) {
             throw new BizException(ErrorCode.VALIDATION_ERROR,
-                    "当前仅支持 ALL / ARTICLE / FOLDER / TAG / GENERAL 范围");
+                    "当前仅支持 ALL / ARTICLE / FOLDER / TAG / GENERAL / TEAM 范围");
         }
         Long id = request.scope().id() == null ? null : Long.parseLong(request.scope().id());
         if (!Set.of("ALL", "GENERAL").contains(type) && id == null) {

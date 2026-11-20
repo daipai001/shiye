@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api/client'
 import { streamChat } from '../api/chat'
+import { useTeamStore } from '../stores/teams'
 import type {
   ApiResult,
   ArticleSummary,
@@ -15,6 +16,7 @@ import type {
   Tag,
 } from '../api/types'
 
+const teamStore = useTeamStore()
 const conversations = ref<Conversation[]>([])
 const currentId = ref<string | null>(null)
 const messages = ref<ChatMessage[]>([])
@@ -26,7 +28,7 @@ const quota = ref<Quota | null>(null)
 const messagesBox = ref<HTMLElement | null>(null)
 let abortController: AbortController | null = null
 const activeRequestId = ref<string | null>(null)
-const scopeType = ref<'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG' | 'GENERAL'>('ALL')
+const scopeType = ref<'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG' | 'GENERAL' | 'TEAM'>('ALL')
 const scopeId = ref('')
 const folders = ref<BookmarkFolder[]>([])
 const tags = ref<Tag[]>([])
@@ -80,6 +82,7 @@ async function loadScopes() {
     const [folderResponse, tagResponse] = await Promise.all([
       api.get<ApiResult<{ items: BookmarkFolder[] }>>('/bookmark-folders'),
       api.get<ApiResult<{ items: Tag[] }>>('/tags'),
+      teamStore.load(),
     ])
     folders.value = folderResponse.data.data.items
     tags.value = tagResponse.data.data.items
@@ -124,8 +127,10 @@ async function ensureArticleOption(articleId: string) {
 async function selectConversation(conversation: Conversation) {
   if (streaming.value) return
   currentId.value = conversation.id
-  const type = conversation.scopeType as 'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG' | 'GENERAL'
-  scopeType.value = ['ALL', 'ARTICLE', 'FOLDER', 'TAG', 'GENERAL'].includes(type) ? type : 'ALL'
+  const type = conversation.scopeType as 'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG' | 'GENERAL' | 'TEAM'
+  scopeType.value = ['ALL', 'ARTICLE', 'FOLDER', 'TAG', 'GENERAL', 'TEAM'].includes(type)
+    ? type
+    : 'ALL'
   scopeId.value = conversation.scopeId || ''
   if (scopeType.value === 'ARTICLE') {
     await ensureArticleOption(scopeId.value)
@@ -395,6 +400,7 @@ onBeforeUnmount(() => {
             <el-option label="单篇资料" value="ARTICLE" />
             <el-option label="按文件夹" value="FOLDER" />
             <el-option label="按标签" value="TAG" />
+            <el-option label="团队资料库" value="TEAM" />
             <el-option label="通用问答" value="GENERAL" />
           </el-select>
           <el-select
@@ -446,6 +452,22 @@ onBeforeUnmount(() => {
               :key="tag.id"
               :label="tag.name"
               :value="tag.id"
+            />
+          </el-select>
+          <el-select
+            v-if="scopeType === 'TEAM'"
+            v-model="scopeId"
+            size="small"
+            filterable
+            placeholder="选择团队"
+            style="width: 180px"
+            :disabled="streaming"
+          >
+            <el-option
+              v-for="team in teamStore.teams"
+              :key="team.id"
+              :label="team.name"
+              :value="team.id"
             />
           </el-select>
         </div>
@@ -543,7 +565,7 @@ onBeforeUnmount(() => {
           <button type="button" class="send-button" :disabled="streaming || !draft.trim()" @click="send">
             {{ streaming ? '回答中…' : '发送' }}
           </button>
-          <p class="composer-hint">回答仅基于你的资料库，不保证覆盖所有内容；引用可回资料库查看原文。</p>
+          <p class="composer-hint">回答仅基于你选择的资料/团队范围，不保证覆盖所有内容；引用可回资料库查看原文。</p>
         </footer>
       </section>
     </div>

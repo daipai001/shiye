@@ -60,6 +60,7 @@ export interface ArticleStats {
 
 export interface ArticleSummary {
   id: string
+  teamId?: string | null
   title: string
   domain?: string | null
   url?: string | null
@@ -149,6 +150,31 @@ export interface ChatMessage {
   feedback?: 'UP' | 'DOWN' | null
   createdAt?: string
   streaming?: boolean
+}
+
+export interface Team {
+  id: string
+  name: string
+  ownerUserId: string
+  myRole: 'OWNER' | 'ADMIN' | 'MEMBER'
+  status: string
+  memberCount: number
+  monthlyTokenQuota: number
+  monthlyCostQuota: number
+  createdAt: string
+}
+
+export interface TeamMember {
+  userId: string
+  email: string
+  displayName: string
+  role: 'OWNER' | 'ADMIN' | 'MEMBER'
+  status: string
+  joinedAt: string
+}
+
+export interface TeamDetail extends Team {
+  members: TeamMember[]
 }
 
 export interface Conversation {
