@@ -130,7 +130,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 问答 | `citations` | 引用 | P0 |
 | 问答 | `message_feedback` | 回答反馈 | 已启用 |
 | AI | `ai_usage` | 每次 AI 调用明细 | P0 |
-| AI | `ai_usage_daily` | 日汇总（预留，当前直接聚合 `ai_usage`） | 预留 |
+| AI | `ai_usage_daily` | 日汇总（定时从 `ai_usage` 聚合） | 已启用 |
 | AI | `user_usage_monthly` | 用户月用量（配额） | P0 |
 | AI | `model_prices` | 模型价格（预留，当前单价来自 `system_settings` 并快照到 `ai_usage`） | 预留 |
 | 配置 | `system_settings` | 全局配置 | P0 |
@@ -686,6 +686,8 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 - `UNIQUE uk_usage_daily (date, user_id, source, scene, model)`
 - `idx_usage_daily_user_date (user_id, date)`
 - `idx_usage_daily_date (date)`
+
+**说明**：user-api 每日把 `ai_usage` 聚合到本表，默认回补最近 7 天；聚合任务可重复执行。
 
 ---
 

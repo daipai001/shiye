@@ -113,6 +113,9 @@ shiye:
     global-monthly-cost: ${GLOBAL_MONTHLY_COST:20.00}
     alert-threshold: ${USAGE_ALERT_THRESHOLD:0.8}
     daily-token-limit: ${USAGE_DAILY_TOKEN_LIMIT:0}
+    daily-aggregation-enabled: ${USAGE_DAILY_AGGREGATION_ENABLED:true}
+    daily-cron: "${USAGE_DAILY_CRON:0 15 0 * * *}"
+    daily-backfill-days: ${USAGE_DAILY_BACKFILL_DAYS:7}
   file:
     upload-dir: ${FILE_UPLOAD_DIR:./data/uploads}
   retention:

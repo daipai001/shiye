@@ -188,7 +188,7 @@ RAG 问答闭环已打通：
 - BGE-reranker 二次重排：对 RRF 候选池（默认最多 20 条）调用 `BAAI/bge-reranker-v2-m3`，失败或未配置 key 时自动回退 RRF；引用分数为 rerank relevance score
 - 回答引用与 `citations` 落库，包含标题、片段、分数、`charStart/charEnd`
 - 会话/消息/引用持久化；问答页支持流式输出、引用卡片、会话列表
-- AI 用量记账：`ai_usage` + `user_usage_monthly`，记录 token、单价快照、成本、耗时
+- AI 用量记账：`ai_usage` + `user_usage_monthly`，记录 token、单价快照、成本、耗时；每日定时聚合到 `ai_usage_daily`（默认回补 7 天）
 - 用户月度配额和全站月度预算检查；问答页显示 token/成本进度
 - `/usage/quota`、`/usage/records`、`/usage/summary` 已接入「用量」页面；趋势按 UTC 日期聚合，缺失日期补 0
 - 资料上传：`POST /articles/upload` 支持 PDF / Markdown / TXT（≤20MB），保存到 `FILE_UPLOAD_DIR`，提取正文后进入切片、BGE-M3 向量化和 AI 摘要/标签流程；相同文件按 SHA-256 去重
