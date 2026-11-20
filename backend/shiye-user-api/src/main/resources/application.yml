@@ -146,3 +146,10 @@ shiye:
     chunk-min-size: ${CHUNK_MIN_SIZE:200}
     chunk-overlap: ${CHUNK_OVERLAP:100}
     max-chunks: ${ARTICLE_MAX_CHUNKS:500}
+    ocr-enabled: ${OCR_ENABLED:false}
+    ocr-command: ${OCR_COMMAND:tesseract}
+    ocr-lang: ${OCR_LANG:chi_sim+eng}
+    ocr-min-text-chars: ${OCR_MIN_TEXT_CHARS:80}
+    ocr-max-pages: ${OCR_MAX_PAGES:20}
+    ocr-dpi: ${OCR_DPI:200}
+    ocr-timeout-ms: ${OCR_TIMEOUT_MS:60000}

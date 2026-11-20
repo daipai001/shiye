@@ -5,8 +5,13 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.junit.jupiter.api.Test;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -17,7 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UploadTextExtractorTest {
 
-    private final UploadTextExtractor extractor = new UploadTextExtractor();
+    private final UploadTextExtractor extractor = new UploadTextExtractor(
+            false, "tesseract", "chi_sim+eng", 80, 20, 200, 60000);
 
     @Test
     void extractsUtf8Markdown() {
@@ -65,5 +71,35 @@ class UploadTextExtractorTest {
                 "not a supported file".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals("UNSUPPORTED_FILE_TYPE", ex.getCode());
+    }
+
+    @Test
+    void reportsMissingOcrCommandForScannedPdf() throws IOException {
+        byte[] pdf;
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+            BufferedImage image = new BufferedImage(600, 200, BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = image.createGraphics();
+            graphics.setColor(Color.WHITE);
+            graphics.fillRect(0, 0, 600, 200);
+            graphics.setColor(Color.BLACK);
+            graphics.drawString("scanned image only", 20, 100);
+            graphics.dispose();
+            PDImageXObject pdImage = LosslessFactory.createFromImage(document, image);
+            try (PDPageContentStream stream = new PDPageContentStream(document, page)) {
+                stream.drawImage(pdImage, 20, 500, 300, 100);
+            }
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            document.save(output);
+            pdf = output.toByteArray();
+        }
+
+        UploadTextExtractor ocrExtractor = new UploadTextExtractor(
+                true, "__missing_tesseract__", "chi_sim+eng", 80, 20, 200, 5000);
+        IngestException ex = assertThrows(IngestException.class,
+                () -> ocrExtractor.extract("scan.pdf", "application/pdf", pdf));
+
+        assertEquals("OCR_UNAVAILABLE", ex.getCode());
     }
 }

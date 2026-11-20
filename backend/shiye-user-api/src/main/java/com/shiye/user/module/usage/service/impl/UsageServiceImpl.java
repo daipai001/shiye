@@ -23,6 +23,8 @@ import com.shiye.user.module.usage.domain.vo.UsageTotals;
 import com.shiye.user.module.usage.mapper.AiUsageMapper;
 import com.shiye.user.module.usage.mapper.UserUsageMonthlyMapper;
 import com.shiye.user.module.usage.service.UsageService;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,16 +48,23 @@ public class UsageServiceImpl implements UsageService {
     private final AiUsageMapper aiUsageMapper;
     private final UserUsageMonthlyMapper monthlyMapper;
     private final RuntimeSystemSettingsService systemSettingsService;
+    private final Counter chatSuccess;
+    private final Counter chatFailed;
 
     public UsageServiceImpl(
             AuthService authService,
             AiUsageMapper aiUsageMapper,
             UserUsageMonthlyMapper monthlyMapper,
-            RuntimeSystemSettingsService systemSettingsService) {
+            RuntimeSystemSettingsService systemSettingsService,
+            MeterRegistry meterRegistry) {
         this.authService = authService;
         this.aiUsageMapper = aiUsageMapper;
         this.monthlyMapper = monthlyMapper;
         this.systemSettingsService = systemSettingsService;
+        this.chatSuccess = Counter.builder("shiye.ai.calls")
+                .tag("scene", "CHAT").tag("status", "SUCCESS").register(meterRegistry);
+        this.chatFailed = Counter.builder("shiye.ai.calls")
+                .tag("scene", "CHAT").tag("status", "FAILED").register(meterRegistry);
     }
 
     @Override
@@ -156,6 +165,7 @@ public class UsageServiceImpl implements UsageService {
         aiUsageMapper.insert(entity);
 
         monthlyMapper.increment(userId, currentMonth(), totalTokens, cost);
+        chatSuccess.increment();
         return new RecordedUsage(promptTokens, completionTokens, totalTokens, cost, "CNY", estimated);
     }
 
@@ -228,6 +238,7 @@ public class UsageServiceImpl implements UsageService {
         entity.setConversationId(conversationId);
         aiUsageMapper.insert(entity);
         monthlyMapper.increment(userId, currentMonth(), 0, BigDecimal.ZERO);
+        chatFailed.increment();
     }
 
     @Override

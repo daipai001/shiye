@@ -54,6 +54,26 @@ jobs:
           find src -name '*.js' -print0 | xargs -0 -n1 node --check
           node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('manifest ok')"
 
+  playwright-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/user-web/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend/user-web
+        run: npm ci
+      - name: Install Chromium
+        working-directory: frontend/user-web
+        run: npx playwright install --with-deps chromium
+      - name: Run auth E2E
+        working-directory: frontend/user-web
+        run: npm run test:e2e
+
   integration-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20

@@ -6,6 +6,8 @@ import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import com.shiye.user.module.alert.support.BudgetAlertEvaluator;
 import com.shiye.user.module.usage.domain.vo.UsageTotals;
 import com.shiye.user.module.usage.service.UsageService;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -40,15 +42,20 @@ public class BudgetAlertScheduler {
     private final RuntimeSystemSettingsService settingsService;
     private final WebhookClient webhookClient;
     private final StringRedisTemplate redisTemplate;
+    private final Counter webhookFailures;
 
     public BudgetAlertScheduler(UsageService usageService,
                                 RuntimeSystemSettingsService settingsService,
                                 WebhookClient webhookClient,
-                                StringRedisTemplate redisTemplate) {
+                                StringRedisTemplate redisTemplate,
+                                MeterRegistry meterRegistry) {
         this.usageService = usageService;
         this.settingsService = settingsService;
         this.webhookClient = webhookClient;
         this.redisTemplate = redisTemplate;
+        this.webhookFailures = Counter.builder("shiye.alert.webhook.failures")
+                .description("Budget alert webhook send failures")
+                .register(meterRegistry);
     }
 
     @Scheduled(initialDelayString = "${shiye.alert.budget-initial-delay-ms:30000}",
@@ -80,6 +87,7 @@ public class BudgetAlertScheduler {
         WebhookClient.WebhookResult result = webhookClient.send(url,
                 payload(settings, totals, alert, month));
         if (!result.ok()) {
+            webhookFailures.increment();
             log.warn("budget alert {} for {} not sent: {}", alert.level(), month,
                     result.message());
             return;

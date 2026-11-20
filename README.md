@@ -192,6 +192,7 @@ RAG 问答闭环已打通：
 - 用户月度配额和全站月度预算检查；问答页显示 token/成本进度
 - `/usage/quota`、`/usage/records`、`/usage/summary` 已接入「用量」页面；趋势按 UTC 日期聚合，缺失日期补 0
 - 资料上传：`POST /articles/upload` 支持 PDF / Markdown / TXT（≤20MB），保存到 `FILE_UPLOAD_DIR`，提取正文后进入切片、BGE-M3 向量化和 AI 摘要/标签流程；相同文件按 SHA-256 去重
+- 扫描版 PDF：可选 Tesseract OCR（`OCR_ENABLED=true`，需要安装 `tesseract` 和 `chi_sim`/`eng` 语言包），默认关闭
 - `POST /articles/{id}/reindex`：换 embedding 模型后重新抓取/切片/向量化
 
 > **Embedding 默认是联调模式**：新环境未配置 key 时 `shiye.ai.embedding.provider=dev` 会生成确定性向量（模型名 `DEV-HASH-1024`），只用于跑通状态机，**不是 BGE-M3 语义向量**。
@@ -251,8 +252,9 @@ RAG 问答闭环已打通：
 
 - 健康检查：user-api/admin-api 的 `/actuator/health`
 - Prometheus：`/actuator/prometheus`，已暴露 HTTP/JVM/Hikari/Redis 指标
+- `deploy/docker-compose.yml` 含 Prometheus 与告警规则：5xx、P95、AI 错误率、Webhook 失败
 - 备份脚本：`deploy/scripts/backup.ps1` / `backup.sh`，备份 MySQL 和 Redis RDB
-- 使用说明见 `deploy/README.md`
+- 测试与压测说明：`scripts/README.md`
 
 ## 已知缺口（下一阶段）
 
@@ -261,9 +263,10 @@ RAG 问答闭环已打通：
 - 已做向量 + 关键词 + RRF 混合检索、BGE-reranker 二次重排、资料 AI 摘要/自动标签、插件当前页问答、书签新增/修改/删除自动同步和管理端模型在线配置。
 - 管理端模型和系统设置均已支持在线编辑；预算告警已支持 Webhook，可在管理端测试发送。
 - 邀请码注册已接入；邮箱验证尚未接入。
-- 扫描版 PDF 未接 OCR；本机向量检索仍为应用层余弦。
+- 扫描版 PDF：可选 Tesseract OCR 已接入，默认关闭；启用需要安装 tesseract 和中文语言包。
+- RediSearch HNSW 仍待数据量上来后接入；本机向量检索仍为应用层余弦。
 - 数据清理任务已接入：过期 refresh token、授权码、幂等键和结束超过 30 天的入库任务。
-- 监控指标和备份脚本已接入；仍缺集成/E2E/压测和告警规则。
+- 监控指标、告警规则、备份脚本、Playwright 登录 E2E 和 k6 压测脚本已接入；仍缺完整业务 E2E、压力基线和 Alertmanager 转发。
 - 问答限流（10 次/分钟/用户）和管理端操作限流（60 次/分钟/管理员）已接入。
 
 ## 下一步

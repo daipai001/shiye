@@ -1,0 +1,42 @@
+groups:
+  - name: shiye-api
+    rules:
+      - alert: ShiyeHttp5xx
+        expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "拾页 API 出现 5xx"
+          description: "最近 5 分钟存在 5xx 响应，检查日志和依赖服务。"
+
+      - alert: ShiyeHttpP95Latency
+        expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[5m])) by (le)) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "拾页 API P95 超过 2s"
+          description: "最近 10 分钟 P95 延迟过高，检查数据库、Redis、AI 服务和慢请求。"
+
+      - alert: ShiyeAiErrorRate
+        expr: |
+          sum(rate(shiye_ai_calls_total{status="FAILED"}[10m]))
+          /
+          clamp_min(sum(rate(shiye_ai_calls_total[10m])), 0.001)
+          > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "拾页 AI 调用错误率超过 10%"
+          description: "最近 10 分钟 Chat AI 失败比例过高，检查 DeepSeek Key、限流和上游状态。"
+
+      - alert: ShiyeWebhookFailure
+        expr: increase(shiye_alert_webhook_failures_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "预算告警 Webhook 发送失败"
+          description: "15 分钟内存在预算告警发送失败，检查 Webhook URL、网络和管理端配置。"

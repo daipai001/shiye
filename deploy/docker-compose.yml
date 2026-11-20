@@ -73,6 +73,13 @@ services:
       AI_CITATION_REQUIRED: ${AI_CITATION_REQUIRED:-true}
       CHUNK_TARGET_SIZE: ${CHUNK_TARGET_SIZE:-700}
       CHUNK_OVERLAP: ${CHUNK_OVERLAP:-100}
+      OCR_ENABLED: ${OCR_ENABLED:-false}
+      OCR_COMMAND: ${OCR_COMMAND:-tesseract}
+      OCR_LANG: ${OCR_LANG:-chi_sim+eng}
+      OCR_MIN_TEXT_CHARS: ${OCR_MIN_TEXT_CHARS:-80}
+      OCR_MAX_PAGES: ${OCR_MAX_PAGES:-20}
+      OCR_DPI: ${OCR_DPI:-200}
+      OCR_TIMEOUT_MS: ${OCR_TIMEOUT_MS:-60000}
       EVAL_WORKER_ENABLED: ${EVAL_WORKER_ENABLED:-true}
       EVAL_WORKER_DELAY_MS: ${EVAL_WORKER_DELAY_MS:-30000}
       FILE_UPLOAD_DIR: /app/data/uploads
@@ -101,7 +108,6 @@ services:
       RERANK_MODEL: ${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
       RERANK_TOP_N: ${RERANK_TOP_N:-20}
       RERANK_TIMEOUT_MS: ${RERANK_TIMEOUT_MS:-20000}
-      RETRIEVAL_RERANK_ENABLED: ${RETRIEVAL_RERANK_ENABLED:-true}
       RETRIEVAL_RERANK_CANDIDATES: ${RETRIEVAL_RERANK_CANDIDATES:-20}
     ports:
       - "${USER_API_PORT:-18080}:18080"
@@ -180,7 +186,24 @@ services:
     depends_on:
       - admin-api
 
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: shiye-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      - user-api
+      - admin-api
+
 volumes:
   mysql-data:
   redis-data:
   shiye-uploads:
+  prometheus-data:

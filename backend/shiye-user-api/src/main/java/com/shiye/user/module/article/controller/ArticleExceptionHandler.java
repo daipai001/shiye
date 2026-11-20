@@ -29,6 +29,7 @@ public class ArticleExceptionHandler {
                     ErrorCode.VALIDATION_ERROR;
             case "EMBEDDING_BAD_RESPONSE", "EMBEDDING_FAILED" -> ErrorCode.EMBEDDING_FAILED;
             case "VECTOR_STORE_UNAVAILABLE" -> ErrorCode.VECTOR_STORE_UNAVAILABLE;
+            case "OCR_UNAVAILABLE", "OCR_FAILED" -> ErrorCode.PARSE_FAILED;
             default -> ErrorCode.PARSE_FAILED;
         };
     }

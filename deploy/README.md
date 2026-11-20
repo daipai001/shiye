@@ -16,6 +16,15 @@
 - `redis_*`：Redis 客户端指标
 - `http_server_requests_seconds_count{status="500"}`：5xx
 
+`deploy/docker-compose.yml` 已包含 Prometheus（默认 `http://localhost:9090`），规则在 `monitoring/alerts.yml`：
+
+- API 5xx
+- P95 > 2s
+- Chat AI 错误率 > 10%
+- 预算 Webhook 发送失败
+
+> 生产环境建议再接 Alertmanager，把告警转发到邮件、IM 或 Webhook。
+
 ## 备份
 
 默认使用 `deploy/scripts/backup.ps1`（Windows）或 `backup.sh`（Linux/macOS）。
