@@ -37,7 +37,7 @@ MAIL_STARTTLS=true
 APP_PUBLIC_URL=https://shiye.example.com
 ```
 
-未配置时 `MAIL_ENABLED=false`，相关接口仍返回成功，但只记录日志、不实际发信。生产建议使用独立发信账号并配置 SPF/DKIM。
+未配置时 `MAIL_ENABLED=false`，相关接口仍返回成功，但不签发邮件 token、不实际发信。生产建议使用独立发信账号并配置 SPF/DKIM。
 
 ## 健康检查
 

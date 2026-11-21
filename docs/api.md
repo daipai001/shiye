@@ -266,7 +266,7 @@ admin-web → POST /admin/api/v1/auth/login
   → 撤销该用户全部 refresh token
 ```
 
-> 邮件发送失败不会阻断注册或邀请主流程；token 只存 SHA-256，单次使用。验证邮件默认 24 小时，重置邮件默认 30 分钟。
+> `MAIL_ENABLED=false` 时不会签发邮件 token，但注册/邀请主流程仍成功；邮件发送失败也不会阻断主流程。token 只存 SHA-256，单次使用。验证邮件默认 24 小时，重置邮件默认 30 分钟。
 
 ---
 
