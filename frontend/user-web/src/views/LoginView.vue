@@ -19,6 +19,9 @@ const confirmPassword = ref('')
 const displayName = ref('')
 const invitationCode = ref('')
 const loading = ref(false)
+const forgotOpen = ref(false)
+const forgotEmail = ref('')
+const sendingReset = ref(false)
 
 function switchMode(next: Mode) {
   mode.value = next
@@ -47,6 +50,28 @@ function validate(): string | null {
     }
   }
   return null
+}
+
+function openForgot() {
+  forgotEmail.value = email.value.trim()
+  forgotOpen.value = true
+}
+
+async function sendPasswordReset() {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail.value.trim())) {
+    ElMessage.warning('请输入有效的邮箱地址')
+    return
+  }
+  sendingReset.value = true
+  try {
+    await api.post('/auth/password/forgot', { email: forgotEmail.value.trim() })
+    ElMessage.success('如果该邮箱已注册，重置邮件会很快送达')
+    forgotOpen.value = false
+  } catch (error) {
+    ElMessage.error(apiErrorMessage(error, '发送重置邮件失败'))
+  } finally {
+    sendingReset.value = false
+  }
 }
 
 async function submit() {
@@ -214,6 +239,9 @@ async function submit() {
             <span>{{ loading ? '处理中…' : mode === 'login' ? '登录' : '注册并进入' }}</span>
             <i aria-hidden="true">→</i>
           </button>
+          <button v-if="mode === 'login'" class="forgot-link" type="button" @click="openForgot">
+            忘记密码？
+          </button>
         </form>
 
         <p v-if="mode === 'register'" class="note">
@@ -226,6 +254,15 @@ async function submit() {
         <p class="terms">登录即表示同意服务条款和隐私政策 · 数据仅存于你的服务端</p>
       </div>
     </section>
+
+    <el-dialog v-model="forgotOpen" title="找回密码" width="380px">
+      <p class="forgot-hint">输入注册邮箱，我们会发送重置链接。未配置 SMTP 时不会实际发送邮件。</p>
+      <el-input v-model="forgotEmail" type="email" placeholder="you@example.com" @keyup.enter="sendPasswordReset" />
+      <template #footer>
+        <el-button @click="forgotOpen = false">取消</el-button>
+        <el-button type="primary" :loading="sendingReset" @click="sendPasswordReset">发送重置邮件</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -704,6 +741,24 @@ async function submit() {
 }
 .input-wrap:focus-within i {
   color: var(--primary);
+}
+.forgot-link {
+  display: block;
+  margin: 12px auto 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.forgot-link:hover {
+  color: var(--ink);
+}
+.forgot-hint {
+  color: var(--faint);
+  font-size: 10px;
+  line-height: 1.6;
+  margin: 0 0 12px;
 }
 .submit {
   position: relative;

@@ -1,0 +1,23 @@
+services:
+  caddy:
+    image: caddy:2.8.4
+    container_name: shiye-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - user-web
+      - admin-web
+
+volumes:
+  caddy-data:
+  caddy-config:

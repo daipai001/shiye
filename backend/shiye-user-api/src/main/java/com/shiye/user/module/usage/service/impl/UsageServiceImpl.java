@@ -16,6 +16,7 @@ import com.shiye.user.module.usage.domain.entity.UsageRangeTotalsRow;
 import com.shiye.user.module.usage.domain.entity.UserUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.vo.QuotaVO;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
+import com.shiye.user.module.usage.domain.vo.TeamReservation;
 import com.shiye.user.module.usage.domain.vo.UsageBreakdownVO;
 import com.shiye.user.module.usage.domain.vo.UsageDailyVO;
 import com.shiye.user.module.usage.domain.vo.UsageRecordVO;
@@ -29,6 +30,8 @@ import com.shiye.user.module.team.domain.vo.TeamQuota;
 import com.shiye.user.module.team.service.TeamService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +49,7 @@ import java.util.Map;
 @Service
 public class UsageServiceImpl implements UsageService {
 
+    private static final Logger log = LoggerFactory.getLogger(UsageServiceImpl.class);
     private static final int MAX_PAGE_SIZE = 100;
 
     private final AuthService authService;
@@ -158,6 +162,36 @@ public class UsageServiceImpl implements UsageService {
         }
         if (totals != null && totals.cost().compareTo(settings.globalMonthlyCost()) >= 0) {
             throw new BizException(ErrorCode.GLOBAL_BUDGET_EXCEEDED, "全站成本预算已用完");
+        }
+    }
+
+    @Override
+    @Transactional
+    public TeamReservation reserveTeamChat(long userId, long teamId, long tokens,
+                                           BigDecimal cost) {
+        teamService.requireMember(userId, teamId);
+        TeamQuota quota = teamService.quota(teamId);
+        String month = currentMonth();
+        teamUsageMapper.ensureRow(teamId, month);
+        int reserved = teamUsageMapper.reserve(
+                teamId, month, tokens, cost, quota.tokenQuota(), quota.costQuota());
+        if (reserved == 0) {
+            throw new BizException(ErrorCode.TEAM_QUOTA_EXCEEDED, "团队本月配额已用完");
+        }
+        return new TeamReservation(teamId, month, tokens, cost);
+    }
+
+    @Override
+    public void releaseTeamChat(TeamReservation reservation) {
+        if (reservation == null) {
+            return;
+        }
+        try {
+            teamUsageMapper.release(
+                    reservation.teamId(), reservation.month(),
+                    reservation.tokens(), reservation.cost());
+        } catch (RuntimeException ex) {
+            log.warn("release team quota reservation failed: {}", ex.getMessage());
         }
     }
 

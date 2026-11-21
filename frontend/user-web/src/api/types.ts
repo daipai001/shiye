@@ -11,6 +11,7 @@ export interface UserSummary {
   displayName: string
   avatarUrl: string | null
   status: string
+  emailVerified: boolean
   createdAt: string
 }
 

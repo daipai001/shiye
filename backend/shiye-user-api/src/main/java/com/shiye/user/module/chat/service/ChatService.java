@@ -8,11 +8,13 @@ import com.shiye.user.module.chat.domain.vo.ChatCancelVO;
 import com.shiye.user.module.chat.domain.vo.ConversationDetailVO;
 import com.shiye.user.module.chat.domain.vo.ConversationVO;
 import com.shiye.user.module.chat.domain.vo.MessageVO;
+import com.shiye.user.module.usage.domain.vo.TeamReservation;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 public interface ChatService {
 
-    void stream(long userId, String source, ChatStreamRequest request, SseEmitter emitter);
+    void stream(long userId, String source, ChatStreamRequest request, SseEmitter emitter,
+                TeamReservation teamReservation);
 
     void streamPage(long userId, String source, PageChatRequest request, SseEmitter emitter);
 

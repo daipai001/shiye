@@ -1,17 +1,22 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import BasicLayout from '../layouts/BasicLayout.vue'
-import LoginView from '../views/LoginView.vue'
-import LibraryView from '../views/LibraryView.vue'
-import ChatView from '../views/ChatView.vue'
-import UsageView from '../views/UsageView.vue'
-import SettingsView from '../views/SettingsView.vue'
-import PluginView from '../views/PluginView.vue'
-import TeamsView from '../views/TeamsView.vue'
+
+const LoginView = () => import('../views/LoginView.vue')
+const VerifyEmailView = () => import('../views/VerifyEmailView.vue')
+const ResetPasswordView = () => import('../views/ResetPasswordView.vue')
+const LibraryView = () => import('../views/LibraryView.vue')
+const ChatView = () => import('../views/ChatView.vue')
+const TeamsView = () => import('../views/TeamsView.vue')
+const UsageView = () => import('../views/UsageView.vue')
+const SettingsView = () => import('../views/SettingsView.vue')
+const PluginView = () => import('../views/PluginView.vue')
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', component: LoginView, meta: { public: true } },
+    { path: '/verify-email', component: VerifyEmailView, meta: { public: true } },
+    { path: '/reset-password', component: ResetPasswordView, meta: { public: true } },
     {
       path: '/',
       component: BasicLayout,

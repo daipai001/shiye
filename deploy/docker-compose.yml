@@ -110,6 +110,15 @@ services:
       RERANK_TOP_N: ${RERANK_TOP_N:-20}
       RERANK_TIMEOUT_MS: ${RERANK_TIMEOUT_MS:-20000}
       RETRIEVAL_RERANK_CANDIDATES: ${RETRIEVAL_RERANK_CANDIDATES:-20}
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_HOST: ${MAIL_HOST:-localhost}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@shiye.local}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-false}
+      MAIL_STARTTLS: ${MAIL_STARTTLS:-false}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:15173}
     ports:
       - "${USER_API_PORT:-18080}:18080"
     volumes:
@@ -189,6 +198,35 @@ services:
     depends_on:
       - admin-api
 
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: shiye-alertmanager
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        URL=$$(printf '%s' "$${ALERTMANAGER_WEBHOOK_URL}" | sed 's/[&|]/\\&/g')
+        sed "s|__WEBHOOK_URL__|$${URL}|g" /etc/alertmanager/alertmanager.yml.tmpl > /tmp/alertmanager.yml
+        exec alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager
+    environment:
+      ALERTMANAGER_WEBHOOK_URL: ${ALERTMANAGER_WEBHOOK_URL:-http://host.docker.internal:19090/shiye-alerts}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./monitoring/alertmanager.yml.tmpl:/etc/alertmanager/alertmanager.yml.tmpl:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+
+  webhook-sink:
+    image: python:3.12-alpine
+    container_name: shiye-webhook-sink
+    command: ["python", "/sink/webhook-sink.py", "19090"]
+    volumes:
+      - ./monitoring/webhook-sink.py:/sink/webhook-sink.py:ro
+    ports:
+      - "${WEBHOOK_SINK_PORT:-19090}:19090"
+    profiles: ["monitoring-test"]
+
   prometheus:
     image: prom/prometheus:v2.55.1
     container_name: shiye-prometheus
@@ -204,9 +242,11 @@ services:
     depends_on:
       - user-api
       - admin-api
+      - alertmanager
 
 volumes:
   mysql-data:
   redis-data:
   shiye-uploads:
   prometheus-data:
+  alertmanager-data:

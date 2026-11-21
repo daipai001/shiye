@@ -12,6 +12,7 @@ const auth = useAuthStore()
 const loading = ref(false)
 const savingProfile = ref(false)
 const savingPassword = ref(false)
+const resendingVerification = ref(false)
 const savingPlugin = ref(false)
 
 const profile = ref<UserSummary | null>(null)
@@ -80,6 +81,18 @@ async function saveProfile() {
     ElMessage.error('保存资料失败')
   } finally {
     savingProfile.value = false
+  }
+}
+
+async function resendVerification() {
+  resendingVerification.value = true
+  try {
+    await api.post('/auth/email/resend')
+    ElMessage.success('验证邮件已发送（需已配置 SMTP）')
+  } catch {
+    ElMessage.error('发送验证邮件失败')
+  } finally {
+    resendingVerification.value = false
   }
 }
 
@@ -168,6 +181,19 @@ onMounted(load)
           <div class="field">
             <label>状态</label>
             <el-input :model-value="profile?.status" disabled />
+          </div>
+          <div class="field">
+            <label>邮箱验证</label>
+            <div class="verify-row">
+              <el-input :model-value="profile?.emailVerified ? '已验证' : '未验证'" disabled />
+              <el-button
+                v-if="profile && !profile.emailVerified"
+                :loading="resendingVerification"
+                @click="resendVerification"
+              >
+                发送验证邮件
+              </el-button>
+            </div>
           </div>
           <div class="field">
             <label>昵称</label>
@@ -341,6 +367,13 @@ onMounted(load)
   color: var(--muted);
   font-size: 12px;
   background: #fff;
+}
+.verify-row {
+  display: flex;
+  gap: 8px;
+}
+.verify-row .el-input {
+  flex: 1;
 }
 @media (max-width: 760px) {
   .form-grid {

@@ -10,6 +10,7 @@ public record UserSummary(
         String displayName,
         String avatarUrl,
         String status,
+        boolean emailVerified,
         LocalDateTime createdAt
 ) {
     public static UserSummary from(UserEntity user) {
@@ -19,6 +20,7 @@ public record UserSummary(
                 user.getDisplayName(),
                 user.getAvatarUrl(),
                 user.getStatus(),
+                user.getEmailVerifiedAt() != null,
                 user.getCreatedAt()
         );
     }

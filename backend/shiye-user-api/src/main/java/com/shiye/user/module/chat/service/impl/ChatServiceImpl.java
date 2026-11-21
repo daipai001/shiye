@@ -39,6 +39,7 @@ import com.shiye.user.module.chat.support.RetrievalResult;
 import com.shiye.user.module.chat.support.RetrievedChunk;
 import com.shiye.user.module.team.service.TeamTaxonomyService;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
+import com.shiye.user.module.usage.domain.vo.TeamReservation;
 import com.shiye.user.module.usage.service.UsageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,15 +110,17 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public void stream(long userId, String source, ChatStreamRequest request, SseEmitter emitter) {
+    public void stream(long userId, String source, ChatStreamRequest request, SseEmitter emitter,
+                       TeamReservation teamReservation) {
         AtomicBoolean cancelled = new AtomicBoolean(false);
         emitter.onCompletion(() -> cancelled.set(true));
         emitter.onTimeout(() -> cancelled.set(true));
         emitter.onError(ex -> cancelled.set(true));
         try {
             chatExecutor.execute(() -> runStream(userId, normalizeSource(source), request,
-                    emitter, cancelled));
+                    emitter, cancelled, teamReservation));
         } catch (RuntimeException ex) {
+            usageService.releaseTeamChat(teamReservation);
             safeComplete(emitter);
         }
     }
@@ -208,7 +211,8 @@ public class ChatServiceImpl implements ChatService {
     }
 
     private void runStream(long userId, String source, ChatStreamRequest request,
-                           SseEmitter emitter, AtomicBoolean cancelled) {
+                           SseEmitter emitter, AtomicBoolean cancelled,
+                           TeamReservation teamReservation) {
         long started = System.currentTimeMillis();
         String requestId = "req_" + UUID.randomUUID().toString().replace("-", "")
                 .substring(0, 24);
@@ -331,6 +335,7 @@ public class ChatServiceImpl implements ChatService {
                     started, firstTokenMs, "AI_UNAVAILABLE", "问答服务暂不可用",
                     emitter, cancelled, ex, teamId);
         } finally {
+            usageService.releaseTeamChat(teamReservation);
             streamRegistry.unregister(requestId);
             safeComplete(emitter);
         }

@@ -77,7 +77,7 @@ public class TeamTaxonomyServiceImpl implements TeamTaxonomyService {
     @Override
     @Transactional
     public TagVO updateTag(long userId, long teamId, long tagId, TeamTagRequest request) {
-        teamService.requireMember(userId, teamId);
+        teamService.requireManager(userId, teamId);
         TeamTagEntity tag = tagMapper.findByIdAndTeam(tagId, teamId);
         if (tag == null) {
             throw new BizException(ErrorCode.NOT_FOUND, "团队标签不存在");
@@ -103,7 +103,7 @@ public class TeamTaxonomyServiceImpl implements TeamTaxonomyService {
     @Override
     @Transactional
     public void deleteTag(long userId, long teamId, long tagId) {
-        teamService.requireMember(userId, teamId);
+        teamService.requireManager(userId, teamId);
         if (tagMapper.findByIdAndTeam(tagId, teamId) == null) {
             throw new BizException(ErrorCode.NOT_FOUND, "团队标签不存在");
         }
@@ -159,7 +159,7 @@ public class TeamTaxonomyServiceImpl implements TeamTaxonomyService {
     @Transactional
     public ArticleFolderVO updateFolder(long userId, long teamId, long folderId,
                                         TeamFolderRequest request) {
-        teamService.requireMember(userId, teamId);
+        teamService.requireManager(userId, teamId);
         TeamFolderEntity folder = folderMapper.findByIdAndTeam(folderId, teamId);
         if (folder == null) {
             throw new BizException(ErrorCode.NOT_FOUND, "团队文件夹不存在");
@@ -180,7 +180,7 @@ public class TeamTaxonomyServiceImpl implements TeamTaxonomyService {
     @Override
     @Transactional
     public void deleteFolder(long userId, long teamId, long folderId) {
-        teamService.requireMember(userId, teamId);
+        teamService.requireManager(userId, teamId);
         if (folderMapper.findByIdAndTeam(folderId, teamId) == null) {
             throw new BizException(ErrorCode.NOT_FOUND, "团队文件夹不存在");
         }

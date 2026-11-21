@@ -5,6 +5,7 @@ import com.shiye.admin.module.users.domain.dto.AdminUserPasswordResetRequest;
 import com.shiye.admin.module.users.domain.dto.AdminUserStatusRequest;
 import com.shiye.admin.module.users.domain.entity.AdminUserRowEntity;
 import com.shiye.admin.module.users.domain.vo.AdminUserVO;
+import com.shiye.admin.module.teams.mapper.AdminTeamMapper;
 import com.shiye.admin.module.users.mapper.AdminUserQueryMapper;
 import com.shiye.admin.module.users.service.AdminUserService;
 import com.shiye.common.api.ErrorCode;
@@ -25,11 +26,14 @@ public class AdminUserServiceImpl implements AdminUserService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final AdminUserQueryMapper userMapper;
+    private final AdminTeamMapper teamMapper;
     private final PasswordEncoder passwordEncoder;
 
     public AdminUserServiceImpl(AdminUserQueryMapper userMapper,
+                                AdminTeamMapper teamMapper,
                                 PasswordEncoder passwordEncoder) {
         this.userMapper = userMapper;
+        this.teamMapper = teamMapper;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -63,6 +67,10 @@ public class AdminUserServiceImpl implements AdminUserService {
     public AdminUserVO updateStatus(long id, AdminUserStatusRequest request) {
         AdminUserRowEntity user = findUser(id);
         String status = request.status().toUpperCase(Locale.ROOT);
+        if ("DISABLED".equals(status) && teamMapper.countActiveOwnedBy(id) > 0) {
+            throw new BizException(ErrorCode.CONFLICT,
+                    "该用户仍拥有团队，请先转让所有权或解散团队");
+        }
         userMapper.updateStatus(user.getId(), status);
         if ("DISABLED".equals(status)) {
             userMapper.revokeUserTokens(user.getId());

@@ -117,6 +117,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 身份 | `refresh_tokens` | 刷新令牌 | P0 |
 | 身份 | `extension_auth_codes` | 插件一次性授权码 | P0 |
 | 身份 | `user_plugin_settings` | 插件/悬浮球偏好 | P0 |
+| 身份 | `email_tokens` | 邮箱验证/找回密码 token | 已启用 |
 | 团队 | `teams` | 团队 | 已启用 |
 | 团队 | `team_members` | 团队成员与角色 | 已启用 |
 | 团队 | `team_usage_monthly` | 团队月用量（配额） | 已启用 |
@@ -181,7 +182,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | `monthly_token_quota` | BIGINT UNSIGNED | 否 | 200000 | 月 token 配额 |
 | `monthly_cost_quota` | DECIMAL(12,6) | 否 | 5.000000 | 月成本配额 |
 | `quota_source` | VARCHAR(16) | 否 | `DEFAULT` | DEFAULT / NEW_USER / ADMIN |
-| `email_verified_at` | DATETIME(3) | 是 | NULL | P1 |
+| `email_verified_at` | DATETIME(3) | 是 | NULL | 邮箱验证时间 |
 | `last_login_at` | DATETIME(3) | 是 | NULL | 最后登录 |
 | `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
 | `updated_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) ON UPDATE | 更新 |
@@ -228,6 +229,27 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 - 角色和状态在每次请求时从数据库读取，降权/禁用后旧 access token 立即失效。
 - 管理员密码只存 BCrypt；重置密码或禁用会撤销该管理员全部 refresh token。
 - 管理员如要使用普通产品，另注册 `users` 账号。
+
+---
+
+### 4.3.1 `email_tokens`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `user_id` | BIGINT UNSIGNED | 否 | — | 用户 |
+| `type` | VARCHAR(16) | 否 | — | VERIFY / RESET |
+| `token_hash` | CHAR(64) | 否 | — | SHA-256(token) |
+| `expires_at` | DATETIME(3) | 否 | — | 过期 |
+| `used_at` | DATETIME(3) | 是 | NULL | 使用时间 |
+| `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
+
+**索引**
+
+- `UNIQUE uk_email_tokens_hash (token_hash)`
+- `idx_email_tokens_user_type (user_id, type, expires_at)`
+
+**说明**：单次使用；验证邮件默认 24 小时，重置邮件默认 30 分钟；过期/使用 7 天后清理。
 
 ---
 

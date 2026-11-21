@@ -6,6 +6,19 @@
 
 SET NAMES utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `email_tokens` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id`    BIGINT UNSIGNED NOT NULL,
+  `type`       VARCHAR(16)     NOT NULL COMMENT 'VERIFY / RESET',
+  `token_hash` CHAR(64)        NOT NULL,
+  `expires_at` DATETIME(3)     NOT NULL,
+  `used_at`    DATETIME(3)     NULL DEFAULT NULL,
+  `created_at` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_email_tokens_hash` (`token_hash`),
+  KEY `idx_email_tokens_user_type` (`user_id`, `type`, `expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='邮箱验证/找回密码 token';
+
 CREATE TABLE IF NOT EXISTS `teams` (
   `id`                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `name`                  VARCHAR(64)     NOT NULL,

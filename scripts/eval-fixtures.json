@@ -1,0 +1,77 @@
+{
+  "articles": [
+    {
+      "key": "chunk",
+      "title": "RAG 切片策略",
+      "url": "https://eval.shiye.local/chunk",
+      "content": "RAG 切片策略建议把正文切成 500 到 800 字，切片之间保留约 100 字重叠，避免句子和段落被截断。每个切片保存 charStart 和 charEnd，引用时可以直接跳回原文位置。切片过小会导致上下文不足，切片过大则会稀释检索相关性。正文清洗后按段落和句子边界切分，再根据目标字数合并。"
+    },
+    {
+      "key": "hybrid",
+      "title": "混合检索与 RRF",
+      "url": "https://eval.shiye.local/hybrid",
+      "content": "拾页混合检索同时使用 BGE-M3 向量召回和 MySQL ngram FULLTEXT 关键词召回，再用 RRF 融合两路排名。融合后的候选池交给 BGE-reranker-v2-m3 二次重排，rerank 失败时自动回退到 RRF 顺序。向量召回负责语义相似，关键词召回负责专有名词和精确短语，两者互补。"
+    },
+    {
+      "key": "redis",
+      "title": "Redis 向量存储",
+      "url": "https://eval.shiye.local/redis",
+      "content": "本地向量存储使用 Redis Hash 保存切片向量，并用用户集合保存切片 ID，检索时在应用层计算余弦相似度。当前每个用户最多扫描 5000 个切片，适合小规模数据。数据量增大后应切换到 RediSearch HNSW 或专用向量数据库，避免全量扫描带来的延迟和内存压力。"
+    },
+    {
+      "key": "budget",
+      "title": "预算与配额",
+      "url": "https://eval.shiye.local/budget",
+      "content": "拾页有全局月度预算和单用户月配额，用户配额同时限制 token 和成本。超过个人配额返回 42902，超过全局预算返回 42903，超过每日 token 限制返回 42904。预算达到告警阈值时通过 Webhook 发送 WARNING 或 EXCEEDED 通知，同一月份同一级别会去重。"
+    },
+    {
+      "key": "bookmark",
+      "title": "书签导入流程",
+      "url": "https://eval.shiye.local/bookmark",
+      "content": "书签导入分为 M2a 文件夹登记和 M2b 条目导入。每次导入一个书签文件夹，可以包含子文件夹。条目会经历抓取、解析、切片、向量化和索引状态，失败条目支持重试，任务支持暂停、恢复和取消。导入接口使用幂等键，避免重复创建任务。"
+    },
+    {
+      "key": "plugin",
+      "title": "插件悬浮球",
+      "url": "https://eval.shiye.local/plugin",
+      "content": "拾页浏览器插件使用 MV3，提供悬浮球、资料库问答、当前页面问答和收藏当前页。插件通过一次性授权码连接账号，可在设置中配置后端 HTTPS 地址、默认问答模式和站点黑名单。当前页问答只使用临时页面上下文，不写入资料库。"
+    }
+  ],
+  "cases": [
+    {"article": "chunk", "question": "RAG 切片建议的大小和重叠是多少？", "goldAnswer": "建议 500 到 800 字，保留约 100 字重叠。"},
+    {"article": "chunk", "question": "切片为什么要保存 charStart 和 charEnd？", "goldAnswer": "用于引用时跳回原文位置。"},
+    {"article": "chunk", "question": "切片过大会有什么问题？", "goldAnswer": "会稀释检索相关性。"},
+    {"article": "chunk", "question": "正文清洗后按什么边界切片？", "goldAnswer": "按段落和句子边界切分，再按目标字数合并。"},
+    {"article": "chunk", "question": "切片过小会带来什么问题？", "goldAnswer": "上下文不足。"},
+
+    {"article": "hybrid", "question": "混合检索使用哪两路召回？", "goldAnswer": "BGE-M3 向量召回和 MySQL ngram FULLTEXT 关键词召回。"},
+    {"article": "hybrid", "question": "两路召回如何融合？", "goldAnswer": "使用 RRF 融合排名。"},
+    {"article": "hybrid", "question": "rerank 使用的模型是什么？", "goldAnswer": "BGE-reranker-v2-m3。"},
+    {"article": "hybrid", "question": "rerank 失败时如何降级？", "goldAnswer": "自动回退到 RRF 顺序。"},
+    {"article": "hybrid", "question": "关键词召回适合处理什么内容？", "goldAnswer": "专有名词和精确短语。"},
+
+    {"article": "redis", "question": "本地向量存储使用什么 Redis 结构？", "goldAnswer": "Redis Hash 保存切片向量，用户集合保存切片 ID。"},
+    {"article": "redis", "question": "当前向量检索如何计算相似度？", "goldAnswer": "在应用层计算余弦相似度。"},
+    {"article": "redis", "question": "每个用户最多扫描多少切片？", "goldAnswer": "5000 个切片。"},
+    {"article": "redis", "question": "数据量增大后建议换什么方案？", "goldAnswer": "RediSearch HNSW 或专用向量数据库。"},
+    {"article": "redis", "question": "全量扫描会带来什么问题？", "goldAnswer": "延迟和内存压力。"},
+
+    {"article": "budget", "question": "超过个人配额返回什么错误码？", "goldAnswer": "42902。"},
+    {"article": "budget", "question": "超过全局预算返回什么错误码？", "goldAnswer": "42903。"},
+    {"article": "budget", "question": "超过每日 token 限制返回什么错误码？", "goldAnswer": "42904。"},
+    {"article": "budget", "question": "预算告警通过什么方式发送？", "goldAnswer": "通过 Webhook 发送 WARNING 或 EXCEEDED 通知。"},
+    {"article": "budget", "question": "预算告警如何去重？", "goldAnswer": "同一月份同一级别去重。"},
+
+    {"article": "bookmark", "question": "书签导入分为哪两个阶段？", "goldAnswer": "M2a 文件夹登记和 M2b 条目导入。"},
+    {"article": "bookmark", "question": "一次导入可以选择几个书签文件夹？", "goldAnswer": "一次一个书签文件夹，可以包含子文件夹。"},
+    {"article": "bookmark", "question": "失败条目支持什么操作？", "goldAnswer": "支持重试。"},
+    {"article": "bookmark", "question": "导入任务支持哪些控制操作？", "goldAnswer": "暂停、恢复和取消。"},
+    {"article": "bookmark", "question": "导入接口如何避免重复任务？", "goldAnswer": "使用幂等键。"},
+
+    {"article": "plugin", "question": "插件使用什么浏览器扩展版本？", "goldAnswer": "MV3。"},
+    {"article": "plugin", "question": "插件如何连接账号？", "goldAnswer": "通过一次性授权码连接。"},
+    {"article": "plugin", "question": "插件支持哪些问答方式？", "goldAnswer": "资料库问答和当前页面问答。"},
+    {"article": "plugin", "question": "当前页问答会把内容写入资料库吗？", "goldAnswer": "不会，只使用临时页面上下文。"},
+    {"article": "plugin", "question": "插件可以配置哪些内容？", "goldAnswer": "后端 HTTPS 地址、默认问答模式和站点黑名单。"}
+  ]
+}

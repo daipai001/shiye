@@ -14,7 +14,7 @@ public interface UserMapper {
     @Select("""
             SELECT id, email, password_hash, display_name, avatar_url, status,
                    monthly_token_quota, monthly_cost_quota, quota_source,
-                   last_login_at, created_at, updated_at, deleted_at
+                   email_verified_at, last_login_at, created_at, updated_at, deleted_at
             FROM users
             WHERE email = #{email} AND deleted_at IS NULL
             LIMIT 1
@@ -24,7 +24,7 @@ public interface UserMapper {
     @Select("""
             SELECT id, email, password_hash, display_name, avatar_url, status,
                    monthly_token_quota, monthly_cost_quota, quota_source,
-                   last_login_at, created_at, updated_at, deleted_at
+                   email_verified_at, last_login_at, created_at, updated_at, deleted_at
             FROM users
             WHERE id = #{id} AND deleted_at IS NULL
             """)
@@ -60,4 +60,12 @@ public interface UserMapper {
             """)
     int updatePassword(@Param("id") long id,
                        @Param("passwordHash") String passwordHash);
+
+    @Update("""
+            UPDATE users
+            SET email_verified_at = COALESCE(email_verified_at, UTC_TIMESTAMP(3)),
+                updated_at = UTC_TIMESTAMP(3)
+            WHERE id = #{id} AND deleted_at IS NULL
+            """)
+    int markEmailVerified(@Param("id") long id);
 }

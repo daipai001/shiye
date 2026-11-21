@@ -16,6 +16,7 @@ public class UserEntity {
     private Long monthlyTokenQuota;
     private BigDecimal monthlyCostQuota;
     private String quotaSource;
+    private LocalDateTime emailVerifiedAt;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

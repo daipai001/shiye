@@ -253,6 +253,21 @@ admin-web → POST /admin/api/v1/auth/login
   → 只能访问 /admin/api/v1/**
 ```
 
+### 2.4 邮箱验证与找回密码
+
+```
+注册 → 发送验证邮件（MAIL_ENABLED=true 时）
+  → 用户打开 /verify-email?token=... → POST /auth/email/verify
+  → users.email_verified_at 写入
+
+忘记密码 → POST /auth/password/forgot {email}
+  → 若邮箱存在，发送 /reset-password?token=...
+  → POST /auth/password/reset {token,newPassword}
+  → 撤销该用户全部 refresh token
+```
+
+> 邮件发送失败不会阻断注册或邀请主流程；token 只存 SHA-256，单次使用。验证邮件默认 24 小时，重置邮件默认 30 分钟。
+
 ---
 
 ## 3. 用户端 API
@@ -282,7 +297,7 @@ admin-web → POST /admin/api/v1/auth/login
 | `refreshToken` | string | refresh token |
 | `expiresIn` | number | 秒 |
 | `tokenType` | string | `Bearer` |
-| `user` | UserSummary | 用户信息 |
+| `user` | UserSummary | 用户信息；含 `emailVerified` |
 
 **错误**：40001、40901、42901
 
@@ -319,6 +334,50 @@ admin-web → POST /admin/api/v1/auth/login
 **请求**：`refreshToken`（可选；不传撤销全部当前设备）
 
 **响应**：`null`
+
+---
+
+#### POST `/auth/email/verify`
+
+**认证**：公开
+
+**请求**：`token`
+
+**响应**：`UserSummary`（`emailVerified=true`）
+
+**错误**：40105
+
+---
+
+#### POST `/auth/email/resend`
+
+**认证**：用户
+
+**请求**：无
+
+**响应**：`null`。已配置 SMTP 时发送验证邮件；已验证则静默成功。
+
+---
+
+#### POST `/auth/password/forgot`
+
+**认证**：公开
+
+**请求**：`email`
+
+**响应**：`null`。无论邮箱是否存在都返回成功，避免枚举用户。
+
+---
+
+#### POST `/auth/password/reset`
+
+**认证**：公开
+
+**请求**：`token`、`newPassword`（8~72 位，含字母和数字）
+
+**响应**：`null`。成功后撤销该用户全部 refresh token。
+
+**错误**：40001、40105
 
 ---
 
@@ -1217,9 +1276,9 @@ admin-web → POST /admin/api/v1/auth/login
 | POST | `/teams/{id}/transfer` | OWNER | 转让所有权；目标必须是 ACTIVE 成员，原 OWNER 变为 ADMIN |
 | DELETE | `/teams/{id}` | OWNER | 解散团队；共享资料回到各自个人库，成员和邀请码清理 |
 | GET/POST | `/teams/{id}/tags` | 成员 | 团队标签列表/创建 |
-| PUT/DELETE | `/teams/{id}/tags/{tagId}` | 成员 | 更新/删除团队标签 |
+| PUT/DELETE | `/teams/{id}/tags/{tagId}` | OWNER/ADMIN | 更新/删除团队标签 |
 | GET/POST | `/teams/{id}/folders` | 成员 | 团队文件夹列表/创建 |
-| PUT/DELETE | `/teams/{id}/folders/{folderId}` | 成员 | 更新/删除团队文件夹 |
+| PUT/DELETE | `/teams/{id}/folders/{folderId}` | OWNER/ADMIN | 更新/删除团队文件夹 |
 | POST/DELETE | `/articles/{id}/team-tags`、`/articles/{id}/team-tags/{tagId}` | 成员 | 给团队资料加/移除团队标签 |
 | POST/DELETE | `/articles/{id}/team-folders`、`/articles/{id}/team-folders/{folderId}` | 成员 | 给团队资料加/移除团队文件夹 |
 
@@ -1229,15 +1288,17 @@ admin-web → POST /admin/api/v1/auth/login
 
 **说明**
 
-- `POST /teams/{id}/invites` 返回 `{code, role, expiresAt}`；`code` 只返回一次，数据库只存 SHA-256。
+- `POST /teams/{id}/invites` 返回 `{code, role, expiresAt}`；请求可带可选 `email`，配置 SMTP 后会发送邀请邮件。`code` 只返回一次，数据库只存 SHA-256。
 - `POST /teams/join` 请求 `{code}`，返回团队详情；无效/过期/已使用返回 `40105`，已在团队返回 `40901`。
 - `POST /teams/{id}/transfer` 请求 `{userId}`；转让后原 OWNER 改为 ADMIN，目标成员改为 OWNER。
 - `DELETE /teams/{id}` 仅 OWNER；解散会把 `articles.team_id` 置空，清除团队成员、邀请码、团队标签/文件夹和团队向量集合，团队软删除。
+- 团队成员可以创建标签/文件夹并给资料添加；重命名、删除需要 OWNER/ADMIN。
 - 团队标签/文件夹只作用于团队资料；`GET /articles?teamId=...&tagId=...&folderId=...` 的 `tagId`/`folderId` 对应团队标签/文件夹 ID。
 - 资料详情和团队列表返回的 `tags`/`folders` 对团队资料来自团队标签/文件夹。
 - 团队范围问答支持 `TEAM`（整个团队）、`TEAM_TAG`（按团队标签）、`TEAM_FOLDER`（按团队文件夹）；`scope.id` 分别为团队 ID、团队标签 ID、团队文件夹 ID。
 - `GET /teams/taxonomy` 返回 `{tags:[{id,name,color,teamId,teamName}], folders:[{id,name,teamId,teamName}]}`，供问答范围下拉使用。
 - 团队问答会同时检查个人配额、团队月配额和全局预算；团队配额超限返回 `42905`。TEAM_TAG/TEAM_FOLDER 会先解析所属团队再检查配额。
+- 团队问答在开始流式回答前会预留 12,000 tokens / ¥0.12 的团队配额，结束后释放未使用部分；并发请求不会同时挤过配额检查。
 - `ai_usage.team_id` 和 `team_usage_monthly` 记录团队问答/RERANK 用量。
 - 资料共享/取消共享接口见 3.3。
 

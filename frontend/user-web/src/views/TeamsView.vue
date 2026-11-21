@@ -53,6 +53,7 @@ const joining = ref(false)
 
 const inviteDialog = ref(false)
 const inviteRole = ref<'ADMIN' | 'MEMBER'>('MEMBER')
+const inviteEmail = ref('')
 const inviteLoading = ref(false)
 const invite = ref<TeamInvite | null>(null)
 const inviteCopied = ref(false)
@@ -116,6 +117,18 @@ async function loadTaxonomy(teamId: string) {
 async function selectTeam(team: Team) {
   selectedId.value = team.id
   await loadDetail(team.id)
+}
+
+function onTagChipClick(tag: Tag) {
+  if (canManage.value) {
+    void deleteTeamTag(tag)
+  }
+}
+
+function onFolderChipClick(folder: ArticleFolder) {
+  if (canManage.value) {
+    void deleteTeamFolder(folder)
+  }
 }
 
 function openTagDialog() {
@@ -314,6 +327,7 @@ async function submitJoin() {
 function openInvite() {
   invite.value = null
   inviteRole.value = 'MEMBER'
+  inviteEmail.value = ''
   inviteCopied.value = false
   inviteDialog.value = true
 }
@@ -324,7 +338,7 @@ async function createInvite() {
   try {
     const { data } = await api.post<ApiResult<TeamInvite>>(
       `/teams/${selected.value.id}/invites`,
-      { role: inviteRole.value },
+      { role: inviteRole.value, email: inviteEmail.value.trim() || undefined },
     )
     invite.value = data.data
     inviteCopied.value = false
@@ -567,10 +581,11 @@ onMounted(() => loadTeams())
               v-for="tag in teamTags"
               :key="tag.id"
               class="team-tag-chip"
+              :class="{ removable: canManage }"
               :style="{ borderColor: tag.color || '#d7d4cc' }"
-              @click="deleteTeamTag(tag)"
+              @click="onTagChipClick(tag)"
             >
-              {{ tag.name }} <b>{{ tag.articleCount || 0 }}</b> <em>×</em>
+              {{ tag.name }} <b>{{ tag.articleCount || 0 }}</b> <em v-if="canManage">×</em>
             </span>
             <span v-if="teamTags.length === 0" class="muted">暂无团队标签</span>
           </div>
@@ -582,9 +597,10 @@ onMounted(() => loadTeams())
               v-for="folder in teamFolders"
               :key="folder.id"
               class="team-folder-chip"
-              @click="deleteTeamFolder(folder)"
+              :class="{ removable: canManage }"
+              @click="onFolderChipClick(folder)"
             >
-              {{ folder.path }} <b>{{ folder.articleCount || 0 }}</b> <em>×</em>
+              {{ folder.path }} <b>{{ folder.articleCount || 0 }}</b> <em v-if="canManage">×</em>
             </span>
             <span v-if="teamFolders.length === 0" class="muted">暂无团队文件夹</span>
           </div>
@@ -616,6 +632,10 @@ onMounted(() => loadTeams())
             <el-option label="成员" value="MEMBER" />
             <el-option v-if="isOwner" label="管理员" value="ADMIN" />
           </el-select>
+        </div>
+        <div class="dialog-field">
+          <span>邮箱（可选，配置 SMTP 后发送邀请邮件）</span>
+          <el-input v-model="inviteEmail" type="email" maxlength="190" placeholder="member@example.com" />
         </div>
         <p class="dialog-hint">邀请码单次使用，7 天内有效；成员使用后自动加入团队。</p>
       </template>
@@ -849,6 +869,9 @@ onMounted(() => loadTeams())
   font-size: 9.5px;
   color: var(--muted);
   background: #fff;
+}
+.team-tag-chip.removable,
+.team-folder-chip.removable {
   cursor: pointer;
 }
 .team-folder-chip {

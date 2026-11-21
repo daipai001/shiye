@@ -4,6 +4,7 @@ import com.shiye.common.api.ErrorCode;
 import com.shiye.common.exception.BizException;
 import com.shiye.user.module.auth.domain.vo.UserSummary;
 import com.shiye.user.module.auth.service.AuthService;
+import com.shiye.user.module.auth.service.EmailTokenService;
 import com.shiye.common.security.Hashes;
 import com.shiye.common.security.SecureCodes;
 import com.shiye.user.module.team.domain.dto.TeamCreateRequest;
@@ -51,15 +52,18 @@ public class TeamServiceImpl implements TeamService {
     private final TeamMemberMapper memberMapper;
     private final TeamInviteMapper inviteMapper;
     private final AuthService authService;
+    private final EmailTokenService emailTokenService;
 
     public TeamServiceImpl(TeamMapper teamMapper,
                            TeamMemberMapper memberMapper,
                            TeamInviteMapper inviteMapper,
-                           AuthService authService) {
+                           AuthService authService,
+                           EmailTokenService emailTokenService) {
         this.teamMapper = teamMapper;
         this.memberMapper = memberMapper;
         this.inviteMapper = inviteMapper;
         this.authService = authService;
+        this.emailTokenService = emailTokenService;
     }
 
     @Override
@@ -170,6 +174,14 @@ public class TeamServiceImpl implements TeamService {
         invite.setRole(role);
         invite.setExpiresAt(expiresAt);
         inviteMapper.insert(invite);
+        if (request.email() != null && !request.email().isBlank()) {
+            try {
+                emailTokenService.sendTeamInvite(
+                        request.email().trim(), access.team().getName(), code);
+            } catch (RuntimeException ex) {
+                // 邀请码仍已创建，邮件失败不阻断
+            }
+        }
         return new TeamInviteVO(code, role, expiresAt);
     }
 

@@ -1,0 +1,9 @@
+{$DOMAIN:localhost} {
+    encode zstd gzip
+    reverse_proxy user-web:80
+}
+
+admin.{$DOMAIN:localhost} {
+    encode zstd gzip
+    reverse_proxy admin-web:80
+}

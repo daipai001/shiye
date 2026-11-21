@@ -3,6 +3,7 @@ package com.shiye.user.module.usage.service;
 import com.shiye.common.api.PageResult;
 import com.shiye.user.module.usage.domain.vo.QuotaVO;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
+import com.shiye.user.module.usage.domain.vo.TeamReservation;
 import com.shiye.user.module.usage.domain.vo.UsageRecordVO;
 import com.shiye.user.module.usage.domain.vo.UsageSummaryVO;
 import com.shiye.user.module.usage.domain.vo.UsageTotals;
@@ -18,6 +19,10 @@ public interface UsageService {
     void assertCanChat(long userId);
 
     void assertCanChat(long userId, Long teamId);
+
+    TeamReservation reserveTeamChat(long userId, long teamId, long tokens, BigDecimal cost);
+
+    void releaseTeamChat(TeamReservation reservation);
 
     default RecordedUsage recordChat(long userId, String requestId, String source, String model,
                                      int promptTokens, int completionTokens,

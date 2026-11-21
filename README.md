@@ -138,7 +138,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 
 ### 6. CI / CD
 
-- `.github/workflows/ci.yml`：push/PR 时跑后端单测、两个前端构建、插件语法检查，并启动 MySQL/Redis 跑真实 API smoke。
+- `.github/workflows/ci.yml`：push/PR 时跑后端单测、两个前端构建、插件语法检查，并启动 MySQL/Redis 跑真实 API smoke 和团队 API smoke（创建团队 → 邀请 → 共享 → 标签/文件夹 → 配额 → 解散）。
 - `.github/workflows/cd.yml`：推送 `v*` tag 或手动触发，构建并推送四个镜像到 GHCR。
 - 可选 SSH 部署：配置仓库变量 `ENABLE_DEPLOY=true`、`IMAGE_PREFIX=ghcr.io/<owner>`，以及 secrets `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` / `DEPLOY_PATH`。
 
@@ -261,8 +261,12 @@ RAG 问答闭环已打通：
 - 健康检查：user-api/admin-api 的 `/actuator/health`
 - 审计保留：admin-api 每日清理超过 `AUDIT_RETENTION_DAYS`（默认 180 天）的审计日志；`AUDIT_RETENTION_ENABLED=false` 可关闭
 - Prometheus：`/actuator/prometheus`，已暴露 HTTP/JVM/Hikari/Redis 指标
-- `deploy/docker-compose.yml` 含 Prometheus 与告警规则：5xx、P95、AI 错误率、Webhook 失败
-- 备份脚本：`deploy/scripts/backup.ps1` / `backup.sh`，备份 MySQL 和 Redis RDB
+- `deploy/docker-compose.yml` 含 Prometheus、Alertmanager 与告警规则：5xx、P95、AI 错误率、Webhook 失败；`ALERTMANAGER_WEBHOOK_URL` 配置转发地址
+- HTTPS：`deploy/docker-compose.https.yml` + `deploy/Caddyfile`，本地已验证 `https://localhost` / `https://admin.localhost`，生产填真实域名和 `ACME_EMAIL`
+- 备份与恢复：`deploy/scripts/backup.ps1` / `backup.sh`、`restore-verify.ps1`；已完成本机 MySQL 恢复演练
+- 压测：`scripts/load-test.mjs`；2,000 篇/6,000 切片、20 VUs 下 246 RPS、P95 159ms（见 `docs/load-test-2026-11-21.md`）
+- RAG 评测：30 条回归用例，recall@5/引用/正确率 1.0，成本 ¥0.05028（见 `docs/rag-eval-2026-11-21.md`）
+- 前端已改为路由懒加载 + Element Plus 按需组件，主包从约 869KB 降到约 54KB（另有共享 client/select 块）
 - 测试与压测说明：`scripts/README.md`
 - 插件打包/上架：`docs/extension-release.md`
 
@@ -272,15 +276,17 @@ RAG 问答闭环已打通：
 - 本机 Redis 没有 RediSearch，向量检索走应用层余弦；数据量大后应换 Redis Stack HNSW。
 - 已做向量 + 关键词 + RRF 混合检索、BGE-reranker 二次重排、资料 AI 摘要/自动标签、插件当前页问答、书签新增/修改/删除自动同步和管理端模型在线配置。
 - 管理端模型和系统设置均已支持在线编辑；预算告警已支持 Webhook，可在管理端测试发送。
-- 邀请码注册已接入；邮箱验证尚未接入。
+- 邀请码注册已接入；邮箱验证、邮件找回密码和团队邀请邮件已接入，需配置 SMTP（`MAIL_ENABLED=true`）；未配置时只记录日志、不阻塞主流程。
 - 扫描版 PDF：可选 Tesseract OCR 已接入，默认关闭；启用需要安装 tesseract 和中文语言包。
 - 插件商店上架：插件 1.0.0 包、图标和上架文档已就绪；还需要开发者账号、商店截图、隐私政策 URL 和审核。
 - RediSearch HNSW 仍待数据量上来后接入；本机向量检索仍为应用层余弦。
 - 数据清理任务已接入：过期 refresh token、授权码、幂等键和结束超过 30 天的入库任务。
-- 监控指标、告警规则、备份脚本、Playwright 登录 E2E 和 k6 压测脚本已接入；仍缺完整业务 E2E、压力基线和 Alertmanager 转发。
+- 监控指标、告警规则、Alertmanager 转发、备份/恢复演练、团队 API smoke、Playwright 登录 E2E 和压测基线已接入；团队配额已加入流式问答前的预留/释放，降低并发超额风险；仍缺真实用户数据下的 RAG 评测。
+- 账号邮件能力已接入（邀请邮件、邮箱验证、邮件找回密码）；默认 `MAIL_ENABLED=false`，生产需配置 SMTP 并验证投递。
 - 问答限流（10 次/分钟/用户）和管理端操作限流（60 次/分钟/管理员）已接入。
 
 ## 下一步
 
-1. 邮箱验证（需要 SMTP）
-2. 部署到服务器（可选 SSH CD 已就绪，需要配置 secrets）
+1. 部署到服务器（Caddy HTTPS 配置已就绪，需要域名、服务器和 secrets）
+2. 用真实用户资料重跑 30 条评测，并按需引入团队配额预留/原子扣减
+3. 生产 SMTP 投递验证与退信处理

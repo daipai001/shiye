@@ -6,8 +6,11 @@ import com.shiye.common.exception.BizException;
 import com.shiye.user.common.ratelimit.MinuteRateLimiter;
 import com.shiye.user.common.security.UserContext;
 import com.shiye.user.module.auth.domain.dto.ExtensionTokenRequest;
+import com.shiye.user.module.auth.domain.dto.EmailVerifyRequest;
 import com.shiye.user.module.auth.domain.dto.LoginRequest;
 import com.shiye.user.module.auth.domain.dto.LogoutRequest;
+import com.shiye.user.module.auth.domain.dto.PasswordForgotRequest;
+import com.shiye.user.module.auth.domain.dto.PasswordResetRequest;
 import com.shiye.user.module.auth.domain.dto.RefreshRequest;
 import com.shiye.user.module.auth.domain.dto.RegisterRequest;
 import com.shiye.user.module.auth.domain.vo.ExtensionCodeResponse;
@@ -60,6 +63,39 @@ public class AuthController {
         return Result.ok(authService.refresh(request.refreshToken(), userAgent(httpRequest), ip(httpRequest)));
     }
 
+    @PostMapping("/email/verify")
+    public Result<com.shiye.user.module.auth.domain.vo.UserSummary> verifyEmail(
+            @Valid @RequestBody EmailVerifyRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+        applyRateLimit(httpResponse, ip(httpRequest));
+        return Result.ok(authService.verifyEmail(request.token()));
+    }
+
+    @PostMapping("/email/resend")
+    public Result<Void> resendVerification() {
+        authService.requestEmailVerification(UserContext.requireUserId());
+        return Result.ok();
+    }
+
+    @PostMapping("/password/forgot")
+    public Result<Void> forgotPassword(@Valid @RequestBody PasswordForgotRequest request,
+                                       HttpServletRequest httpRequest,
+                                       HttpServletResponse httpResponse) {
+        applyRateLimit(httpResponse, ip(httpRequest));
+        authService.requestPasswordReset(request.email());
+        return Result.ok();
+    }
+
+    @PostMapping("/password/reset")
+    public Result<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request,
+                                      HttpServletRequest httpRequest,
+                                      HttpServletResponse httpResponse) {
+        applyRateLimit(httpResponse, ip(httpRequest));
+        authService.resetPassword(request.token(), request.newPassword());
+        return Result.ok();
+    }
+
     @PostMapping("/logout")
     public Result<Void> logout(@RequestBody(required = false) LogoutRequest request) {
         authService.logout(UserContext.requireUserId(), request == null ? null : request.refreshToken());
@@ -95,7 +131,7 @@ public class AuthController {
         response.setHeader("X-RateLimit-Remaining", String.valueOf(result.remaining()));
         response.setHeader("X-RateLimit-Reset", String.valueOf(result.resetEpochSeconds()));
         if (result.exceeded()) {
-            throw new BizException(ErrorCode.RATE_LIMITED, "登录/注册过于频繁，请稍后再试");
+            throw new BizException(ErrorCode.RATE_LIMITED, "认证操作过于频繁，请稍后再试");
         }
     }
 

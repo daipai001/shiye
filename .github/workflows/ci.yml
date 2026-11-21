@@ -151,6 +151,8 @@ jobs:
           exit 1
       - name: Smoke test
         run: bash scripts/ci-smoke.sh
+      - name: Team smoke test
+        run: bash scripts/ci-team-smoke.sh
       - name: Show API log on failure
         if: failure()
         run: tail -n 200 /tmp/shiye-user-api.log || true

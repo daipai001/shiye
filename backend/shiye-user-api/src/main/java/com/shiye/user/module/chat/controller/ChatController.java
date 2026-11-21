@@ -11,6 +11,7 @@ import com.shiye.user.module.chat.domain.vo.ChatCancelVO;
 import com.shiye.user.module.chat.service.ChatRateLimitService;
 import com.shiye.user.module.chat.service.ChatService;
 import com.shiye.user.module.team.service.TeamTaxonomyService;
+import com.shiye.user.module.usage.domain.vo.TeamReservation;
 import com.shiye.user.module.usage.service.UsageService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -63,11 +64,16 @@ public class ChatController {
                              HttpServletResponse response) {
         long userId = UserContext.requireUserId();
         applyRateLimit(response, userId);
-        usageService.assertCanChat(userId, teamId(request.scope()));
+        Long teamId = teamId(request.scope());
+        usageService.assertCanChat(userId, teamId);
+        TeamReservation reservation = teamId == null
+                ? null
+                : usageService.reserveTeamChat(
+                        userId, teamId, 12_000, new java.math.BigDecimal("0.12"));
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("X-Accel-Buffering", "no");
         SseEmitter emitter = new SseEmitter(180_000L);
-        chatService.stream(userId, client, request, emitter);
+        chatService.stream(userId, client, request, emitter, reservation);
         return emitter;
     }
 

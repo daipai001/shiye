@@ -22,6 +22,7 @@ import com.shiye.user.module.auth.mapper.ExtensionAuthCodeMapper;
 import com.shiye.user.module.auth.mapper.RefreshTokenMapper;
 import com.shiye.user.module.auth.mapper.UserMapper;
 import com.shiye.user.module.auth.service.AuthService;
+import com.shiye.user.module.auth.service.EmailTokenService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
     private final RuntimeSystemSettingsService systemSettingsService;
+    private final EmailTokenService emailTokenService;
 
     @Value("${shiye.jwt.refresh-expire-seconds:2592000}")
     private long refreshExpireSeconds;
@@ -53,13 +55,15 @@ public class AuthServiceImpl implements AuthService {
                            ExtensionAuthCodeMapper extensionAuthCodeMapper,
                            PasswordEncoder passwordEncoder,
                            JwtTokenService jwtTokenService,
-                           RuntimeSystemSettingsService systemSettingsService) {
+                           RuntimeSystemSettingsService systemSettingsService,
+                           EmailTokenService emailTokenService) {
         this.userMapper = userMapper;
         this.refreshTokenMapper = refreshTokenMapper;
         this.extensionAuthCodeMapper = extensionAuthCodeMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenService = jwtTokenService;
         this.systemSettingsService = systemSettingsService;
+        this.emailTokenService = emailTokenService;
     }
 
     @Override
@@ -95,6 +99,11 @@ public class AuthServiceImpl implements AuthService {
         UserEntity saved = userMapper.findById(user.getId());
         if (saved == null) {
             throw new BizException(ErrorCode.INTERNAL_ERROR);
+        }
+        try {
+            emailTokenService.sendVerification(saved);
+        } catch (RuntimeException ex) {
+            // 邮件失败不能阻断注册
         }
         return issueTokens(saved, userAgent, ip);
     }
@@ -232,6 +241,51 @@ public class AuthServiceImpl implements AuthService {
             throw new BizException(ErrorCode.VALIDATION_ERROR, "新密码不能与原密码相同");
         }
         userMapper.updatePassword(userId, passwordEncoder.encode(request.newPassword()));
+        refreshTokenMapper.revokeAllForSubject(SUBJECT_USER, userId);
+    }
+
+    @Override
+    public void requestEmailVerification(long userId) {
+        UserEntity user = requireActiveUser(userId);
+        if (user.getEmailVerifiedAt() != null) {
+            return;
+        }
+        emailTokenService.sendVerification(user);
+    }
+
+    @Override
+    @Transactional
+    public UserSummary verifyEmail(String token) {
+        long userId = emailTokenService.consume(token, EmailTokenService.TYPE_VERIFY);
+        userMapper.markEmailVerified(userId);
+        return UserSummary.from(requireActiveUser(userId));
+    }
+
+    @Override
+    public void requestPasswordReset(String email) {
+        if (email == null || email.isBlank()) {
+            return;
+        }
+        UserEntity user = userMapper.findByEmail(normalizeEmail(email));
+        if (user == null || !"ACTIVE".equals(user.getStatus())) {
+            return;
+        }
+        try {
+            emailTokenService.sendPasswordReset(user);
+        } catch (RuntimeException ex) {
+            // 不暴露邮箱是否存在，也不阻断接口
+        }
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        long userId = emailTokenService.consume(token, EmailTokenService.TYPE_RESET);
+        UserEntity user = userMapper.findById(userId);
+        if (user == null || !"ACTIVE".equals(user.getStatus())) {
+            throw new BizException(ErrorCode.INVALID_AUTH_CODE);
+        }
+        userMapper.updatePassword(userId, passwordEncoder.encode(newPassword));
         refreshTokenMapper.revokeAllForSubject(SUBJECT_USER, userId);
     }
 

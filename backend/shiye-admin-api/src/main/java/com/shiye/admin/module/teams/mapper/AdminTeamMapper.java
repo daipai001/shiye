@@ -84,4 +84,12 @@ public interface AdminTeamMapper {
     int updateQuota(@Param("id") long id,
                     @Param("tokens") long tokens,
                     @Param("cost") BigDecimal cost);
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM teams
+            WHERE owner_user_id = #{userId}
+              AND deleted_at IS NULL AND status = 'ACTIVE'
+            """)
+    long countActiveOwnedBy(@Param("userId") long userId);
 }

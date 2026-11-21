@@ -1,18 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AdminLayout from '../layouts/AdminLayout.vue'
-import LoginView from '../views/LoginView.vue'
-import OverviewView from '../views/OverviewView.vue'
-import UsageView from '../views/UsageView.vue'
-import UsersView from '../views/UsersView.vue'
-import ImportsView from '../views/ImportsView.vue'
-import TasksView from '../views/TasksView.vue'
-import ModelsView from '../views/ModelsView.vue'
-import SettingsView from '../views/SettingsView.vue'
-import AuditView from '../views/AuditView.vue'
-import EvalView from '../views/EvalView.vue'
-import AdminsView from '../views/AdminsView.vue'
-import TeamsView from '../views/TeamsView.vue'
 import { loadAdmin } from '../api/authStorage'
+
+const LoginView = () => import('../views/LoginView.vue')
+const OverviewView = () => import('../views/OverviewView.vue')
+const UsageView = () => import('../views/UsageView.vue')
+const UsersView = () => import('../views/UsersView.vue')
+const TeamsView = () => import('../views/TeamsView.vue')
+const ImportsView = () => import('../views/ImportsView.vue')
+const TasksView = () => import('../views/TasksView.vue')
+const ModelsView = () => import('../views/ModelsView.vue')
+const SettingsView = () => import('../views/SettingsView.vue')
+const EvalView = () => import('../views/EvalView.vue')
+const AuditView = () => import('../views/AuditView.vue')
+const AdminsView = () => import('../views/AdminsView.vue')
 
 const router = createRouter({
   history: createWebHistory(),

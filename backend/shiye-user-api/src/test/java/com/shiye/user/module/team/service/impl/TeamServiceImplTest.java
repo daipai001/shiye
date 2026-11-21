@@ -1,6 +1,7 @@
 package com.shiye.user.module.team.service.impl;
 
 import com.shiye.user.module.auth.service.AuthService;
+import com.shiye.user.module.auth.service.EmailTokenService;
 import com.shiye.user.module.team.domain.dto.TeamMemberAddRequest;
 import com.shiye.user.module.team.domain.dto.TeamMemberUpdateRequest;
 import com.shiye.user.module.team.domain.entity.TeamEntity;
@@ -25,8 +26,9 @@ class TeamServiceImplTest {
     private final TeamMemberMapper memberMapper = mock(TeamMemberMapper.class);
     private final TeamInviteMapper inviteMapper = mock(TeamInviteMapper.class);
     private final AuthService authService = mock(AuthService.class);
+    private final EmailTokenService emailTokenService = mock(EmailTokenService.class);
     private final TeamServiceImpl service = new TeamServiceImpl(
-            teamMapper, memberMapper, inviteMapper, authService);
+            teamMapper, memberMapper, inviteMapper, authService, emailTokenService);
 
     @Test
     void ownerCannotLeaveTeam() {

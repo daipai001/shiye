@@ -32,4 +32,12 @@ public interface AuthService {
     void changePassword(long userId, UserPasswordUpdateRequest request);
 
     UserQuotaVO quota(long userId);
+
+    void requestEmailVerification(long userId);
+
+    UserSummary verifyEmail(String token);
+
+    void requestPasswordReset(String email);
+
+    void resetPassword(String token, String newPassword);
 }
