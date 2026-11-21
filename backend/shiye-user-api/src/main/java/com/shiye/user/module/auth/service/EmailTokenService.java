@@ -39,17 +39,26 @@ public class EmailTokenService {
 
     @Transactional
     public void sendVerification(UserEntity user) {
+        if (!mailService.isEnabled()) {
+            return;
+        }
         String token = issue(user.getId(), TYPE_VERIFY, verifyExpireMinutes);
         mailService.sendVerification(user.getEmail(), token);
     }
 
     @Transactional
     public void sendPasswordReset(UserEntity user) {
+        if (!mailService.isEnabled()) {
+            return;
+        }
         String token = issue(user.getId(), TYPE_RESET, resetExpireMinutes);
         mailService.sendPasswordReset(user.getEmail(), token);
     }
 
     public void sendTeamInvite(String email, String teamName, String code) {
+        if (!mailService.isEnabled()) {
+            return;
+        }
         mailService.sendTeamInvite(email, teamName, code);
     }
 
