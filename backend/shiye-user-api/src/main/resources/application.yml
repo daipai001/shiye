@@ -76,6 +76,11 @@ shiye:
     rate-limit-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:10}
   chat:
     rate-limit-per-minute: ${CHAT_RATE_LIMIT_PER_MINUTE:10}
+    executor:
+      # 每个流式回答占用一个线程；并发高时按需调大
+      core-size: ${CHAT_EXECUTOR_CORE_SIZE:16}
+      max-size: ${CHAT_EXECUTOR_MAX_SIZE:32}
+      queue-capacity: ${CHAT_EXECUTOR_QUEUE_CAPACITY:100}
   ai:
     enabled: ${AI_ENABLED:false}
     citation-required: ${AI_CITATION_REQUIRED:true}

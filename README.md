@@ -264,7 +264,9 @@ RAG 问答闭环已打通：
 - `deploy/docker-compose.yml` 含 Prometheus、Alertmanager 与告警规则：5xx、P95、AI 错误率、Webhook 失败；`ALERTMANAGER_WEBHOOK_URL` 配置转发地址
 - HTTPS：`deploy/docker-compose.https.yml` + `deploy/Caddyfile`，本地已验证 `https://localhost` / `https://admin.localhost`，生产填真实域名和 `ACME_EMAIL`
 - 备份与恢复：`deploy/scripts/backup.ps1` / `backup.sh`、`restore-verify.ps1`；已完成本机 MySQL 恢复演练
-- 压测：`scripts/load-test.mjs`；2,000 篇/6,000 切片、20 VUs 下 246 RPS、P95 159ms（见 `docs/load-test-2026-11-21.md`）
+- 读接口压测：`scripts/load-test.mjs`；2,000 篇/6,000 切片、20 VUs 下 246 RPS、P95 159ms
+- AI/RAG 压测：`scripts/mock-ai.mjs` + `scripts/load-test-chat.mjs`；10 VUs 下 229 请求、0 失败、15.27 RPS、P95 1111ms（服务端记录延迟平均 118ms）
+- 压测记录：`docs/load-test-2026-11-21.md`
 - RAG 评测：30 条回归用例，recall@5/引用/正确率 1.0，成本 ¥0.05028（见 `docs/rag-eval-2026-11-21.md`）
 - 前端已改为路由懒加载 + Element Plus 按需组件，主包从约 869KB 降到约 54KB（另有共享 client/select 块）
 - 测试与压测说明：`scripts/README.md`
@@ -281,7 +283,8 @@ RAG 问答闭环已打通：
 - 插件商店上架：插件 1.0.0 包、图标和上架文档已就绪；还需要开发者账号、商店截图、隐私政策 URL 和审核。
 - RediSearch HNSW 仍待数据量上来后接入；本机向量检索仍为应用层余弦。
 - 数据清理任务已接入：过期 refresh token、授权码、幂等键和结束超过 30 天的入库任务。
-- 监控指标、告警规则、Alertmanager 转发、备份/恢复演练、团队 API smoke、Playwright 登录 E2E 和压测基线已接入；团队配额已加入流式问答前的预留/释放，降低并发超额风险；仍缺真实用户数据下的 RAG 评测。
+- 监控指标、告警规则、Alertmanager 转发、备份/恢复演练、团队 API smoke、Playwright 登录 E2E、读接口和 AI/RAG 压测基线已接入；团队配额已加入流式问答前的预留/释放；仍缺真实用户数据下的 RAG 评测。
+- 流式问答线程池已可配置（默认 core=16 / max=32 / queue=100）；流结束后同步写入消息/引用/用量，数据库写入会影响端到端延迟。
 - 账号邮件能力已接入（邀请邮件、邮箱验证、邮件找回密码）；默认 `MAIL_ENABLED=false`，生产需配置 SMTP 并验证投递。
 - 问答限流（10 次/分钟/用户）和管理端操作限流（60 次/分钟/管理员）已接入。
 

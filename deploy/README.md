@@ -43,6 +43,17 @@ APP_PUBLIC_URL=https://shiye.example.com
 
 未配置时 `MAIL_ENABLED=false`，相关接口仍返回成功，但不签发邮件 token、不实际发信。生产建议使用独立发信账号并配置 SPF/DKIM。
 
+## AI/RAG 压测（mock）
+
+`docker-compose.loadtest.yml` 会额外启动 `shiye-mock-ai`，并把 user-api 指向本地 mock 模型，不消耗外部 API：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.https.yml \
+  -f docker-compose.loadtest.yml up -d --build
+```
+
+只用于本地压测；生产不要叠加该文件。具体脚本和结果见 `scripts/README.md`、`docs/load-test-2026-11-21.md`。
+
 ## 健康检查
 
 - user-api：`http://localhost:18080/actuator/health`

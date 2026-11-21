@@ -40,6 +40,28 @@ k6 run -e BASE_URL=http://localhost:18080/api/v1 -e VUS=20 -e DURATION=30s scrip
 
 2026-11-21 本地结果见 `docs/load-test-2026-11-21.md`（2,000 篇/6,000 切片，246 RPS，P95 159ms）。
 
+## AI/RAG 流式问答压测（mock 模型）
+
+不消耗外部 API：`scripts/mock-ai.mjs` 提供 OpenAI 兼容的 chat/embedding/rerank，`deploy/docker-compose.loadtest.yml` 把它接入 user-api。
+
+```powershell
+$env:DOMAIN='localhost'
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.https.yml `
+  -f deploy/docker-compose.loadtest.yml up -d --build
+
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'
+$env:BASE_URL='https://localhost/api/v1'
+$env:EMAIL='chatload@shiye.local'
+$env:PASSWORD='ChatLoad123'
+$env:VUS='10'
+$env:DURATION='15s'
+node scripts/load-test-chat.mjs
+```
+
+2026-11-21 结果：10 VUs / 15s，229 请求，0 失败，15.27 RPS，P50 606ms，P95 1111ms；服务端记录延迟平均 118ms。详见 `docs/load-test-2026-11-21.md`。
+
+> mock 只验证链路和资源使用，不代表真实模型质量/延迟；生产不要启用该 overlay。
+
 ## RAG 评测回归
 
 ```powershell
