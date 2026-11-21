@@ -138,7 +138,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 
 ### 6. CI / CD
 
-- `.github/workflows/ci.yml`：push/PR 时跑后端单测、两个前端构建、插件语法检查，并启动 MySQL/Redis 跑真实 API smoke 和团队 API smoke（创建团队 → 邀请 → 共享 → 标签/文件夹 → 配额 → 解散）。
+- `.github/workflows/ci.yml`：push/PR 时跑后端单测、两个前端构建、插件语法检查，并启动 MySQL/Redis 跑真实 API smoke、团队 API smoke（创建团队 → 邀请 → 共享 → 标签/文件夹 → 配额 → 解散）、MySQL 备份恢复演练和 Prometheus/Alertmanager 配置校验。
 - `.github/workflows/cd.yml`：推送 `v*` tag 或手动触发，构建并推送四个镜像到 GHCR。
 - 可选 SSH 部署：配置仓库变量 `ENABLE_DEPLOY=true`、`IMAGE_PREFIX=ghcr.io/<owner>`，以及 secrets `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` / `DEPLOY_PATH`。
 

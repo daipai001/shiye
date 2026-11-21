@@ -74,6 +74,25 @@ jobs:
         working-directory: frontend/user-web
         run: npm run test:e2e
 
+  monitoring-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Prometheus rules
+        run: |
+          docker run --rm \
+            -v "$PWD/deploy/monitoring/alerts.yml:/tmp/alerts.yml:ro" \
+            --entrypoint promtool \
+            prom/prometheus:v2.55.1 check rules /tmp/alerts.yml
+      - name: Validate Alertmanager config
+        run: |
+          sed 's|__WEBHOOK_URL__|http://localhost:19090/shiye-alerts|' \
+            deploy/monitoring/alertmanager.yml.tmpl > /tmp/alertmanager.yml
+          docker run --rm \
+            -v "/tmp/alertmanager.yml:/tmp/alertmanager.yml:ro" \
+            --entrypoint amtool \
+            prom/alertmanager:v0.28.1 check-config /tmp/alertmanager.yml
+
   integration-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -153,6 +172,18 @@ jobs:
         run: bash scripts/ci-smoke.sh
       - name: Team smoke test
         run: bash scripts/ci-team-smoke.sh
+      - name: Backup/restore drill
+        run: |
+          set -euo pipefail
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot shiye -e \
+            "CREATE TABLE IF NOT EXISTS restore_drill_marker (id INT PRIMARY KEY, note VARCHAR(64)); INSERT INTO restore_drill_marker VALUES (1,'before-restore') ON DUPLICATE KEY UPDATE note='before-restore';"
+          mysqldump -h 127.0.0.1 -P 3306 -uroot -proot --single-transaction --routines --triggers --no-tablespaces --default-character-set=utf8mb4 shiye > /tmp/shiye-restore.sql
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "DROP DATABASE IF EXISTS shiye_restore_drill; CREATE DATABASE shiye_restore_drill;"
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot --default-character-set=utf8mb4 shiye_restore_drill < /tmp/shiye-restore.sql
+          test "$(mysql -h 127.0.0.1 -P 3306 -uroot -proot -N -e "SELECT note FROM shiye_restore_drill.restore_drill_marker WHERE id=1")" = "before-restore"
+          tables=$(mysql -h 127.0.0.1 -P 3306 -uroot -proot -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='shiye_restore_drill' AND table_type='BASE TABLE'")
+          test "$tables" -ge 30
+          echo "restore drill passed: tables=$tables"
       - name: Show API log on failure
         if: failure()
         run: tail -n 200 /tmp/shiye-user-api.log || true
