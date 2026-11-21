@@ -10,6 +10,7 @@ import com.shiye.user.module.chat.domain.dto.PageChatRequest;
 import com.shiye.user.module.chat.domain.vo.ChatCancelVO;
 import com.shiye.user.module.chat.service.ChatRateLimitService;
 import com.shiye.user.module.chat.service.ChatService;
+import com.shiye.user.module.team.service.TeamTaxonomyService;
 import com.shiye.user.module.usage.service.UsageService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.Set;
+
 @RestController
 @RequestMapping("/api/v1/chat")
 public class ChatController {
@@ -29,12 +32,15 @@ public class ChatController {
     private final ChatService chatService;
     private final UsageService usageService;
     private final ChatRateLimitService rateLimitService;
+    private final TeamTaxonomyService teamTaxonomyService;
 
     public ChatController(ChatService chatService, UsageService usageService,
-                          ChatRateLimitService rateLimitService) {
+                          ChatRateLimitService rateLimitService,
+                          TeamTaxonomyService teamTaxonomyService) {
         this.chatService = chatService;
         this.usageService = usageService;
         this.rateLimitService = rateLimitService;
+        this.teamTaxonomyService = teamTaxonomyService;
     }
 
     @PostMapping(value = "/page-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -71,13 +77,24 @@ public class ChatController {
     }
 
     private Long teamId(ChatStreamRequest.Scope scope) {
-        if (scope == null || !"TEAM".equalsIgnoreCase(scope.type())) {
+        if (scope == null) {
+            return null;
+        }
+        String type = scope.type() == null ? "" : scope.type().toUpperCase();
+        if (!Set.of("TEAM", "TEAM_TAG", "TEAM_FOLDER").contains(type)) {
             return null;
         }
         if (scope.id() == null || !scope.id().matches("\\d+")) {
-            throw new BizException(ErrorCode.VALIDATION_ERROR, "TEAM 范围需要 teamId");
+            throw new BizException(ErrorCode.VALIDATION_ERROR, type + " 范围需要 ID");
         }
-        return Long.parseLong(scope.id());
+        long id = Long.parseLong(scope.id());
+        if ("TEAM".equals(type)) {
+            return id;
+        }
+        if ("TEAM_TAG".equals(type)) {
+            return teamTaxonomyService.teamIdForTag(id);
+        }
+        return teamTaxonomyService.teamIdForFolder(id);
     }
 
     private void applyRateLimit(HttpServletResponse response, long userId) {

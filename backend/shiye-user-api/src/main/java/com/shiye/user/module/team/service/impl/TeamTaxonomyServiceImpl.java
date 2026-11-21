@@ -14,6 +14,10 @@ import com.shiye.user.module.team.domain.entity.TeamFolderEntity;
 import com.shiye.user.module.team.domain.entity.TeamFolderRow;
 import com.shiye.user.module.team.domain.entity.TeamTagEntity;
 import com.shiye.user.module.team.domain.entity.TeamTagRow;
+import com.shiye.user.module.team.domain.vo.TeamFolderOptionVO;
+import com.shiye.user.module.team.domain.vo.TeamTagOptionVO;
+import com.shiye.user.module.team.domain.vo.TeamTaxonomyOptionsVO;
+import com.shiye.user.module.team.domain.vo.TeamVO;
 import com.shiye.user.module.team.mapper.TeamFolderMapper;
 import com.shiye.user.module.team.mapper.TeamTagMapper;
 import com.shiye.user.module.team.service.TeamService;
@@ -276,6 +280,42 @@ public class TeamTaxonomyServiceImpl implements TeamTaxonomyService {
         tagMapper.deleteAll(teamId);
         folderMapper.deleteAllArticleRelations(teamId);
         folderMapper.deleteAll(teamId);
+    }
+
+    @Override
+    public TeamTaxonomyOptionsVO options(long userId) {
+        List<TeamTagOptionVO> tags = new ArrayList<>();
+        List<TeamFolderOptionVO> folders = new ArrayList<>();
+        for (TeamVO team : teamService.myTeams(userId)) {
+            long teamId = Long.parseLong(team.id());
+            for (TagVO tag : tags(userId, teamId)) {
+                tags.add(new TeamTagOptionVO(
+                        tag.id(), tag.name(), tag.color(), team.id(), team.name()));
+            }
+            for (ArticleFolderVO folder : folders(userId, teamId)) {
+                folders.add(new TeamFolderOptionVO(
+                        folder.id(), folder.path(), team.id(), team.name()));
+            }
+        }
+        return new TeamTaxonomyOptionsVO(tags, folders);
+    }
+
+    @Override
+    public long teamIdForTag(long tagId) {
+        Long teamId = tagMapper.findTeamId(tagId);
+        if (teamId == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "团队标签不存在");
+        }
+        return teamId;
+    }
+
+    @Override
+    public long teamIdForFolder(long folderId) {
+        Long teamId = folderMapper.findTeamId(folderId);
+        if (teamId == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "团队文件夹不存在");
+        }
+        return teamId;
     }
 
     private TeamTagEntity createTagInternal(long userId, long teamId, String rawName,

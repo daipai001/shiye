@@ -16,6 +16,7 @@ import com.shiye.user.module.team.domain.dto.TeamUpdateRequest;
 import com.shiye.user.module.team.domain.vo.TeamDetailVO;
 import com.shiye.user.module.team.domain.vo.TeamInviteVO;
 import com.shiye.user.module.team.domain.vo.TeamMemberVO;
+import com.shiye.user.module.team.domain.vo.TeamTaxonomyOptionsVO;
 import com.shiye.user.module.team.domain.vo.TeamVO;
 import com.shiye.user.module.team.service.TeamDissolveService;
 import com.shiye.user.module.team.service.TeamService;
@@ -56,6 +57,11 @@ public class TeamController {
     @PostMapping
     public Result<TeamDetailVO> create(@Valid @RequestBody TeamCreateRequest request) {
         return Result.ok(teamService.create(UserContext.requireUserId(), request));
+    }
+
+    @GetMapping("/taxonomy")
+    public Result<TeamTaxonomyOptionsVO> taxonomy() {
+        return Result.ok(taxonomyService.options(UserContext.requireUserId()));
     }
 
     @GetMapping("/{id}")

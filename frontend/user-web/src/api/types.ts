@@ -184,6 +184,26 @@ export interface TeamInvite {
   expiresAt: string
 }
 
+export interface TeamTagOption {
+  id: string
+  name: string
+  color?: string | null
+  teamId: string
+  teamName: string
+}
+
+export interface TeamFolderOption {
+  id: string
+  name: string
+  teamId: string
+  teamName: string
+}
+
+export interface TeamTaxonomyOptions {
+  tags: TeamTagOption[]
+  folders: TeamFolderOption[]
+}
+
 export interface Conversation {
   id: string
   title: string

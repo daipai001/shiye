@@ -37,6 +37,7 @@ import com.shiye.user.module.chat.service.ChunkRetrievalService;
 import com.shiye.user.module.chat.support.ConversationQueryRewriter;
 import com.shiye.user.module.chat.support.RetrievalResult;
 import com.shiye.user.module.chat.support.RetrievedChunk;
+import com.shiye.user.module.team.service.TeamTaxonomyService;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
 import com.shiye.user.module.usage.service.UsageService;
 import org.slf4j.Logger;
@@ -79,6 +80,7 @@ public class ChatServiceImpl implements ChatService {
     private final DeepSeekChatClient chatClient;
     private final UsageService usageService;
     private final RuntimeSystemSettingsService systemSettingsService;
+    private final TeamTaxonomyService teamTaxonomyService;
     private final ChatStreamRegistry streamRegistry;
     private final Executor chatExecutor;
 
@@ -90,6 +92,7 @@ public class ChatServiceImpl implements ChatService {
                            DeepSeekChatClient chatClient,
                            UsageService usageService,
                            RuntimeSystemSettingsService systemSettingsService,
+                           TeamTaxonomyService teamTaxonomyService,
                            ChatStreamRegistry streamRegistry,
                            @Qualifier("chatExecutor") Executor chatExecutor) {
         this.conversationMapper = conversationMapper;
@@ -100,6 +103,7 @@ public class ChatServiceImpl implements ChatService {
         this.chatClient = chatClient;
         this.usageService = usageService;
         this.systemSettingsService = systemSettingsService;
+        this.teamTaxonomyService = teamTaxonomyService;
         this.streamRegistry = streamRegistry;
         this.chatExecutor = chatExecutor;
     }
@@ -218,7 +222,7 @@ public class ChatServiceImpl implements ChatService {
         try {
             String question = request.question().trim();
             Scope scope = resolveScope(request, null);
-            teamId = "TEAM".equals(scope.type()) ? scope.id() : null;
+            teamId = resolveTeamId(scope);
             conversation = resolveConversation(userId, request, scope, question);
             List<MessageEntity> recentForRewrite = messageMapper.findRecent(
                     conversation.getId(), userId, 4);
@@ -526,9 +530,10 @@ public class ChatServiceImpl implements ChatService {
             return scope;
         }
         String type = request.scope().type().trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("ALL", "ARTICLE", "FOLDER", "TAG", "GENERAL", "TEAM").contains(type)) {
+        if (!Set.of("ALL", "ARTICLE", "FOLDER", "TAG", "GENERAL", "TEAM",
+                "TEAM_TAG", "TEAM_FOLDER").contains(type)) {
             throw new BizException(ErrorCode.VALIDATION_ERROR,
-                    "当前仅支持 ALL / ARTICLE / FOLDER / TAG / GENERAL / TEAM 范围");
+                    "当前仅支持 ALL / ARTICLE / FOLDER / TAG / GENERAL / TEAM / TEAM_TAG / TEAM_FOLDER 范围");
         }
         Long id = request.scope().id() == null ? null : Long.parseLong(request.scope().id());
         if (!Set.of("ALL", "GENERAL").contains(type) && id == null) {
@@ -537,6 +542,22 @@ public class ChatServiceImpl implements ChatService {
         scope.type = type;
         scope.id = id;
         return scope;
+    }
+
+    private Long resolveTeamId(Scope scope) {
+        if (scope.id() == null) {
+            return null;
+        }
+        if ("TEAM".equals(scope.type())) {
+            return scope.id();
+        }
+        if ("TEAM_TAG".equals(scope.type())) {
+            return teamTaxonomyService.teamIdForTag(scope.id());
+        }
+        if ("TEAM_FOLDER".equals(scope.type())) {
+            return teamTaxonomyService.teamIdForFolder(scope.id());
+        }
+        return null;
     }
 
     private List<ChatMessage> buildMessages(ConversationEntity conversation, long userId,

@@ -14,6 +14,8 @@ import type {
   PageResult,
   Quota,
   Tag,
+  TeamFolderOption,
+  TeamTagOption,
 } from '../api/types'
 
 const teamStore = useTeamStore()
@@ -28,10 +30,12 @@ const quota = ref<Quota | null>(null)
 const messagesBox = ref<HTMLElement | null>(null)
 let abortController: AbortController | null = null
 const activeRequestId = ref<string | null>(null)
-const scopeType = ref<'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG' | 'GENERAL' | 'TEAM'>('ALL')
+const scopeType = ref<'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG' | 'GENERAL' | 'TEAM' | 'TEAM_TAG' | 'TEAM_FOLDER'>('ALL')
 const scopeId = ref('')
 const folders = ref<BookmarkFolder[]>([])
 const tags = ref<Tag[]>([])
+const teamTags = ref<TeamTagOption[]>([])
+const teamFolders = ref<TeamFolderOption[]>([])
 const articles = ref<ArticleSummary[]>([])
 const articleLoading = ref(false)
 
@@ -79,16 +83,21 @@ async function loadConversations() {
 
 async function loadScopes() {
   try {
-    const [folderResponse, tagResponse] = await Promise.all([
+    const [folderResponse, tagResponse, taxonomyResponse] = await Promise.all([
       api.get<ApiResult<{ items: BookmarkFolder[] }>>('/bookmark-folders'),
       api.get<ApiResult<{ items: Tag[] }>>('/tags'),
+      api.get<ApiResult<{ tags: TeamTagOption[]; folders: TeamFolderOption[] }>>('/teams/taxonomy'),
       teamStore.load(),
     ])
     folders.value = folderResponse.data.data.items
     tags.value = tagResponse.data.data.items
+    teamTags.value = taxonomyResponse.data.data.tags
+    teamFolders.value = taxonomyResponse.data.data.folders
   } catch {
     folders.value = []
     tags.value = []
+    teamTags.value = []
+    teamFolders.value = []
   }
   await searchArticles('')
 }
@@ -127,8 +136,10 @@ async function ensureArticleOption(articleId: string) {
 async function selectConversation(conversation: Conversation) {
   if (streaming.value) return
   currentId.value = conversation.id
-  const type = conversation.scopeType as 'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG' | 'GENERAL' | 'TEAM'
-  scopeType.value = ['ALL', 'ARTICLE', 'FOLDER', 'TAG', 'GENERAL', 'TEAM'].includes(type)
+  const type = conversation.scopeType as
+    'ALL' | 'ARTICLE' | 'FOLDER' | 'TAG' | 'GENERAL' | 'TEAM' | 'TEAM_TAG' | 'TEAM_FOLDER'
+  scopeType.value = ['ALL', 'ARTICLE', 'FOLDER', 'TAG', 'GENERAL', 'TEAM',
+    'TEAM_TAG', 'TEAM_FOLDER'].includes(type)
     ? type
     : 'ALL'
   scopeId.value = conversation.scopeId || ''
@@ -401,6 +412,8 @@ onBeforeUnmount(() => {
             <el-option label="按文件夹" value="FOLDER" />
             <el-option label="按标签" value="TAG" />
             <el-option label="团队资料库" value="TEAM" />
+            <el-option label="团队标签" value="TEAM_TAG" />
+            <el-option label="团队文件夹" value="TEAM_FOLDER" />
             <el-option label="通用问答" value="GENERAL" />
           </el-select>
           <el-select
@@ -468,6 +481,38 @@ onBeforeUnmount(() => {
               :key="team.id"
               :label="team.name"
               :value="team.id"
+            />
+          </el-select>
+          <el-select
+            v-if="scopeType === 'TEAM_TAG'"
+            v-model="scopeId"
+            size="small"
+            filterable
+            placeholder="选择团队标签"
+            style="width: 240px"
+            :disabled="streaming"
+          >
+            <el-option
+              v-for="tag in teamTags"
+              :key="tag.id"
+              :label="`${tag.teamName} · ${tag.name}`"
+              :value="tag.id"
+            />
+          </el-select>
+          <el-select
+            v-if="scopeType === 'TEAM_FOLDER'"
+            v-model="scopeId"
+            size="small"
+            filterable
+            placeholder="选择团队文件夹"
+            style="width: 240px"
+            :disabled="streaming"
+          >
+            <el-option
+              v-for="folder in teamFolders"
+              :key="folder.id"
+              :label="`${folder.teamName} · ${folder.name}`"
+              :value="folder.id"
             />
           </el-select>
         </div>

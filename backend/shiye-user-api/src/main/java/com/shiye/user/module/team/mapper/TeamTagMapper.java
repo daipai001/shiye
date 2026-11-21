@@ -123,4 +123,7 @@ public interface TeamTagMapper {
 
     @Delete("DELETE FROM team_tags WHERE team_id = #{teamId}")
     int deleteAll(@Param("teamId") long teamId);
+
+    @Select("SELECT team_id FROM team_tags WHERE id = #{tagId}")
+    Long findTeamId(@Param("tagId") long tagId);
 }

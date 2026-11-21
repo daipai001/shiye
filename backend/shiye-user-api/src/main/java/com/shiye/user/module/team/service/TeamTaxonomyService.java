@@ -6,6 +6,7 @@ import com.shiye.user.module.team.domain.dto.ArticleTeamFolderRequest;
 import com.shiye.user.module.team.domain.dto.ArticleTeamTagRequest;
 import com.shiye.user.module.team.domain.dto.TeamFolderRequest;
 import com.shiye.user.module.team.domain.dto.TeamTagRequest;
+import com.shiye.user.module.team.domain.vo.TeamTaxonomyOptionsVO;
 
 import java.util.List;
 import java.util.Map;
@@ -50,4 +51,10 @@ public interface TeamTaxonomyService {
     void clearArticleTaxonomy(long teamId, long articleId);
 
     void deleteTeamTaxonomy(long teamId);
+
+    TeamTaxonomyOptionsVO options(long userId);
+
+    long teamIdForTag(long tagId);
+
+    long teamIdForFolder(long folderId);
 }

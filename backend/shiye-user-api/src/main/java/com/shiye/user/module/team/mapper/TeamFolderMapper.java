@@ -120,4 +120,7 @@ public interface TeamFolderMapper {
 
     @Delete("DELETE FROM team_folders WHERE team_id = #{teamId}")
     int deleteAll(@Param("teamId") long teamId);
+
+    @Select("SELECT team_id FROM team_folders WHERE id = #{folderId}")
+    Long findTeamId(@Param("folderId") long folderId);
 }

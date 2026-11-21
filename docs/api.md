@@ -943,7 +943,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 ### 3.4 问答
 
-> **当前实现**：`POST /chat/stream` 已接入 DeepSeek SSE、混合检索和 rerank，支持 `ALL / ARTICLE / FOLDER / TAG / GENERAL / TEAM` 范围；`GENERAL` 不检索资料库，直接回答，`TEAM` 只检索指定团队资料。检索 query 会结合最近用户问题做轻量改写，改善多轮追问。`POST /chat/page-stream` 支持插件当前页临时问答。
+> **当前实现**：`POST /chat/stream` 已接入 DeepSeek SSE、混合检索和 rerank，支持 `ALL / ARTICLE / FOLDER / TAG / GENERAL / TEAM / TEAM_TAG / TEAM_FOLDER` 范围；`GENERAL` 不检索资料库，直接回答；`TEAM` / `TEAM_TAG` / `TEAM_FOLDER` 只检索对应团队资料。检索 query 会结合最近用户问题做轻量改写，改善多轮追问。`POST /chat/page-stream` 支持插件当前页临时问答。
 > 引用、usage、会话/消息持久化已接通；默认使用联调 embedding，真实语义检索需配置 BGE-M3。
 
 #### POST `/chat/stream`
@@ -966,8 +966,8 @@ admin-web → POST /admin/api/v1/auth/login
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `conversationId` | string/null | 否 | 不传则新建会话 |
-| `scope.type` | string | 是 | ALL/ARTICLE/FOLDER/TAG/GENERAL/TEAM |
-| `scope.id` | string/null | 条件 | ARTICLE/FOLDER/TAG/TEAM 时必填；ALL/GENERAL 为空 |
+| `scope.type` | string | 是 | ALL/ARTICLE/FOLDER/TAG/GENERAL/TEAM/TEAM_TAG/TEAM_FOLDER |
+| `scope.id` | string/null | 条件 | ARTICLE/FOLDER/TAG/TEAM/TEAM_TAG/TEAM_FOLDER 时必填；ALL/GENERAL 为空 |
 | `question` | string | 是 | 1~4000 字 |
 | `model` | string/null | 否 | 不传用默认 |
 
@@ -1203,6 +1203,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
 | GET | `/teams` | 用户 | 我加入的团队 |
+| GET | `/teams/taxonomy` | 用户 | 我所有团队的标签/文件夹选项（用于团队范围问答） |
 | POST | `/teams` | 用户 | 创建团队，创建者为 OWNER |
 | GET | `/teams/{id}` | 成员 | 团队详情 + 成员 |
 | PUT | `/teams/{id}` | OWNER | 修改名称、token/成本配额 |
@@ -1234,7 +1235,9 @@ admin-web → POST /admin/api/v1/auth/login
 - `DELETE /teams/{id}` 仅 OWNER；解散会把 `articles.team_id` 置空，清除团队成员、邀请码、团队标签/文件夹和团队向量集合，团队软删除。
 - 团队标签/文件夹只作用于团队资料；`GET /articles?teamId=...&tagId=...&folderId=...` 的 `tagId`/`folderId` 对应团队标签/文件夹 ID。
 - 资料详情和团队列表返回的 `tags`/`folders` 对团队资料来自团队标签/文件夹。
-- 团队问答会同时检查个人配额、团队月配额和全局预算；团队配额超限返回 `42905`。
+- 团队范围问答支持 `TEAM`（整个团队）、`TEAM_TAG`（按团队标签）、`TEAM_FOLDER`（按团队文件夹）；`scope.id` 分别为团队 ID、团队标签 ID、团队文件夹 ID。
+- `GET /teams/taxonomy` 返回 `{tags:[{id,name,color,teamId,teamName}], folders:[{id,name,teamId,teamName}]}`，供问答范围下拉使用。
+- 团队问答会同时检查个人配额、团队月配额和全局预算；团队配额超限返回 `42905`。TEAM_TAG/TEAM_FOLDER 会先解析所属团队再检查配额。
 - `ai_usage.team_id` 和 `team_usage_monthly` 记录团队问答/RERANK 用量。
 - 资料共享/取消共享接口见 3.3。
 
@@ -2087,7 +2090,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 20 | 管理后台-登录 | `POST /admin/api/v1/auth/login` |
 | 21 | 管理后台-管理员 | `GET/POST /admin/api/v1/admins`、`PUT /admin/api/v1/admins/{id}`、`PUT /admin/api/v1/admins/{id}/status`、`PUT /admin/api/v1/admins/{id}/password` |
 | 22 | Web-团队 | `GET/POST /teams`、`GET/PUT/DELETE /teams/{id}`、`GET/POST /teams/{id}/members`、`PUT/DELETE /teams/{id}/members/{userId}`、`POST /teams/{id}/leave`、`POST /teams/{id}/invites`、`POST /teams/join`、`POST /teams/{id}/transfer`、团队标签/文件夹 CRUD |
-| 23 | Web-团队资料 | `GET /articles?teamId=&tagId=&folderId=`、`POST/DELETE /articles/{id}/share`、团队标签/文件夹关联、`POST /chat/stream`（TEAM） |
+| 23 | Web-团队资料 | `GET /articles?teamId=&tagId=&folderId=`、`POST/DELETE /articles/{id}/share`、团队标签/文件夹关联、`POST /chat/stream`（TEAM/TEAM_TAG/TEAM_FOLDER）、`GET /teams/taxonomy` |
 | 24 | 管理后台-团队与配额 | `GET /admin/api/v1/teams`、`PUT /admin/api/v1/teams/{id}/quota` |
 
 ---

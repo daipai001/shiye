@@ -17,6 +17,7 @@ import com.shiye.user.module.chat.support.RetrievalResult;
 import com.shiye.user.module.chat.support.RetrievedChunk;
 import com.shiye.user.module.tag.service.TagService;
 import com.shiye.user.module.team.service.TeamService;
+import com.shiye.user.module.team.service.TeamTaxonomyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,6 +58,7 @@ public class ChunkRetrievalService {
     private final RuntimeSystemSettingsService systemSettingsService;
     private final TagService tagService;
     private final TeamService teamService;
+    private final TeamTaxonomyService teamTaxonomyService;
     private final int maxPerArticle;
     private final double minScore;
     private final int maxScanChunks;
@@ -75,6 +77,7 @@ public class ChunkRetrievalService {
             RuntimeSystemSettingsService systemSettingsService,
             TagService tagService,
             TeamService teamService,
+            TeamTaxonomyService teamTaxonomyService,
             @Value("${shiye.ai.retrieval.max-per-article:3}") int maxPerArticle,
             @Value("${shiye.ai.retrieval.min-score:0.2}") double minScore,
             @Value("${shiye.ai.retrieval.max-scan-chunks:5000}") int maxScanChunks,
@@ -91,6 +94,7 @@ public class ChunkRetrievalService {
         this.systemSettingsService = systemSettingsService;
         this.tagService = tagService;
         this.teamService = teamService;
+        this.teamTaxonomyService = teamTaxonomyService;
         this.maxPerArticle = Math.max(1, maxPerArticle);
         this.minScore = minScore;
         this.maxScanChunks = Math.max(100, maxScanChunks);
@@ -430,6 +434,18 @@ public class ChunkRetrievalService {
             return new ScopeResolution(
                     new HashSet<>(articleMapper.findReadyIdsByTeam(scopeId)), scopeId);
         }
+        if ("TEAM_TAG".equals(scope)) {
+            long teamId = teamTaxonomyService.teamIdForTag(scopeId);
+            return new ScopeResolution(
+                    new HashSet<>(teamTaxonomyService.findArticleIdsByTag(
+                            userId, teamId, scopeId)), teamId);
+        }
+        if ("TEAM_FOLDER".equals(scope)) {
+            long teamId = teamTaxonomyService.teamIdForFolder(scopeId);
+            return new ScopeResolution(
+                    new HashSet<>(teamTaxonomyService.findArticleIdsByFolder(
+                            userId, teamId, scopeId)), teamId);
+        }
         if ("ARTICLE".equals(scope)) {
             ArticleEntity article = articleMapper.findById(scopeId);
             if (article == null) {
@@ -453,7 +469,7 @@ public class ChunkRetrievalService {
                     new HashSet<>(tagService.findArticleIdsByTag(userId, scopeId)), null);
         }
         throw new BizException(ErrorCode.VALIDATION_ERROR,
-                "当前仅支持 ALL / ARTICLE / FOLDER / TAG / TEAM 范围");
+                "当前仅支持 ALL / ARTICLE / FOLDER / TAG / TEAM / TEAM_TAG / TEAM_FOLDER 范围");
     }
 
     private String userKey(long userId) {
