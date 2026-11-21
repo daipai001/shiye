@@ -21,6 +21,10 @@ DOMAIN=shiye.example.com ACME_EMAIL=ops@example.com \
 
 Caddy 负责 TLS 和 80→443 跳转；`user-web` / `admin-web` 的 nginx 继续把 `/api/`、`/admin/api/` 反代到各自 API。生产不要直接暴露 15173/15174/18080/18081。
 
+两个 web 的 nginx 使用 Docker 内置 DNS（`resolver 127.0.0.11`）动态解析 API 容器，重建 API 后不需要重启 nginx。已实测：强制重建 user-api/admin-api 后，两个 HTTPS health 仍为 200。
+
+> `MAIL_ENABLED=false` 时 user-api 默认关闭邮件健康检查（`MAIL_HEALTH_ENABLED=false`），避免 `/actuator/health` 因 SMTP 不可用变成 DOWN。
+
 ## SMTP
 
 邮箱验证、邮件找回密码和团队邀请邮件通过 SMTP 发送。至少配置：

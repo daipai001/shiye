@@ -2,6 +2,10 @@
 set -euo pipefail
 
 BASE="${BASE_URL:-http://127.0.0.1:18080/api/v1}"
+CURL_OPTS=()
+if [ "${CURL_INSECURE:-false}" = "true" ]; then
+  CURL_OPTS+=(-k)
+fi
 STAMP="$(date +%s)-$RANDOM"
 EMAIL_A="team-a-$STAMP@shiye.local"
 EMAIL_B="team-b-$STAMP@shiye.local"
@@ -23,15 +27,15 @@ process.stdin.on("end", () => {
 }
 
 json_post() {
-  curl -sS -X POST "$1" -H "Content-Type: application/json" "${@:3}" --data "$2"
+  curl "${CURL_OPTS[@]}" -sS -X POST "$1" -H "Content-Type: application/json" "${@:3}" --data "$2"
 }
 
 json_put() {
-  curl -sS -X PUT "$1" -H "Content-Type: application/json" "${@:3}" --data "$2"
+  curl "${CURL_OPTS[@]}" -sS -X PUT "$1" -H "Content-Type: application/json" "${@:3}" --data "$2"
 }
 
 json_delete() {
-  curl -sS -X DELETE "$1" -H "Authorization: Bearer $2"
+  curl "${CURL_OPTS[@]}" -sS -X DELETE "$1" -H "Authorization: Bearer $2"
 }
 
 auth_header() {
@@ -69,17 +73,17 @@ json_post "$BASE/articles/$ARTICLE_ID/team-tags" "{\"tagId\":\"$TAG_ID\"}" -H "$
 json_post "$BASE/articles/$ARTICLE_ID/team-folders" "{\"folderId\":\"$FOLDER_ID\"}" -H "$(auth_header "$TOKEN_B")" >/dev/null
 
 echo "[team-ci] team article filters"
-BY_TAG=$(curl -sS "$BASE/articles?teamId=$TEAM_ID&tagId=$TAG_ID" -H "$(auth_header "$TOKEN_B")")
+BY_TAG=$(curl "${CURL_OPTS[@]}" -sS "$BASE/articles?teamId=$TEAM_ID&tagId=$TAG_ID" -H "$(auth_header "$TOKEN_B")")
 test "$(echo "$BY_TAG" | json_get data.total)" = "1"
 test "$(echo "$BY_TAG" | json_get data.items.0.tags.0.name)" = "CI-Tag"
-DETAIL=$(curl -sS "$BASE/articles/$ARTICLE_ID" -H "$(auth_header "$TOKEN_B")")
+DETAIL=$(curl "${CURL_OPTS[@]}" -sS "$BASE/articles/$ARTICLE_ID" -H "$(auth_header "$TOKEN_B")")
 test "$(echo "$DETAIL" | json_get data.teamId)" = "$TEAM_ID"
 
 echo "[team-ci] team quota blocks chat"
 json_put "$BASE/teams/$TEAM_ID" \
   "{\"name\":\"CI Team\",\"monthlyTokenQuota\":0,\"monthlyCostQuota\":20}" \
   -H "$(auth_header "$TOKEN_A")" >/dev/null
-CHAT_STATUS=$(curl -sS -o /tmp/team-chat.json -w '%{http_code}' -X POST "$BASE/chat/stream" \
+CHAT_STATUS=$(curl "${CURL_OPTS[@]}" -sS -o /tmp/team-chat.json -w '%{http_code}' -X POST "$BASE/chat/stream" \
   -H "$(auth_header "$TOKEN_B")" -H 'Content-Type: application/json' \
   --data "{\"scope\":{\"type\":\"TEAM_TAG\",\"id\":\"$TAG_ID\"},\"question\":\"team quota test\"}")
 test "$CHAT_STATUS" = "429"
@@ -87,7 +91,7 @@ test "$(json_get code < /tmp/team-chat.json)" = "42905"
 
 echo "[team-ci] dissolve"
 json_delete "$BASE/teams/$TEAM_ID" "$TOKEN_A" >/dev/null
-TEAM_STATUS=$(curl -sS -o /tmp/team-after.json -w '%{http_code}' "$BASE/teams/$TEAM_ID" -H "$(auth_header "$TOKEN_B")")
+TEAM_STATUS=$(curl "${CURL_OPTS[@]}" -sS -o /tmp/team-after.json -w '%{http_code}' "$BASE/teams/$TEAM_ID" -H "$(auth_header "$TOKEN_B")")
 test "$TEAM_STATUS" = "404"
 
 echo "[team-ci] team smoke passed"

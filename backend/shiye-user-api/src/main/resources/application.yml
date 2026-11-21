@@ -50,6 +50,9 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:false}
   metrics:
     tags:
       application: ${spring.application.name}
