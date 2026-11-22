@@ -919,7 +919,7 @@ admin-web → POST /admin/api/v1/auth/login
 
 **错误**：40402、40005、40903
 
-> 重新抓取会删除旧切片和 Redis 向量；已有引用记录保留历史引用片段。
+> 重新抓取成功后会删除旧切片和 Redis 向量，已有引用记录保留历史引用片段。如果抓取/解析阶段失败，旧正文和切片仍然有效，文章恢复为 `READY`，本次 `ingest_task` 记录为 `FAILED`；Embedding/向量阶段失败才会把文章标记为 `FAILED`。
 
 ---
 

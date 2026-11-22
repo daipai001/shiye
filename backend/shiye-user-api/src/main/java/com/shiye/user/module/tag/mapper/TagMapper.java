@@ -89,9 +89,11 @@ public interface TagMapper {
     List<TagRow> listWithCounts(@Param("userId") long userId);
 
     @Select("""
-            SELECT article_id
-            FROM article_tags
-            WHERE user_id = #{userId} AND tag_id = #{tagId}
+            SELECT at.article_id
+            FROM article_tags at
+            JOIN articles a ON a.id = at.article_id
+            WHERE at.user_id = #{userId} AND at.tag_id = #{tagId}
+              AND a.user_id = #{userId} AND a.deleted_at IS NULL AND a.status = 'READY'
             """)
     List<Long> findArticleIdsByTag(@Param("userId") long userId,
                                    @Param("tagId") long tagId);

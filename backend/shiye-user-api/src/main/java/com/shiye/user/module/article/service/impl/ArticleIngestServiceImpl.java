@@ -42,6 +42,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 
@@ -258,6 +259,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
             throw new BizException(ErrorCode.VALIDATION_ERROR, "只有 URL 资料支持重新抓取");
         }
         UrlNormalizer.Normalized normalized = normalize(article.getUrl());
+        boolean wasReady = ArticleStatus.READY.name().equals(article.getStatus());
         articleMapper.updateStatus(articleId, userId, ArticleStatus.PENDING.name());
         String title = article.getTitle();
         String sourceType = article.getSourceType() == null ? "MANUAL" : article.getSourceType();
@@ -266,8 +268,31 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                 ingestResolved(userId, 0, null, normalized, title, false, sourceType);
             } catch (Exception ex) {
                 log.warn("reindex article {} failed: {}", articleId, ex.getMessage());
+                restoreReadyAfterReindexFailure(userId, articleId, wasReady, ex);
             }
         });
+    }
+
+    /**
+     * 重新抓取在 FETCH/PARSE 阶段失败时，旧正文和切片仍然有效，恢复 READY，
+     * 只把本次 ingest_task 记为失败，避免一条已索引资料因为网站临时不可达而消失。
+     */
+    private void restoreReadyAfterReindexFailure(long userId, long articleId,
+                                                 boolean wasReady, Exception ex) {
+        if (!wasReady || !(ex instanceof IngestException ingest)) {
+            return;
+        }
+        if (!Set.of("SSRF_BLOCKED", "FETCH_FAILED", "INVALID_URL", "PARSE_FAILED")
+                .contains(ingest.getCode())) {
+            return;
+        }
+        try {
+            articleMapper.updateStatus(articleId, userId, ArticleStatus.READY.name());
+            log.info("reindex article {} failed at {}, restored READY with existing chunks",
+                    articleId, ingest.getCode());
+        } catch (RuntimeException restoreEx) {
+            log.warn("restore READY for article {} failed: {}", articleId, restoreEx.getMessage());
+        }
     }
 
     private IngestOutcome ingestResolved(long userId, long folderId, String folderPath,
@@ -390,13 +415,13 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         }
 
         Long teamId = articleMapper.findTeamId(articleId);
+        // 一次 SQL 写入所有 vector_id，避免每个切片一次 UPDATE。
+        chunkMapper.assignVectorIds(articleId, userId);
         for (int i = 0; i < stored.size(); i++) {
             if (i == 0) {
                 ingestTaskService.advance(taskId, "INDEX");
             }
             ArticleChunkEntity chunk = stored.get(i);
-            String vectorId = "kb:chunk:" + chunk.getId();
-            chunkMapper.updateVectorId(chunk.getId(), userId, vectorId);
             vectorStore.upsert(
                     userId,
                     articleId,

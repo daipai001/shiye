@@ -28,12 +28,11 @@ public interface ArticleChunkMapper {
 
     @Update("""
             UPDATE article_chunks
-            SET vector_id = #{vectorId}
-            WHERE id = #{id} AND user_id = #{userId}
+            SET vector_id = CONCAT('kb:chunk:', id)
+            WHERE article_id = #{articleId} AND user_id = #{userId}
             """)
-    int updateVectorId(@Param("id") long id,
-                       @Param("userId") long userId,
-                       @Param("vectorId") String vectorId);
+    int assignVectorIds(@Param("articleId") long articleId,
+                        @Param("userId") long userId);
 
     @Select("""
             SELECT id, article_id, user_id, chunk_index, content, token_count,

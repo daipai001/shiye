@@ -22,9 +22,11 @@ public interface ArticleFolderMapper {
                      @Param("folderPath") String folderPath);
 
     @Select("""
-            SELECT article_id
-            FROM article_folders
-            WHERE user_id = #{userId} AND bookmark_folder_id = #{folderId}
+            SELECT af.article_id
+            FROM article_folders af
+            JOIN articles a ON a.id = af.article_id
+            WHERE af.user_id = #{userId} AND af.bookmark_folder_id = #{folderId}
+              AND a.user_id = #{userId} AND a.deleted_at IS NULL AND a.status = 'READY'
             """)
     List<Long> findArticleIdsByFolder(@Param("userId") long userId,
                                       @Param("folderId") long folderId);
