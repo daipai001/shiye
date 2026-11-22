@@ -23,6 +23,7 @@ import com.shiye.user.module.auth.mapper.RefreshTokenMapper;
 import com.shiye.user.module.auth.mapper.UserMapper;
 import com.shiye.user.module.auth.service.AuthService;
 import com.shiye.user.module.auth.service.EmailTokenService;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -94,7 +95,11 @@ public class AuthServiceImpl implements AuthService {
         user.setMonthlyTokenQuota(settings.defaultMonthlyTokens());
         user.setMonthlyCostQuota(settings.defaultMonthlyCost());
         user.setQuotaSource("NEW_USER");
-        userMapper.insert(user);
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException ex) {
+            throw new BizException(ErrorCode.CONFLICT, "邮箱已注册");
+        }
 
         UserEntity saved = userMapper.findById(user.getId());
         if (saved == null) {
@@ -139,7 +144,9 @@ public class AuthServiceImpl implements AuthService {
         if (!"ACTIVE".equals(user.getStatus())) {
             throw new BizException(ErrorCode.USER_DISABLED);
         }
-        refreshTokenMapper.revoke(existing.getId(), null);
+        if (refreshTokenMapper.revoke(existing.getId(), null) == 0) {
+            throw new BizException(ErrorCode.REFRESH_REVOKED);
+        }
         return issueTokens(user, userAgent, ip);
     }
 

@@ -27,15 +27,27 @@ public class AdminRateLimitService {
     }
 
     public RateLimitResult hit(long adminId) {
+        return hit("admin:" + adminId, limitPerMinute);
+    }
+
+    /**
+     * 登录/刷新按 IP 限流，默认比日常操作更严格（10 次/分钟）。
+     */
+    public RateLimitResult hitAuth(String ip) {
+        return hit("auth:" + (ip == null ? "unknown" : ip),
+                Math.min(10, limitPerMinute));
+    }
+
+    private RateLimitResult hit(String bucket, int limit) {
         long minute = Instant.now().getEpochSecond() / 60;
         long reset = (minute + 1) * 60;
-        String key = "shiye:rl:admin:" + adminId + ":" + minute;
+        String key = "shiye:rl:" + bucket + ":" + minute;
         try {
             Long count = redisTemplate.opsForValue().increment(key);
             redisTemplate.expire(key, Duration.ofMinutes(2));
             long used = count == null ? 0 : count;
-            long remaining = Math.max(0, limitPerMinute - used);
-            return new RateLimitResult(limitPerMinute, remaining, reset, used > limitPerMinute);
+            long remaining = Math.max(0, limit - used);
+            return new RateLimitResult(limit, remaining, reset, used > limit);
         } catch (RuntimeException ex) {
             log.warn("admin rate limit unavailable, fail open: {}", ex.getMessage());
             return null;

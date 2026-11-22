@@ -50,6 +50,11 @@ public class AdminJwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        // 拒绝编码/矩阵参数/重复斜杠路径，避免用 /%61dmins 绕过角色前缀判断。
+        if (isUnsafePath(request.getRequestURI())) {
+            writeError(response, ErrorCode.FORBIDDEN);
+            return;
+        }
         String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (authorization == null || !authorization.startsWith("Bearer ")) {
             writeError(response, ErrorCode.UNAUTHORIZED);
@@ -77,6 +82,17 @@ public class AdminJwtAuthFilter extends OncePerRequestFilter {
         } finally {
             AdminContext.clear();
         }
+    }
+
+    static boolean isUnsafePath(String path) {
+        if (path == null || path.isBlank()) {
+            return true;
+        }
+        return path.indexOf('%') >= 0
+                || path.indexOf(';') >= 0
+                || path.indexOf('\\') >= 0
+                || path.contains("//")
+                || path.contains("..");
     }
 
     private boolean allowRequest(HttpServletResponse response, long adminId) throws IOException {

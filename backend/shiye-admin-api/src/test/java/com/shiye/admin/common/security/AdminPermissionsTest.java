@@ -13,6 +13,7 @@ class AdminPermissionsTest {
         assertTrue(AdminPermissions.allows("SUPER_ADMIN", "PUT", "/admin/api/v1/settings"));
         assertTrue(AdminPermissions.allows("SUPER_ADMIN", "POST", "/admin/api/v1/models/test"));
         assertTrue(AdminPermissions.allows("SUPER_ADMIN", "DELETE", "/admin/api/v1/eval/cases/1"));
+        assertTrue(AdminPermissions.allows("SUPER_ADMIN", "PUT", "/admin/api/v1/budget"));
     }
 
     @Test
@@ -20,10 +21,12 @@ class AdminPermissionsTest {
         assertTrue(AdminPermissions.allows("OPERATOR", "PUT", "/admin/api/v1/users/1/quota"));
         assertTrue(AdminPermissions.allows("OPERATOR", "POST", "/admin/api/v1/imports/1/retry"));
         assertTrue(AdminPermissions.allows("OPERATOR", "POST", "/admin/api/v1/eval/runs"));
+        assertTrue(AdminPermissions.allows("OPERATOR", "PUT", "/admin/api/v1/teams/1/quota"));
         assertFalse(AdminPermissions.allows("OPERATOR", "GET", "/admin/api/v1/settings"));
         assertFalse(AdminPermissions.allows("OPERATOR", "PUT", "/admin/api/v1/models/chat"));
         assertFalse(AdminPermissions.allows("OPERATOR", "GET", "/admin/api/v1/admins"));
         assertFalse(AdminPermissions.allows("OPERATOR", "POST", "/admin/api/v1/admins"));
+        assertFalse(AdminPermissions.allows("OPERATOR", "PUT", "/admin/api/v1/budget"));
     }
 
     @Test
@@ -45,5 +48,13 @@ class AdminPermissionsTest {
     void legacyAdminRoleNormalizesToSuperAdmin() {
         assertTrue(AdminPermissions.isKnownRole("admin"));
         assertTrue(AdminPermissions.allows("admin", "GET", "/admin/api/v1/admins"));
+    }
+
+    @Test
+    void unsafePathsAreRejected() {
+        assertTrue(AdminJwtAuthFilter.isUnsafePath("/admin/api/v1/%61dmins"));
+        assertTrue(AdminJwtAuthFilter.isUnsafePath("/admin/api/v1/admins;foo"));
+        assertTrue(AdminJwtAuthFilter.isUnsafePath("/admin/api/v1//admins"));
+        assertFalse(AdminJwtAuthFilter.isUnsafePath("/admin/api/v1/admins"));
     }
 }

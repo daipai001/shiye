@@ -596,7 +596,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
 | `user_id` | BIGINT UNSIGNED | 否 | — | 用户 |
 | `title` | VARCHAR(255) | 否 | — | 标题 |
-| `scope_type` | VARCHAR(16) | 否 | `ALL` | ALL / ARTICLE / FOLDER / TAG / CURRENT |
+| `scope_type` | VARCHAR(16) | 否 | `ALL` | ALL / ARTICLE / FOLDER / TAG / GENERAL / TEAM / TEAM_TAG / TEAM_FOLDER |
 | `scope_id` | BIGINT UNSIGNED | 是 | NULL | 资料/文件夹/标签 ID |
 | `model` | VARCHAR(64) | 是 | NULL | 使用的 Chat 模型 |
 | `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |

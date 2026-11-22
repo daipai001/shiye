@@ -73,7 +73,9 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         if (admin == null || !"ACTIVE".equals(admin.getStatus())) {
             throw new BizException(ErrorCode.ADMIN_DISABLED);
         }
-        refreshTokenMapper.revoke(existing.getId(), null);
+        if (refreshTokenMapper.revoke(existing.getId(), null) == 0) {
+            throw new BizException(ErrorCode.REFRESH_REVOKED);
+        }
         return issueTokens(admin, userAgent, ip);
     }
 

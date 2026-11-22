@@ -204,6 +204,8 @@ data: {"text":"你收藏的资料里..."}
 
 > 启用 BGE-reranker 时，`citation.score` 为 reranker 的 `relevance_score`（0~1），`citation` 顺序即重排后的顺序；未启用或 rerank 失败时回退 RRF 混合检索分数。rerank token 写入 `ai_usage.scene=RERANK`，不影响 SSE 事件结构。
 
+> 问答线程池队列满时会返回 `error`（`code=SERVER_BUSY`, `retryable=true`）后结束。客户端如果收到 EOF 但没有 `done`/`error`，应视为异常中断，不要显示为空回答。
+
 客户端断开：服务端取消上游请求，记录 `ABORTED`。
 
 ### 1.10 页面/客户端映射
@@ -2001,8 +2003,10 @@ admin-web → POST /admin/api/v1/auth/login
 | 角色 | 权限 |
 |---|---|
 | `SUPER_ADMIN` | 全部；包括管理员、模型配置、系统设置 |
-| `OPERATOR` | 总览、用量、用户、导入、任务、评测、审计的读写；不能访问管理员/模型/系统设置 |
+| `OPERATOR` | 总览、用量、用户、导入、任务、评测、审计的读写；不能访问管理员/模型/系统设置/预算 |
 | `VIEWER` | 上述业务模块只读；不能执行 POST/PUT/DELETE |
+
+> 管理端登录和刷新按 IP 限流（默认 10 次/分钟），超限返回 42901；管理端操作另按管理员限流（默认 60 次/分钟）。
 
 #### GET `/admins`
 
@@ -2175,6 +2179,7 @@ admin-web → POST /admin/api/v1/auth/login
 | `/admin/api/v1/tasks` | 禁止 | 允许 | — |
 | `/admin/api/v1/models` | 禁止 | 仅 `SUPER_ADMIN` | — |
 | `/admin/api/v1/settings` | 禁止 | 仅 `SUPER_ADMIN` | — |
+| `/admin/api/v1/budget` | 禁止 | 仅 `SUPER_ADMIN` | — |
 | `/admin/api/v1/admins` | 禁止 | 仅 `SUPER_ADMIN` | — |
 | `/admin/api/v1/teams` | 禁止 | 所有角色可读，`SUPER_ADMIN` / `OPERATOR` 可改配额 | — |
 | 其他 `/admin/api/v1/*` | 禁止 | `SUPER_ADMIN` / `OPERATOR` 读写，`VIEWER` 只读 | — |

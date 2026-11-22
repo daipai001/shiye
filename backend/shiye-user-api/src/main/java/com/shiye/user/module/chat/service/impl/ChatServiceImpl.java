@@ -121,8 +121,21 @@ public class ChatServiceImpl implements ChatService {
                     emitter, cancelled, teamReservation));
         } catch (RuntimeException ex) {
             usageService.releaseTeamChat(teamReservation);
+            safeSend(emitter, "error", new ChatSseError(
+                    "SERVER_BUSY", "问答服务繁忙，请稍后再试", true));
             safeComplete(emitter);
         }
+    }
+
+    @Override
+    public Long resolveTeamId(long userId, ChatStreamRequest request) {
+        Scope scope = resolveScope(request, null);
+        if (request.conversationId() != null) {
+            ConversationEntity existing = findConversation(
+                    userId, Long.parseLong(request.conversationId()));
+            scope.overrideFrom(existing);
+        }
+        return resolveTeamId(scope);
     }
 
     @Override
@@ -135,6 +148,8 @@ public class ChatServiceImpl implements ChatService {
             chatExecutor.execute(() -> runPageStream(userId, normalizeSource(source), request,
                     emitter, cancelled));
         } catch (RuntimeException ex) {
+            safeSend(emitter, "error", new ChatSseError(
+                    "SERVER_BUSY", "问答服务繁忙，请稍后再试", true));
             safeComplete(emitter);
         }
     }
@@ -226,8 +241,8 @@ public class ChatServiceImpl implements ChatService {
         try {
             String question = request.question().trim();
             Scope scope = resolveScope(request, null);
-            teamId = resolveTeamId(scope);
             conversation = resolveConversation(userId, request, scope, question);
+            teamId = resolveTeamId(scope);
             List<MessageEntity> recentForRewrite = messageMapper.findRecent(
                     conversation.getId(), userId, 4);
             String retrievalQuery = ConversationQueryRewriter.rewrite(
@@ -270,7 +285,7 @@ public class ChatServiceImpl implements ChatService {
             ));
             sendCitations(emitter, chunks);
 
-            if (chunks.isEmpty()) {
+            if (!general && chunks.isEmpty()) {
                 send(emitter, "delta", new ChatSseDelta(NO_RESULT_ANSWER));
                 int latency = (int) (System.currentTimeMillis() - started);
                 messageMapper.updateAssistant(

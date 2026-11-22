@@ -10,7 +10,6 @@ import com.shiye.user.module.chat.domain.dto.PageChatRequest;
 import com.shiye.user.module.chat.domain.vo.ChatCancelVO;
 import com.shiye.user.module.chat.service.ChatRateLimitService;
 import com.shiye.user.module.chat.service.ChatService;
-import com.shiye.user.module.team.service.TeamTaxonomyService;
 import com.shiye.user.module.usage.domain.vo.TeamReservation;
 import com.shiye.user.module.usage.service.UsageService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -24,8 +23,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.Set;
-
 @RestController
 @RequestMapping("/api/v1/chat")
 public class ChatController {
@@ -33,15 +30,12 @@ public class ChatController {
     private final ChatService chatService;
     private final UsageService usageService;
     private final ChatRateLimitService rateLimitService;
-    private final TeamTaxonomyService teamTaxonomyService;
 
     public ChatController(ChatService chatService, UsageService usageService,
-                          ChatRateLimitService rateLimitService,
-                          TeamTaxonomyService teamTaxonomyService) {
+                          ChatRateLimitService rateLimitService) {
         this.chatService = chatService;
         this.usageService = usageService;
         this.rateLimitService = rateLimitService;
-        this.teamTaxonomyService = teamTaxonomyService;
     }
 
     @PostMapping(value = "/page-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -64,7 +58,7 @@ public class ChatController {
                              HttpServletResponse response) {
         long userId = UserContext.requireUserId();
         applyRateLimit(response, userId);
-        Long teamId = teamId(request.scope());
+        Long teamId = chatService.resolveTeamId(userId, request);
         usageService.assertCanChat(userId, teamId);
         TeamReservation reservation = teamId == null
                 ? null
@@ -80,27 +74,6 @@ public class ChatController {
     @PostMapping("/{requestId}/cancel")
     public Result<ChatCancelVO> cancel(@PathVariable String requestId) {
         return Result.ok(chatService.cancel(UserContext.requireUserId(), requestId));
-    }
-
-    private Long teamId(ChatStreamRequest.Scope scope) {
-        if (scope == null) {
-            return null;
-        }
-        String type = scope.type() == null ? "" : scope.type().toUpperCase();
-        if (!Set.of("TEAM", "TEAM_TAG", "TEAM_FOLDER").contains(type)) {
-            return null;
-        }
-        if (scope.id() == null || !scope.id().matches("\\d+")) {
-            throw new BizException(ErrorCode.VALIDATION_ERROR, type + " 范围需要 ID");
-        }
-        long id = Long.parseLong(scope.id());
-        if ("TEAM".equals(type)) {
-            return id;
-        }
-        if ("TEAM_TAG".equals(type)) {
-            return teamTaxonomyService.teamIdForTag(id);
-        }
-        return teamTaxonomyService.teamIdForFolder(id);
     }
 
     private void applyRateLimit(HttpServletResponse response, long userId) {

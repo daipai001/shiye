@@ -113,6 +113,8 @@ export async function streamChat(
   const decoder = new TextDecoder('utf-8')
   let buffer = ''
 
+  let sawDone = false
+  let sawError = false
   const dispatch = (block: string) => {
     let event = 'message'
     const dataLines: string[] = []
@@ -149,8 +151,10 @@ export async function streamChat(
         estimated: boolean
       })
     } else if (event === 'done') {
+      sawDone = true
       callbacks.onDone?.((data as { finishReason: string }).finishReason)
     } else if (event === 'error') {
+      sawError = true
       callbacks.onError?.(data as { code: string; message: string; retryable: boolean })
     }
   }
@@ -169,6 +173,9 @@ export async function streamChat(
     }
     if (buffer.trim()) {
       dispatch(buffer)
+    }
+    if (!sawDone && !sawError) {
+      callbacks.onError?.({ code: 'STREAM_BROKEN', message: '回答流意外结束', retryable: true })
     }
   } catch (error) {
     if ((error as Error).name === 'AbortError') return

@@ -21,10 +21,13 @@ public class UserJwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtTokenService jwtTokenService;
     private final ObjectMapper objectMapper;
+    private final UserStatusProvider userStatusProvider;
 
-    public UserJwtAuthFilter(JwtTokenService jwtTokenService, ObjectMapper objectMapper) {
+    public UserJwtAuthFilter(JwtTokenService jwtTokenService, ObjectMapper objectMapper,
+                             UserStatusProvider userStatusProvider) {
         this.jwtTokenService = jwtTokenService;
         this.objectMapper = objectMapper;
+        this.userStatusProvider = userStatusProvider;
     }
 
     @Override
@@ -56,6 +59,10 @@ public class UserJwtAuthFilter extends OncePerRequestFilter {
             JwtTokenService.JwtPrincipal principal = jwtTokenService.parse(authorization.substring(7));
             if (!"USER".equals(principal.role())) {
                 writeError(response, ErrorCode.INVALID_TOKEN_AUDIENCE);
+                return;
+            }
+            if (!userStatusProvider.isActive(principal.subjectId())) {
+                writeError(response, ErrorCode.USER_DISABLED);
                 return;
             }
             UserContext.set(new UserContext.UserPrincipal(principal.subjectId(), principal.role()));

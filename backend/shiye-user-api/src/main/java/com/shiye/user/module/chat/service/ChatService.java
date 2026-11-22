@@ -18,6 +18,12 @@ public interface ChatService {
 
     void streamPage(long userId, String source, PageChatRequest request, SseEmitter emitter);
 
+    /**
+     * 解析本次请求最终生效的团队范围（含已有会话的 scope）。
+     * 用于在开始 SSE 前做团队配额检查，避免用请求 scope 绕过已有团队会话的配额。
+     */
+    Long resolveTeamId(long userId, ChatStreamRequest request);
+
     PageResult<ConversationVO> conversations(long userId, int page, int pageSize);
 
     ConversationDetailVO conversation(long userId, long conversationId);

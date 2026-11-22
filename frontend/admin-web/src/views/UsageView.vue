@@ -22,6 +22,23 @@ function formatPercent(value?: number | null) {
   return `${Number(value || 0) * 100 < 1 ? (Number(value || 0) * 100).toFixed(2) : (Number(value || 0) * 100).toFixed(1)}%`
 }
 
+function sourceLabel(source: string) {
+  if (source === 'WEB') return '网页'
+  if (source === 'EXTENSION') return '插件'
+  if (source === 'ADMIN') return '管理后台'
+  if (source === 'API') return 'API'
+  return source
+}
+
+function sceneLabel(scene: string) {
+  if (scene === 'CHAT') return '问答'
+  if (scene === 'EMBEDDING') return '向量化'
+  if (scene === 'SUMMARY') return '摘要'
+  if (scene === 'RERANK') return '重排'
+  if (scene === 'EVAL') return '评测'
+  return scene
+}
+
 function params() {
   return {
     page: page.value,
@@ -99,11 +116,15 @@ onMounted(load)
       <el-select v-model="source" placeholder="全部来源" clearable class="short" @change="applyFilter">
         <el-option label="网页" value="WEB" />
         <el-option label="插件" value="EXTENSION" />
+        <el-option label="管理后台" value="ADMIN" />
+        <el-option label="API" value="API" />
       </el-select>
       <el-select v-model="scene" placeholder="全部场景" clearable class="short" @change="applyFilter">
         <el-option label="问答" value="CHAT" />
         <el-option label="向量化" value="EMBEDDING" />
         <el-option label="摘要" value="SUMMARY" />
+        <el-option label="重排" value="RERANK" />
+        <el-option label="评测" value="EVAL" />
       </el-select>
       <el-select v-model="status" placeholder="全部状态" clearable class="short" @change="applyFilter">
         <el-option label="成功" value="SUCCESS" />
@@ -119,7 +140,7 @@ onMounted(load)
         <h2>来源</h2>
         <div v-if="!data?.summary.sourceSplit?.length" class="empty compact">暂无数据</div>
         <div v-for="item in data?.summary.sourceSplit || []" :key="item.key" class="split-row">
-          <span>{{ item.key === 'EXTENSION' ? '插件' : '网页' }}</span>
+          <span>{{ sourceLabel(item.key) }}</span>
           <b>{{ item.tokens.toLocaleString() }} tokens</b>
           <em>{{ formatCost(item.cost) }}</em>
         </div>
@@ -160,7 +181,7 @@ onMounted(load)
         <div v-for="item in data.items" :key="item.id" class="usage-row">
           <span class="time">{{ formatUtcTime(item.createdAt) }}</span>
           <span class="email">{{ item.userEmail || item.userId }}</span>
-          <span>{{ item.source === 'EXTENSION' ? '插件' : '网页' }} / {{ item.scene === 'CHAT' ? '问答' : item.scene }}</span>
+          <span>{{ sourceLabel(item.source) }} / {{ sceneLabel(item.scene) }}</span>
           <span class="model">{{ item.model }}</span>
           <span>{{ item.totalTokens.toLocaleString() }}</span>
           <span>{{ formatCost(item.cost) }}</span>

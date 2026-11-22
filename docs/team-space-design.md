@@ -2,6 +2,12 @@
 
 > 状态：**第一阶段已实现**（2026-11-20）：`teams` / `team_members` / `team_invites` / `team_usage_monthly`、团队角色、成员管理、单次邀请码、资料共享、团队问答、团队配额和个人/团队双配额、团队解散、所有权转让、后台团队用量页、团队标签/文件夹、团队标签/文件夹范围问答、邀请邮件（SMTP 可选）。
 
+邀请规则：
+
+- 邀请码是 bearer code，不绑定邮箱；`team_invites` 只存 `token_hash`、角色、过期时间和使用时间。
+- 请求里的 `email` 只用于发送邀请邮件；不存库、不做邮箱校验。
+- 被移除成员之前创建的未使用邀请码不会自动撤销，这是后续待补规则。
+
 产品规则（已实现/已确认）：
 
 - 团队成员都可以创建团队标签/文件夹并给资料添加；重命名、删除需要 OWNER/ADMIN。
@@ -54,18 +60,17 @@
 
 约束：每个团队至少一名 ACTIVE OWNER；`teams.owner_user_id` 必须与 OWNER 成员一致。
 
-### 3.3 `team_invites`（可选，第一版可先不做）
+### 3.3 `team_invites`（已实现）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `id` | BIGINT UNSIGNED | 主键 |
 | `team_id` | BIGINT UNSIGNED | 团队 |
 | `inviter_user_id` | BIGINT UNSIGNED | 邀请人 |
-| `email` | VARCHAR(190) | 被邀请邮箱 |
 | `role` | VARCHAR(16) | ADMIN / MEMBER |
 | `token_hash` | CHAR(64) | 邀请 token 哈希 |
 | `expires_at` | DATETIME(3) | 过期时间 |
-| `accepted_at` / `revoked_at` | DATETIME(3) | 接受/撤销 |
+| `used_at` | DATETIME(3) | 使用时间 |
 | `created_at` | DATETIME(3) | 创建 |
 
 索引：`UNIQUE uk_team_invites_token (token_hash)`、`idx_team_invites_team (team_id, expires_at)`。
@@ -79,8 +84,9 @@
 - `bookmark_folders`
 - `article_folders`
 - `tags`
-- `conversations`
 - `file_assets`（上传文件）
+
+> 当前实现里 `conversations` 通过 `scope_type` / `scope_id` 记录团队范围，没有单独的 `team_id`；读取团队会话时会校验当前成员身份。后续做团队审计/清理时可再加 `team_id`。
 
 索引：`idx_articles_team (team_id, status, updated_at)`、`idx_conversations_team (team_id, updated_at)` 等。
 
@@ -94,7 +100,7 @@
 | 导入/上传/删除团队资料 | 允许 | 允许 | 允许（可配置为仅 ADMIN） |
 | 管理标签/文件夹 | 允许 | 允许 | 允许 |
 | 邀请/移除成员 | 允许 | 允许 | 禁止 |
-| 修改成员角色 | 允许 | 仅 MEMBER 晋升/降级 | 禁止 |
+| 修改成员角色 | 允许 | 可调整 MEMBER，不能设置 ADMIN | 禁止 |
 | 修改团队配额/名称 | 允许 | 禁止 | 禁止 |
 | 解散团队 | 允许 | 禁止 | 禁止 |
 

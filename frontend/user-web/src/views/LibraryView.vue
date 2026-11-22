@@ -175,16 +175,16 @@ function applySearch() {
   loadArticles()
 }
 
-async function loadTeamTaxonomy() {
-  if (!teamFilter.value) {
+async function loadTeamTaxonomy(teamId: string | null = teamFilter.value) {
+  if (!teamId) {
     teamTags.value = []
     teamFolders.value = []
     return
   }
   try {
     const [tagResponse, folderResponse] = await Promise.all([
-      api.get<ApiResult<Tag[]>>(`/teams/${teamFilter.value}/tags`),
-      api.get<ApiResult<ArticleFolder[]>>(`/teams/${teamFilter.value}/folders`),
+      api.get<ApiResult<Tag[]>>(`/teams/${teamId}/tags`),
+      api.get<ApiResult<ArticleFolder[]>>(`/teams/${teamId}/folders`),
     ])
     teamTags.value = tagResponse.data.data
     teamFolders.value = folderResponse.data.data
@@ -370,6 +370,9 @@ async function openArticle(article: ArticleSummary) {
     ])
     detail.value = detailResponse.data.data
     chunks.value = chunkResponse.data.data.items
+    if (detail.value.teamId && detail.value.teamId !== teamFilter.value) {
+      await loadTeamTaxonomy(detail.value.teamId)
+    }
   } catch {
     ElMessage.error('读取资料详情失败')
   } finally {

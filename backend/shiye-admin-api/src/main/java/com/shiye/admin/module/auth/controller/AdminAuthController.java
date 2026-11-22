@@ -1,14 +1,18 @@
 package com.shiye.admin.module.auth.controller;
 
 import com.shiye.admin.common.security.AdminContext;
+import com.shiye.admin.common.security.AdminRateLimitService;
 import com.shiye.admin.module.auth.domain.dto.AdminLoginRequest;
 import com.shiye.admin.module.auth.domain.dto.AdminLogoutRequest;
 import com.shiye.admin.module.auth.domain.dto.AdminRefreshRequest;
 import com.shiye.admin.module.auth.domain.vo.AdminSummary;
 import com.shiye.admin.module.auth.domain.vo.AdminTokenResponse;
 import com.shiye.admin.module.auth.service.AdminAuthService;
+import com.shiye.common.api.ErrorCode;
 import com.shiye.common.api.Result;
+import com.shiye.common.exception.BizException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,20 +25,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminAuthController {
 
     private final AdminAuthService adminAuthService;
+    private final AdminRateLimitService rateLimitService;
 
-    public AdminAuthController(AdminAuthService adminAuthService) {
+    public AdminAuthController(AdminAuthService adminAuthService,
+                               AdminRateLimitService rateLimitService) {
         this.adminAuthService = adminAuthService;
+        this.rateLimitService = rateLimitService;
     }
 
     @PostMapping("/login")
     public Result<AdminTokenResponse> login(@Valid @RequestBody AdminLoginRequest request,
-                                            HttpServletRequest httpRequest) {
+                                            HttpServletRequest httpRequest,
+                                            HttpServletResponse httpResponse) {
+        applyAuthLimit(httpResponse, ip(httpRequest));
         return Result.ok(adminAuthService.login(request, userAgent(httpRequest), ip(httpRequest)));
     }
 
     @PostMapping("/refresh")
     public Result<AdminTokenResponse> refresh(@Valid @RequestBody AdminRefreshRequest request,
-                                              HttpServletRequest httpRequest) {
+                                              HttpServletRequest httpRequest,
+                                              HttpServletResponse httpResponse) {
+        applyAuthLimit(httpResponse, ip(httpRequest));
         return Result.ok(adminAuthService.refresh(
                 request.refreshToken(),
                 userAgent(httpRequest),
@@ -51,6 +62,19 @@ public class AdminAuthController {
     @GetMapping("/me")
     public Result<AdminSummary> me() {
         return Result.ok(adminAuthService.me(AdminContext.requireAdminId()));
+    }
+
+    private void applyAuthLimit(HttpServletResponse response, String ip) {
+        AdminRateLimitService.RateLimitResult result = rateLimitService.hitAuth(ip);
+        if (result == null) {
+            return;
+        }
+        response.setHeader("X-RateLimit-Limit", String.valueOf(result.limit()));
+        response.setHeader("X-RateLimit-Remaining", String.valueOf(result.remaining()));
+        response.setHeader("X-RateLimit-Reset", String.valueOf(result.resetEpochSeconds()));
+        if (result.exceeded()) {
+            throw new BizException(ErrorCode.RATE_LIMITED, "管理员登录过于频繁，请稍后再试");
+        }
     }
 
     private String userAgent(HttpServletRequest request) {

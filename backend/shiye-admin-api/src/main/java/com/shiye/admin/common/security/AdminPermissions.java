@@ -56,7 +56,8 @@ public final class AdminPermissions {
             return false;
         }
         if (requestPath.startsWith("/admin/api/v1/models")
-                || requestPath.startsWith("/admin/api/v1/settings")) {
+                || requestPath.startsWith("/admin/api/v1/settings")
+                || requestPath.startsWith("/admin/api/v1/budget")) {
             return false;
         }
         return !ROLE_VIEWER.equals(normalized) || !isWriteMethod(method);

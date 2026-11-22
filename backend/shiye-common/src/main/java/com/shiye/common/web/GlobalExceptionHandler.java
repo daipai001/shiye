@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -65,6 +66,12 @@ public class GlobalExceptionHandler {
             HttpRequestMethodNotSupportedException ex) {
         return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.httpStatus())
                 .body(Result.fail(ErrorCode.METHOD_NOT_ALLOWED));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Result<Void>> handleNoResource(NoResourceFoundException ex) {
+        return ResponseEntity.status(ErrorCode.NOT_FOUND.httpStatus())
+                .body(Result.fail(ErrorCode.NOT_FOUND));
     }
 
     @ExceptionHandler(Exception.class)
