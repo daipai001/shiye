@@ -104,6 +104,7 @@ public interface TeamFolderMapper {
             JOIN articles a ON a.id = af.article_id
             WHERE af.folder_id = #{folderId} AND af.team_id = #{teamId}
               AND a.team_id = #{teamId} AND a.deleted_at IS NULL
+              AND a.status = 'READY'
             """)
     List<Long> findArticleIdsByFolder(@Param("teamId") long teamId,
                                       @Param("folderId") long folderId);

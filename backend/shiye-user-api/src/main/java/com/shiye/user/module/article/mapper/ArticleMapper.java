@@ -189,7 +189,7 @@ public interface ArticleMapper {
                    published_at, fetched_at, summary, content_text, content_hash,
                    word_count, language, status, file_asset_id, created_at, updated_at, deleted_at
             FROM articles
-            WHERE user_id = #{userId} AND deleted_at IS NULL
+            WHERE user_id = #{userId} AND deleted_at IS NULL AND status = 'READY'
               AND id IN
               <foreach collection="ids" item="id" open="(" separator="," close=")">
                 #{id}
@@ -235,7 +235,7 @@ public interface ArticleMapper {
                    published_at, fetched_at, summary, content_text, content_hash,
                    word_count, language, status, file_asset_id, created_at, updated_at, deleted_at
             FROM articles
-            WHERE team_id = #{teamId} AND deleted_at IS NULL
+            WHERE team_id = #{teamId} AND deleted_at IS NULL AND status = 'READY'
               AND id IN
               <foreach collection="ids" item="id" open="(" separator="," close=")">
                 #{id}

@@ -72,14 +72,16 @@ public interface ArticleChunkMapper {
 
     @Select("""
             <script>
-            SELECT id, article_id, user_id, content, char_start, char_end,
-                   MATCH(content) AGAINST(#{query} IN NATURAL LANGUAGE MODE) AS score
-            FROM article_chunks
-            WHERE user_id = #{userId}
-              AND MATCH(content) AGAINST(#{query} IN NATURAL LANGUAGE MODE)
-            <if test="articleId != null"> AND article_id = #{articleId}</if>
+            SELECT c.id, c.article_id, c.user_id, c.content, c.char_start, c.char_end,
+                   MATCH(c.content) AGAINST(#{query} IN NATURAL LANGUAGE MODE) AS score
+            FROM article_chunks c
+            JOIN articles a ON a.id = c.article_id
+            WHERE c.user_id = #{userId}
+              AND a.user_id = #{userId} AND a.deleted_at IS NULL AND a.status = 'READY'
+              AND MATCH(c.content) AGAINST(#{query} IN NATURAL LANGUAGE MODE)
+            <if test="articleId != null"> AND c.article_id = #{articleId}</if>
             <if test="articleIds != null">
-              AND article_id IN
+              AND c.article_id IN
               <foreach collection="articleIds" item="id" open="(" separator="," close=")">
                 #{id}
               </foreach>
@@ -96,11 +98,13 @@ public interface ArticleChunkMapper {
 
     @Select("""
             <script>
-            SELECT id, article_id, user_id, content, char_start, char_end,
-                   MATCH(content) AGAINST(#{query} IN NATURAL LANGUAGE MODE) AS score
-            FROM article_chunks
-            WHERE MATCH(content) AGAINST(#{query} IN NATURAL LANGUAGE MODE)
-              AND article_id IN
+            SELECT c.id, c.article_id, c.user_id, c.content, c.char_start, c.char_end,
+                   MATCH(c.content) AGAINST(#{query} IN NATURAL LANGUAGE MODE) AS score
+            FROM article_chunks c
+            JOIN articles a ON a.id = c.article_id
+            WHERE MATCH(c.content) AGAINST(#{query} IN NATURAL LANGUAGE MODE)
+              AND a.deleted_at IS NULL AND a.status = 'READY'
+              AND c.article_id IN
               <foreach collection="articleIds" item="id" open="(" separator="," close=")">
                 #{id}
               </foreach>
@@ -111,5 +115,21 @@ public interface ArticleChunkMapper {
     List<ArticleChunkSearchRow> searchKeywordByArticleIds(
             @Param("query") String query,
             @Param("articleIds") List<Long> articleIds,
+            @Param("limit") int limit);
+
+    @Select("""
+            SELECT c.id, c.article_id, c.user_id, c.content, c.char_start, c.char_end,
+                   MATCH(c.content) AGAINST(#{query} IN NATURAL LANGUAGE MODE) AS score
+            FROM article_chunks c
+            JOIN articles a ON a.id = c.article_id
+            WHERE a.team_id = #{teamId}
+              AND a.deleted_at IS NULL AND a.status = 'READY'
+              AND MATCH(c.content) AGAINST(#{query} IN NATURAL LANGUAGE MODE)
+            ORDER BY score DESC
+            LIMIT #{limit}
+            """)
+    List<ArticleChunkSearchRow> searchKeywordByTeam(
+            @Param("teamId") long teamId,
+            @Param("query") String query,
             @Param("limit") int limit);
 }

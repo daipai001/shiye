@@ -21,6 +21,8 @@ import com.shiye.user.module.team.service.TeamTaxonomyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -48,6 +50,7 @@ public class ChunkRetrievalService {
 
     private static final Logger log = LoggerFactory.getLogger(ChunkRetrievalService.class);
     private static final int MAX_RERANK_DOC_CHARS = 4000;
+    private static final int VECTOR_PIPELINE_BATCH = 500;
 
     private final EmbeddingService embeddingService;
     private final StringRedisTemplate redisTemplate;
@@ -197,40 +200,41 @@ public class ChunkRetrievalService {
             return List.of();
         }
 
+        List<String> ids = new ArrayList<>(chunkIds);
+        int limit = Math.min(ids.size(), maxScanChunks);
         List<Candidate> candidates = new ArrayList<>();
-        int scanned = 0;
-        for (String chunkId : chunkIds) {
-            if (++scanned > maxScanChunks) {
-                break;
+        for (int start = 0; start < limit; start += VECTOR_PIPELINE_BATCH) {
+            int end = Math.min(start + VECTOR_PIPELINE_BATCH, limit);
+            List<Map<?, ?>> batchFields = readChunkFields(ids.subList(start, end));
+            for (Map<?, ?> fields : batchFields) {
+                if (fields.isEmpty()) {
+                    continue;
+                }
+                if (!model.equals(stringValue(fields.get("embedding_model")))) {
+                    continue;
+                }
+                Long articleId = longValue(fields.get("article_id"));
+                Long parsedChunkId = longValue(fields.get("chunk_id"));
+                if (articleId == null || parsedChunkId == null) {
+                    continue;
+                }
+                if (allowedArticleIds != null && !allowedArticleIds.contains(articleId)) {
+                    continue;
+                }
+                float[] vector = decode(stringValue(fields.get("vector")));
+                if (vector == null || vector.length != queryVector.length) {
+                    continue;
+                }
+                Candidate candidate = new Candidate(
+                        articleId,
+                        parsedChunkId,
+                        stringValue(fields.get("content")),
+                        intValue(fields.get("char_start")),
+                        intValue(fields.get("char_end"))
+                );
+                candidate.vectorScore = cosine(queryVector, vector);
+                candidates.add(candidate);
             }
-            Map<Object, Object> fields = redisTemplate.opsForHash().entries(chunkKey(chunkId));
-            if (fields.isEmpty()) {
-                continue;
-            }
-            if (!model.equals(stringValue(fields.get("embedding_model")))) {
-                continue;
-            }
-            Long articleId = longValue(fields.get("article_id"));
-            Long parsedChunkId = longValue(fields.get("chunk_id"));
-            if (articleId == null || parsedChunkId == null) {
-                continue;
-            }
-            if (allowedArticleIds != null && !allowedArticleIds.contains(articleId)) {
-                continue;
-            }
-            float[] vector = decode(stringValue(fields.get("vector")));
-            if (vector == null || vector.length != queryVector.length) {
-                continue;
-            }
-            Candidate candidate = new Candidate(
-                    articleId,
-                    parsedChunkId,
-                    stringValue(fields.get("content")),
-                    intValue(fields.get("char_start")),
-                    intValue(fields.get("char_end"))
-            );
-            candidate.vectorScore = cosine(queryVector, vector);
-            candidates.add(candidate);
         }
 
         double effectiveMinScore = model.startsWith("DEV-HASH") ? -1.0 : minScore;
@@ -242,12 +246,49 @@ public class ChunkRetrievalService {
         return candidates;
     }
 
+    /**
+     * 一次 pipeline 读取一批 chunk hash，避免每个切片一次 Redis 往返。
+     */
+    private List<Map<?, ?>> readChunkFields(List<String> chunkIds) {
+        List<Map<?, ?>> fields = new ArrayList<>(chunkIds.size());
+        try {
+            List<Object> pipelineResults = redisTemplate.executePipelined(
+                    new SessionCallback<Object>() {
+                        @Override
+                        @SuppressWarnings({"rawtypes", "unchecked"})
+                        public Object execute(RedisOperations operations) {
+                            for (String chunkId : chunkIds) {
+                                operations.opsForHash().entries(chunkKey(chunkId));
+                            }
+                            return null;
+                        }
+                    });
+            for (int i = 0; i < chunkIds.size(); i++) {
+                Object value = i < pipelineResults.size() ? pipelineResults.get(i) : null;
+                fields.add(value instanceof Map<?, ?> map ? map : Map.of());
+            }
+            return fields;
+        } catch (RuntimeException ex) {
+            log.warn("pipeline vector read failed, fallback to serial: {}", ex.getMessage());
+        }
+        for (String chunkId : chunkIds) {
+            try {
+                fields.add(redisTemplate.opsForHash().entries(chunkKey(chunkId)));
+            } catch (RuntimeException ex) {
+                fields.add(Map.of());
+            }
+        }
+        return fields;
+    }
+
     private List<Candidate> keywordCandidates(long userId, String query, String scope,
                                               Long scopeId, Set<Long> allowedArticleIds,
                                               Long teamId) {
         try {
             List<ArticleChunkSearchRow> rows;
-            if (teamId != null || allowedArticleIds != null) {
+            if ("TEAM".equals(scope)) {
+                rows = chunkMapper.searchKeywordByTeam(teamId, query, keywordCandidates);
+            } else if (teamId != null || allowedArticleIds != null) {
                 List<Long> articleIds = allowedArticleIds == null
                         ? List.of() : new ArrayList<>(allowedArticleIds);
                 rows = articleIds.isEmpty()

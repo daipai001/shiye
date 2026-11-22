@@ -107,6 +107,7 @@ public interface TeamTagMapper {
             JOIN articles a ON a.id = att.article_id
             WHERE att.tag_id = #{tagId} AND att.team_id = #{teamId}
               AND a.team_id = #{teamId} AND a.deleted_at IS NULL
+              AND a.status = 'READY'
             """)
     List<Long> findArticleIdsByTag(@Param("teamId") long teamId,
                                    @Param("tagId") long tagId);
