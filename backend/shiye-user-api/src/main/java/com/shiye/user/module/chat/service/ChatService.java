@@ -8,15 +8,16 @@ import com.shiye.user.module.chat.domain.vo.ChatCancelVO;
 import com.shiye.user.module.chat.domain.vo.ConversationDetailVO;
 import com.shiye.user.module.chat.domain.vo.ConversationVO;
 import com.shiye.user.module.chat.domain.vo.MessageVO;
-import com.shiye.user.module.usage.domain.vo.TeamReservation;
+import com.shiye.user.module.usage.domain.vo.ChatReservation;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 public interface ChatService {
 
     void stream(long userId, String source, ChatStreamRequest request, SseEmitter emitter,
-                TeamReservation teamReservation);
+                ChatReservation reservation);
 
-    void streamPage(long userId, String source, PageChatRequest request, SseEmitter emitter);
+    void streamPage(long userId, String source, PageChatRequest request, SseEmitter emitter,
+                    ChatReservation reservation);
 
     /**
      * 解析本次请求最终生效的团队范围（含已有会话的 scope）。

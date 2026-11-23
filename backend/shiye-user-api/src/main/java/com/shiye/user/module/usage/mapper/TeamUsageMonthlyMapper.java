@@ -20,6 +20,14 @@ public interface TeamUsageMonthlyMapper {
     TeamUsageMonthlyEntity find(@Param("teamId") long teamId,
                                 @Param("month") String month);
 
+    @Select("""
+            SELECT id
+            FROM teams
+            WHERE id = #{teamId} AND deleted_at IS NULL
+            FOR UPDATE
+            """)
+    Long lockTeamRow(@Param("teamId") long teamId);
+
     @Insert("""
             INSERT INTO team_usage_monthly (team_id, month, tokens, cost, calls)
             VALUES (#{teamId}, #{month}, #{tokens}, #{cost}, 1)

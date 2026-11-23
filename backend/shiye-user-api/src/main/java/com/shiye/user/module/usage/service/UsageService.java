@@ -1,6 +1,7 @@
 package com.shiye.user.module.usage.service;
 
 import com.shiye.common.api.PageResult;
+import com.shiye.user.module.usage.domain.vo.ChatReservation;
 import com.shiye.user.module.usage.domain.vo.QuotaVO;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
 import com.shiye.user.module.usage.domain.vo.TeamReservation;
@@ -23,6 +24,10 @@ public interface UsageService {
     TeamReservation reserveTeamChat(long userId, long teamId, long tokens, BigDecimal cost);
 
     void releaseTeamChat(TeamReservation reservation);
+
+    ChatReservation reserveChat(long userId, Long teamId);
+
+    void releaseChat(ChatReservation reservation);
 
     default RecordedUsage recordChat(long userId, String requestId, String source, String model,
                                      int promptTokens, int completionTokens,

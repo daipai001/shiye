@@ -14,9 +14,11 @@ import com.shiye.user.module.usage.domain.entity.UsageDailyRow;
 import com.shiye.user.module.usage.domain.entity.TeamUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.entity.UsageRangeTotalsRow;
 import com.shiye.user.module.usage.domain.entity.UserUsageMonthlyEntity;
+import com.shiye.user.module.usage.domain.vo.ChatReservation;
 import com.shiye.user.module.usage.domain.vo.QuotaVO;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
 import com.shiye.user.module.usage.domain.vo.TeamReservation;
+import com.shiye.user.module.usage.domain.vo.UserReservation;
 import com.shiye.user.module.usage.domain.vo.UsageBreakdownVO;
 import com.shiye.user.module.usage.domain.vo.UsageDailyVO;
 import com.shiye.user.module.usage.domain.vo.UsageRecordVO;
@@ -32,6 +34,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,6 +63,8 @@ public class UsageServiceImpl implements UsageService {
     private final RuntimeSystemSettingsService systemSettingsService;
     private final Counter chatSuccess;
     private final Counter chatFailed;
+    private final long chatReserveTokens;
+    private final BigDecimal chatReserveCost;
 
     public UsageServiceImpl(
             AuthService authService,
@@ -68,7 +73,9 @@ public class UsageServiceImpl implements UsageService {
             TeamUsageMonthlyMapper teamUsageMapper,
             TeamService teamService,
             RuntimeSystemSettingsService systemSettingsService,
-            MeterRegistry meterRegistry) {
+            MeterRegistry meterRegistry,
+            @Value("${shiye.usage.chat-reserve-tokens:8000}") long chatReserveTokens,
+            @Value("${shiye.usage.chat-reserve-cost:0.06}") BigDecimal chatReserveCost) {
         this.authService = authService;
         this.aiUsageMapper = aiUsageMapper;
         this.monthlyMapper = monthlyMapper;
@@ -79,6 +86,9 @@ public class UsageServiceImpl implements UsageService {
                 .tag("scene", "CHAT").tag("status", "SUCCESS").register(meterRegistry);
         this.chatFailed = Counter.builder("shiye.ai.calls")
                 .tag("scene", "CHAT").tag("status", "FAILED").register(meterRegistry);
+        this.chatReserveTokens = Math.max(1000, chatReserveTokens);
+        this.chatReserveCost = chatReserveCost == null || chatReserveCost.signum() < 0
+                ? BigDecimal.ZERO : chatReserveCost;
     }
 
     @Override
@@ -172,6 +182,10 @@ public class UsageServiceImpl implements UsageService {
         teamService.requireMember(userId, teamId);
         TeamQuota quota = teamService.quota(teamId);
         String month = currentMonth();
+        // 同一团队的月度行初始化/预留串行化，避免并发 INSERT 空行造成死锁。
+        if (teamUsageMapper.lockTeamRow(teamId) == null) {
+            throw new BizException(ErrorCode.TEAM_QUOTA_EXCEEDED, "团队不存在或已解散");
+        }
         teamUsageMapper.ensureRow(teamId, month);
         int reserved = teamUsageMapper.reserve(
                 teamId, month, tokens, cost, quota.tokenQuota(), quota.costQuota());
@@ -193,6 +207,56 @@ public class UsageServiceImpl implements UsageService {
         } catch (RuntimeException ex) {
             log.warn("release team quota reservation failed: {}", ex.getMessage());
         }
+    }
+
+    @Override
+    @Transactional
+    public ChatReservation reserveChat(long userId, Long teamId) {
+        UserQuotaVO quota = authService.quota(userId);
+        String month = currentMonth();
+        // 同一用户的配额初始化串行化，避免并发 INSERT 空月度行造成 InnoDB 死锁。
+        if (monthlyMapper.lockUserRow(userId) == null) {
+            throw new BizException(ErrorCode.UNAUTHORIZED);
+        }
+        UserUsageMonthlyEntity usage = monthlyMapper.findForUpdate(userId, month);
+        if (usage == null) {
+            monthlyMapper.insertEmpty(userId, month);
+            usage = monthlyMapper.findForUpdate(userId, month);
+        }
+        long usedTokens = usage == null || usage.getTokens() == null ? 0 : usage.getTokens();
+        BigDecimal usedCost = usage == null || usage.getCost() == null
+                ? BigDecimal.ZERO : usage.getCost();
+        if (usedTokens + chatReserveTokens > quota.monthlyTokenQuota()
+                || usedCost.add(chatReserveCost).compareTo(quota.monthlyCostQuota()) > 0) {
+            throw new BizException(ErrorCode.USER_QUOTA_EXCEEDED, "本月配额不足以开始本次问答");
+        }
+        if (monthlyMapper.add(userId, month, chatReserveTokens, chatReserveCost) == 0) {
+            throw new BizException(ErrorCode.USER_QUOTA_EXCEEDED, "本月配额预留失败，请稍后重试");
+        }
+        UserReservation userReservation = new UserReservation(
+                userId, month, chatReserveTokens, chatReserveCost);
+        if (teamId == null) {
+            return new ChatReservation(userReservation, null);
+        }
+        TeamReservation teamReservation = reserveTeamChat(
+                userId, teamId, 12_000, new BigDecimal("0.12"));
+        return new ChatReservation(userReservation, teamReservation);
+    }
+
+    @Override
+    public void releaseChat(ChatReservation reservation) {
+        if (reservation == null) {
+            return;
+        }
+        UserReservation user = reservation.user();
+        if (user != null) {
+            try {
+                monthlyMapper.release(user.userId(), user.month(), user.tokens(), user.cost());
+            } catch (RuntimeException ex) {
+                log.warn("release user quota reservation failed: {}", ex.getMessage());
+            }
+        }
+        releaseTeamChat(reservation.team());
     }
 
     @Override

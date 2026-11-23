@@ -10,7 +10,7 @@ import com.shiye.user.module.chat.domain.dto.PageChatRequest;
 import com.shiye.user.module.chat.domain.vo.ChatCancelVO;
 import com.shiye.user.module.chat.service.ChatRateLimitService;
 import com.shiye.user.module.chat.service.ChatService;
-import com.shiye.user.module.usage.domain.vo.TeamReservation;
+import com.shiye.user.module.usage.domain.vo.ChatReservation;
 import com.shiye.user.module.usage.service.UsageService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -48,7 +48,8 @@ public class ChatController {
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("X-Accel-Buffering", "no");
         SseEmitter emitter = new SseEmitter(180_000L);
-        chatService.streamPage(userId, client, request, emitter);
+        ChatReservation reservation = usageService.reserveChat(userId, null);
+        chatService.streamPage(userId, client, request, emitter, reservation);
         return emitter;
     }
 
@@ -60,13 +61,10 @@ public class ChatController {
         applyRateLimit(response, userId);
         Long teamId = chatService.resolveTeamId(userId, request);
         usageService.assertCanChat(userId, teamId);
-        TeamReservation reservation = teamId == null
-                ? null
-                : usageService.reserveTeamChat(
-                        userId, teamId, 12_000, new java.math.BigDecimal("0.12"));
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("X-Accel-Buffering", "no");
         SseEmitter emitter = new SseEmitter(180_000L);
+        ChatReservation reservation = usageService.reserveChat(userId, teamId);
         chatService.stream(userId, client, request, emitter, reservation);
         return emitter;
     }

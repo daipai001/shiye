@@ -39,7 +39,7 @@ import com.shiye.user.module.chat.support.RetrievalResult;
 import com.shiye.user.module.chat.support.RetrievedChunk;
 import com.shiye.user.module.team.service.TeamTaxonomyService;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
-import com.shiye.user.module.usage.domain.vo.TeamReservation;
+import com.shiye.user.module.usage.domain.vo.ChatReservation;
 import com.shiye.user.module.usage.service.UsageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,16 +111,16 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public void stream(long userId, String source, ChatStreamRequest request, SseEmitter emitter,
-                       TeamReservation teamReservation) {
+                       ChatReservation reservation) {
         AtomicBoolean cancelled = new AtomicBoolean(false);
         emitter.onCompletion(() -> cancelled.set(true));
         emitter.onTimeout(() -> cancelled.set(true));
         emitter.onError(ex -> cancelled.set(true));
         try {
             chatExecutor.execute(() -> runStream(userId, normalizeSource(source), request,
-                    emitter, cancelled, teamReservation));
+                    emitter, cancelled, reservation));
         } catch (RuntimeException ex) {
-            usageService.releaseTeamChat(teamReservation);
+            usageService.releaseChat(reservation);
             safeSend(emitter, "error", new ChatSseError(
                     "SERVER_BUSY", "问答服务繁忙，请稍后再试", true));
             safeComplete(emitter);
@@ -139,15 +139,17 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public void streamPage(long userId, String source, PageChatRequest request, SseEmitter emitter) {
+    public void streamPage(long userId, String source, PageChatRequest request, SseEmitter emitter,
+                           ChatReservation reservation) {
         AtomicBoolean cancelled = new AtomicBoolean(false);
         emitter.onCompletion(() -> cancelled.set(true));
         emitter.onTimeout(() -> cancelled.set(true));
         emitter.onError(ex -> cancelled.set(true));
         try {
             chatExecutor.execute(() -> runPageStream(userId, normalizeSource(source), request,
-                    emitter, cancelled));
+                    emitter, cancelled, reservation));
         } catch (RuntimeException ex) {
+            usageService.releaseChat(reservation);
             safeSend(emitter, "error", new ChatSseError(
                     "SERVER_BUSY", "问答服务繁忙，请稍后再试", true));
             safeComplete(emitter);
@@ -227,7 +229,7 @@ public class ChatServiceImpl implements ChatService {
 
     private void runStream(long userId, String source, ChatStreamRequest request,
                            SseEmitter emitter, AtomicBoolean cancelled,
-                           TeamReservation teamReservation) {
+                           ChatReservation reservation) {
         long started = System.currentTimeMillis();
         String requestId = "req_" + UUID.randomUUID().toString().replace("-", "")
                 .substring(0, 24);
@@ -350,14 +352,15 @@ public class ChatServiceImpl implements ChatService {
                     started, firstTokenMs, "AI_UNAVAILABLE", "问答服务暂不可用",
                     emitter, cancelled, ex, teamId);
         } finally {
-            usageService.releaseTeamChat(teamReservation);
+            usageService.releaseChat(reservation);
             streamRegistry.unregister(requestId);
             safeComplete(emitter);
         }
     }
 
     private void runPageStream(long userId, String source, PageChatRequest request,
-                               SseEmitter emitter, AtomicBoolean cancelled) {
+                               SseEmitter emitter, AtomicBoolean cancelled,
+                               ChatReservation reservation) {
         long started = System.currentTimeMillis();
         String requestId = "req_" + UUID.randomUUID().toString().replace("-", "")
                 .substring(0, 24);
@@ -414,6 +417,7 @@ public class ChatServiceImpl implements ChatService {
             handlePageFailure(userId, source, requestId, started, "AI_UNAVAILABLE",
                     "问答服务暂不可用", emitter, cancelled, ex);
         } finally {
+            usageService.releaseChat(reservation);
             streamRegistry.unregister(requestId);
             safeComplete(emitter);
         }

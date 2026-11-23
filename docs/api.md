@@ -1300,7 +1300,7 @@ admin-web → POST /admin/api/v1/auth/login
 - 团队范围问答支持 `TEAM`（整个团队）、`TEAM_TAG`（按团队标签）、`TEAM_FOLDER`（按团队文件夹）；`scope.id` 分别为团队 ID、团队标签 ID、团队文件夹 ID。
 - `GET /teams/taxonomy` 返回 `{tags:[{id,name,color,teamId,teamName}], folders:[{id,name,teamId,teamName}]}`，供问答范围下拉使用。
 - 团队问答会同时检查个人配额、团队月配额和全局预算；团队配额超限返回 `42905`。TEAM_TAG/TEAM_FOLDER 会先解析所属团队再检查配额。
-- 团队问答在开始流式回答前会预留 12,000 tokens / ¥0.12 的团队配额，结束后释放未使用部分；并发请求不会同时挤过配额检查。
+- 每次流式问答开始前会预留个人配额（默认 8,000 tokens / ¥0.06），团队问答额外预留 12,000 tokens / ¥0.12；结束后释放预留，按实际 token/成本记账。并发请求不会同时挤过配额检查；预留失败返回 42902 / 42905。
 - `ai_usage.team_id` 和 `team_usage_monthly` 记录团队问答/RERANK 用量。
 - 资料共享/取消共享接口见 3.3。
 

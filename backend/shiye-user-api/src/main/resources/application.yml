@@ -143,6 +143,9 @@ shiye:
     global-monthly-tokens: ${GLOBAL_MONTHLY_TOKENS:2000000}
     global-monthly-cost: ${GLOBAL_MONTHLY_COST:20.00}
     alert-threshold: ${USAGE_ALERT_THRESHOLD:0.8}
+    # 每次流式问答开始前预留的个人配额，结束后释放
+    chat-reserve-tokens: ${CHAT_RESERVE_TOKENS:8000}
+    chat-reserve-cost: ${CHAT_RESERVE_COST:0.06}
     daily-token-limit: ${USAGE_DAILY_TOKEN_LIMIT:0}
     daily-aggregation-enabled: ${USAGE_DAILY_AGGREGATION_ENABLED:true}
     daily-cron: "${USAGE_DAILY_CRON:0 15 0 * * *}"
