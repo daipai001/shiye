@@ -84,7 +84,7 @@ public class RediSearchVectorSearcher {
         }
     }
 
-    private List<VectorSearchHit> parse(Object result) {
+    List<VectorSearchHit> parse(Object result) {
         Map<String, Object> root = toMap(result);
         Object results = root.get("results");
         if (results instanceof List<?> list) {
@@ -209,12 +209,12 @@ public class RediSearchVectorSearcher {
         return buffer.array();
     }
 
-    private String escapeTag(String value) {
+    static String escapeTag(String value) {
         if (value == null || value.isBlank()) {
             return "";
         }
         StringBuilder escaped = new StringBuilder(value.length() + 8);
-        String special = ",.<>{}[]\"':;!@#$%^&*()-+=~|/\\";
+        String special = " ,.<>{}[]\"':;!@#$%^&*()-+=~|/\\";
         for (char ch : value.toLowerCase(Locale.ROOT).toCharArray()) {
             if (special.indexOf(ch) >= 0) {
                 escaped.append('\\');

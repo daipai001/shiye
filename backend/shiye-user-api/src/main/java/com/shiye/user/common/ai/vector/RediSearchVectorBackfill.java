@@ -27,7 +27,7 @@ public class RediSearchVectorBackfill {
 
     @EventListener(ApplicationReadyEvent.class)
     public void backfill() {
-        if (!enabled) {
+        if (!enabled || index.isBackfillComplete()) {
             return;
         }
         int migrated = index.backfillExistingVectors();
