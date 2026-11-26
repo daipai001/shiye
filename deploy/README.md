@@ -43,6 +43,22 @@ APP_PUBLIC_URL=https://shiye.example.com
 
 未配置时 `MAIL_ENABLED=false`，相关接口仍返回成功，但不签发邮件 token、不实际发信。生产建议使用独立发信账号并配置 SPF/DKIM。
 
+## RediSearch HNSW（可选）
+
+Docker 默认使用 `redis/redis-stack-server`，带 RediSearch：
+
+```text
+VECTOR_STORE=redisearch
+VECTOR_BACKFILL=true   # 首次启用时回填旧 base64 向量，完成后可改回 false
+```
+
+说明：
+
+- HNSW 目前覆盖个人 `ALL` 范围；团队、标签、文件夹范围继续走 Redis Hash pipeline。
+- Redis 不带 search 模块时会自动回退到原 pipeline，不影响启动。
+- 旧的 `vector` 字段保留；新切片同时写 `vector_bin`。
+- 切换 embedding 模型/维度后需要重建索引并重新入库。
+
 ## AI/RAG 压测（mock）
 
 `docker-compose.loadtest.yml` 会额外启动 `shiye-mock-ai`，并把 user-api 指向本地 mock 模型，不消耗外部 API：

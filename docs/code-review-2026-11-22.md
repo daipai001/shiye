@@ -59,7 +59,7 @@
 
 | 级别 | 问题 | 建议 |
 |---|---|---|
-| P1 | 向量召回仍是应用层余弦，最多扫描 5000 个切片；数据量再大需要 RediSearch HNSW | 增加扫描上限/索引迁移到 Redis Stack；当前已用 pipeline 把 Redis 往返从 N 次降到每 500 个切片 1 次 |
+| P1 | 向量召回仍是应用层余弦，最多扫描 5000 个切片；数据量再大需要 RediSearch HNSW | 已提供可选 `VECTOR_STORE=redisearch` HNSW 路径（个人 ALL 范围），Redis Stack 不可用时自动回退；首次启用用 `VECTOR_BACKFILL=true` 回填旧向量。团队范围仍走 pipeline |
 | P1 | 收集/上传/重建索引没有单文章锁，并发可能重复删/插切片 | 已加 Redis 单文章锁 `shiye:ingest:lock:{id}`，Redis 不可用时 fail-open；同一资料同时只跑一个入库/重建任务 |
 | P1 | 个人配额/全局预算并发 check-then-act | 个人/团队配额已做行锁预留；全局预算已改为 `global_usage_monthly` 独立原子计数器（预留/实际/释放），3 并发实测 1 个 200 + 2 个 42903，无 500 |
 | P2 | 评测 worker 崩溃后运行可能永久 RUNNING；失败运行状态仍显示 DONE | worker 每次 tick 将超过 `EVAL_STALE_MINUTES` 的 RUNNING 标记为 FAILED；管理端按 metrics.error 显示 FAILED |

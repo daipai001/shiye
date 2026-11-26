@@ -2,11 +2,14 @@ package com.shiye.user.common.ai.vector;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,9 +26,12 @@ public class RedisChunkVectorStore implements ChunkVectorStore {
     private static final Logger log = LoggerFactory.getLogger(RedisChunkVectorStore.class);
 
     private final StringRedisTemplate redisTemplate;
+    private final RediSearchVectorIndex searchIndex;
 
-    public RedisChunkVectorStore(StringRedisTemplate redisTemplate) {
+    public RedisChunkVectorStore(StringRedisTemplate redisTemplate,
+                                 RediSearchVectorIndex searchIndex) {
         this.redisTemplate = redisTemplate;
+        this.searchIndex = searchIndex;
     }
 
     @Override
@@ -43,6 +49,16 @@ public class RedisChunkVectorStore implements ChunkVectorStore {
             fields.put("char_end", String.valueOf(charEnd));
             fields.put("vector", encode(vector));
             redisTemplate.opsForHash().putAll(key, fields);
+            if (searchIndex.isEnabled()) {
+                byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+                byte[] field = "vector_bin".getBytes(StandardCharsets.UTF_8);
+                byte[] binary = binary(vector);
+                redisTemplate.execute((RedisCallback<Object>) connection -> {
+                    RedisConnection redis = connection;
+                    redis.hSet(keyBytes, field, binary);
+                    return null;
+                });
+            }
             redisTemplate.opsForSet().add(userChunksKey(userId), String.valueOf(chunkId));
         } catch (RuntimeException ex) {
             log.warn("write vector failed for chunk {}: {}", chunkId, ex.getMessage());
@@ -103,11 +119,15 @@ public class RedisChunkVectorStore implements ChunkVectorStore {
     }
 
     private String encode(float[] vector) {
+        return Base64.getEncoder().encodeToString(binary(vector));
+    }
+
+    private byte[] binary(float[] vector) {
         ByteBuffer buffer = ByteBuffer.allocate(vector.length * Float.BYTES)
                 .order(ByteOrder.LITTLE_ENDIAN);
         for (float value : vector) {
             buffer.putFloat(value);
         }
-        return Base64.getEncoder().encodeToString(buffer.array());
+        return buffer.array();
     }
 }

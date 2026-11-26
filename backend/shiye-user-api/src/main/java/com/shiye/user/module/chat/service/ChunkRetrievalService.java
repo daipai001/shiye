@@ -7,6 +7,8 @@ import com.shiye.user.common.ai.embedding.EmbeddingService;
 import com.shiye.user.common.ai.rerank.RerankException;
 import com.shiye.user.common.ai.rerank.RerankResult;
 import com.shiye.user.common.ai.rerank.RerankService;
+import com.shiye.user.common.ai.vector.RediSearchVectorSearcher;
+import com.shiye.user.common.ai.vector.VectorSearchHit;
 import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import com.shiye.user.module.article.domain.entity.ArticleChunkSearchRow;
 import com.shiye.user.module.article.domain.entity.ArticleEntity;
@@ -58,6 +60,7 @@ public class ChunkRetrievalService {
     private final ArticleFolderMapper folderMapper;
     private final ArticleChunkMapper chunkMapper;
     private final RerankService rerankService;
+    private final RediSearchVectorSearcher rediSearchVectorSearcher;
     private final RuntimeSystemSettingsService systemSettingsService;
     private final TagService tagService;
     private final TeamService teamService;
@@ -77,6 +80,7 @@ public class ChunkRetrievalService {
             ArticleFolderMapper folderMapper,
             ArticleChunkMapper chunkMapper,
             RerankService rerankService,
+            RediSearchVectorSearcher rediSearchVectorSearcher,
             RuntimeSystemSettingsService systemSettingsService,
             TagService tagService,
             TeamService teamService,
@@ -94,6 +98,7 @@ public class ChunkRetrievalService {
         this.folderMapper = folderMapper;
         this.chunkMapper = chunkMapper;
         this.rerankService = rerankService;
+        this.rediSearchVectorSearcher = rediSearchVectorSearcher;
         this.systemSettingsService = systemSettingsService;
         this.tagService = tagService;
         this.teamService = teamService;
@@ -194,6 +199,27 @@ public class ChunkRetrievalService {
         }
         float[] queryVector = queryVectors.get(0);
         String model = embeddingService.model();
+        if (teamId == null && allowedArticleIds == null && rediSearchVectorSearcher.isEnabled()) {
+            List<VectorSearchHit> hits = rediSearchVectorSearcher.search(
+                    userId, model, queryVector, vectorCandidates);
+            if (!hits.isEmpty()) {
+                double effectiveMinScore = model.startsWith("DEV-HASH") ? -1.0 : minScore;
+                List<Candidate> candidates = new ArrayList<>(hits.size());
+                for (VectorSearchHit hit : hits) {
+                    if (hit.articleId() == 0 || hit.score() < effectiveMinScore) {
+                        continue;
+                    }
+                    Candidate candidate = new Candidate(
+                            hit.articleId(), hit.chunkId(), hit.content(),
+                            hit.charStart(), hit.charEnd());
+                    candidate.vectorScore = hit.score();
+                    candidates.add(candidate);
+                }
+                if (!candidates.isEmpty()) {
+                    return candidates;
+                }
+            }
+        }
         Set<String> chunkIds = redisTemplate.opsForSet().members(
                 teamId == null ? userKey(userId) : teamKey(teamId));
         if (chunkIds == null || chunkIds.isEmpty()) {

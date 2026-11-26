@@ -84,6 +84,11 @@ shiye:
   ai:
     enabled: ${AI_ENABLED:false}
     citation-required: ${AI_CITATION_REQUIRED:true}
+    vector:
+      # hash = Redis Hash + 应用层余弦；redisearch = Redis Stack HNSW
+      store: ${VECTOR_STORE:hash}
+      # 首次切换 redisearch 时设为 true，把旧 base64 向量回填成 vector_bin
+      backfill: ${VECTOR_BACKFILL:false}
     chat:
       base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com/v1}
       api-key: ${DEEPSEEK_API_KEY:}
