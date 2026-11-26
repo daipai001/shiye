@@ -16,12 +16,15 @@ import com.shiye.user.module.usage.domain.vo.RecordedUsage;
 import com.shiye.user.module.usage.service.UsageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -51,24 +54,32 @@ public class RagEvalWorker {
     private final DeepSeekChatClient chatClient;
     private final UsageService usageService;
     private final ObjectMapper objectMapper;
+    private final int staleMinutes;
 
     public RagEvalWorker(UserEvalMapper mapper,
                          ChunkRetrievalService retrievalService,
                          EmbeddingService embeddingService,
                          DeepSeekChatClient chatClient,
                          UsageService usageService,
-                         ObjectMapper objectMapper) {
+                         ObjectMapper objectMapper,
+                         @Value("${shiye.eval.stale-minutes:30}") int staleMinutes) {
         this.mapper = mapper;
         this.retrievalService = retrievalService;
         this.embeddingService = embeddingService;
         this.chatClient = chatClient;
         this.usageService = usageService;
         this.objectMapper = objectMapper;
+        this.staleMinutes = Math.max(5, staleMinutes);
     }
 
     @Scheduled(initialDelayString = "${shiye.eval.worker-initial-delay-ms:15000}",
             fixedDelayString = "${shiye.eval.worker-delay-ms:30000}")
     public void tick() {
+        int recovered = mapper.recoverStaleRuns(
+                LocalDateTime.now(ZoneOffset.UTC).minusMinutes(staleMinutes));
+        if (recovered > 0) {
+            log.warn("recovered {} stale eval runs as FAILED", recovered);
+        }
         for (int i = 0; i < MAX_RUNS_PER_TICK; i++) {
             EvalRunRow run = mapper.findPendingRun();
             if (run == null) {

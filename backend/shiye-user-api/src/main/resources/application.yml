@@ -163,6 +163,8 @@ shiye:
   eval:
     worker-enabled: ${EVAL_WORKER_ENABLED:true}
     worker-delay-ms: ${EVAL_WORKER_DELAY_MS:30000}
+    # RUNNING 超过该分钟数视为 worker 中断，自动标记为 FAILED
+    stale-minutes: ${EVAL_STALE_MINUTES:30}
   bookmark:
     worker-enabled: ${BOOKMARK_WORKER_ENABLED:true}
     worker-delay-ms: ${BOOKMARK_WORKER_DELAY_MS:3000}

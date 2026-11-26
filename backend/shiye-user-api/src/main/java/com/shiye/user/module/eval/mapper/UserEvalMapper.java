@@ -30,6 +30,16 @@ public interface UserEvalMapper {
             """)
     int markStarted(@Param("id") long id);
 
+    @Update("""
+            UPDATE rag_eval_runs
+            SET finished_at = UTC_TIMESTAMP(3),
+                metrics = JSON_OBJECT('error', '评测 worker 中断或超时', 'stale', TRUE)
+            WHERE started_at IS NOT NULL
+              AND finished_at IS NULL
+              AND started_at < #{before}
+            """)
+    int recoverStaleRuns(@Param("before") java.time.LocalDateTime before);
+
     @Select("""
             SELECT id, user_id, question, expected_article_ids, expected_chunk_ids, gold_answer
             FROM rag_eval_cases

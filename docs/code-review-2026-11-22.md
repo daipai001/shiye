@@ -62,7 +62,7 @@
 | P1 | 向量召回仍是应用层余弦，最多扫描 5000 个切片；数据量再大需要 RediSearch HNSW | 增加扫描上限/索引迁移到 Redis Stack；当前已用 pipeline 把 Redis 往返从 N 次降到每 500 个切片 1 次 |
 | P1 | 收集/上传/重建索引没有单文章锁，并发可能重复删/插切片 | 已加 Redis 单文章锁 `shiye:ingest:lock:{id}`，Redis 不可用时 fail-open；同一资料同时只跑一个入库/重建任务 |
 | P1 | 个人配额/全局预算并发 check-then-act | 个人/团队配额已做行锁预留；全局预算已改为 `global_usage_monthly` 独立原子计数器（预留/实际/释放），3 并发实测 1 个 200 + 2 个 42903，无 500 |
-| P2 | 评测 worker 崩溃后运行可能永久 RUNNING；失败运行状态仍显示 DONE | 加租约/心跳和 FAILED 状态 |
+| P2 | 评测 worker 崩溃后运行可能永久 RUNNING；失败运行状态仍显示 DONE | worker 每次 tick 将超过 `EVAL_STALE_MINUTES` 的 RUNNING 标记为 FAILED；管理端按 metrics.error 显示 FAILED |
 | P2 | 被移除成员创建但未使用的邀请码仍可重新加入 | 移除成员时撤销其邀请，或邀请绑定邮箱/用户 |
 | P2 | 认证接口信任客户端 `X-Forwarded-For` | 只信任受控代理，或使用代理写入的 `X-Real-IP`；生产不要暴露 API 端口 |
 | P2 | 会话表没有 team_id，团队历史依赖 scope 解析 | 后续可加 `conversations.team_id`，便于审计和清理 |

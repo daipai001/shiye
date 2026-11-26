@@ -153,7 +153,8 @@ public class AdminEvalServiceImpl implements AdminEvalService {
 
     private String statusOf(EvalRunEntity entity) {
         if (entity.getFinishedAt() != null) {
-            return "DONE";
+            String metrics = entity.getMetrics();
+            return metrics != null && metrics.contains("\"error\"") ? "FAILED" : "DONE";
         }
         return entity.getStartedAt() == null ? "PENDING" : "RUNNING";
     }
