@@ -82,7 +82,8 @@ public class RediSearchVectorIndex {
                     commands.dispatch(Ft.FT_CREATE,
                             new NestedMultiOutput<>(ByteArrayCodec.INSTANCE), args).get();
                 } catch (Exception ex) {
-                    if (ex.getMessage() == null || !ex.getMessage().contains("Index already exists")) {
+                    String message = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase();
+                    if (!message.contains("already exists")) {
                         throw ex;
                     }
                 }
