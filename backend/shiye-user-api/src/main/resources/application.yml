@@ -170,6 +170,8 @@ shiye:
     fetch-timeout-seconds: ${BOOKMARK_FETCH_TIMEOUT_SECONDS:20}
     max-page-bytes: ${BOOKMARK_MAX_PAGE_BYTES:5242880}
   article:
+    # 同一资料同时只处理一个入库/重建索引任务
+    ingest-lock-minutes: ${INGEST_LOCK_MINUTES:30}
     max-text-chars: ${ARTICLE_MAX_TEXT_CHARS:500000}
     max-upload-bytes: ${ARTICLE_MAX_UPLOAD_BYTES:20971520}
     chunk-target-size: ${CHUNK_TARGET_SIZE:700}

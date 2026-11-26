@@ -14,6 +14,7 @@ import com.shiye.user.module.article.mapper.ArticleChunkMapper;
 import com.shiye.user.module.article.mapper.ArticleFolderMapper;
 import com.shiye.user.module.article.mapper.ArticleMapper;
 import com.shiye.user.module.article.service.ArticleEnrichmentService;
+import com.shiye.user.module.article.service.ArticleIngestLockService;
 import com.shiye.user.module.article.service.ArticleIngestService;
 import com.shiye.user.module.article.service.ArticleUploadRateLimitService;
 import com.shiye.user.module.article.support.ArticleStatus;
@@ -66,6 +67,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
     private final UsageService usageService;
     private final IngestTaskService ingestTaskService;
     private final Executor ingestExecutor;
+    private final ArticleIngestLockService ingestLockService;
     private final int maxTextChars;
     private final int maxUploadBytes;
 
@@ -84,6 +86,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                                     UsageService usageService,
                                     IngestTaskService ingestTaskService,
                                     @Qualifier("ingestExecutor") Executor ingestExecutor,
+                                    ArticleIngestLockService ingestLockService,
                                     @Value("${shiye.article.max-text-chars:500000}") int maxTextChars,
                                     @Value("${shiye.article.max-upload-bytes:20971520}") int maxUploadBytes) {
         this.articleMapper = articleMapper;
@@ -101,6 +104,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         this.usageService = usageService;
         this.ingestTaskService = ingestTaskService;
         this.ingestExecutor = ingestExecutor;
+        this.ingestLockService = ingestLockService;
         this.maxTextChars = Math.max(10000, maxTextChars);
         this.maxUploadBytes = Math.max(1024, maxUploadBytes);
     }
@@ -260,7 +264,6 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         }
         UrlNormalizer.Normalized normalized = normalize(article.getUrl());
         boolean wasReady = ArticleStatus.READY.name().equals(article.getStatus());
-        articleMapper.updateStatus(articleId, userId, ArticleStatus.PENDING.name());
         String title = article.getTitle();
         String sourceType = article.getSourceType() == null ? "MANUAL" : article.getSourceType();
         ingestExecutor.execute(() -> {
@@ -305,52 +308,61 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
             linkFolder(userId, article.getId(), folderId, folderPath);
             return new IngestOutcome(article.getId(), true);
         }
+        boolean existed = article != null;
         if (article == null) {
             article = createArticle(userId, normalized, bookmarkTitle, sourceType);
-        } else {
-            articleMapper.updateStatus(article.getId(), userId, ArticleStatus.PENDING.name());
         }
 
         long articleId = article.getId();
         linkFolder(userId, articleId, folderId, folderPath);
-        long taskId = ingestTaskService.begin(userId, articleId,
-                sourceType == null ? "MANUAL" : sourceType, "FETCH");
-
+        String lockToken = ingestLockService.tryAcquire(articleId);
+        if (lockToken == null) {
+            throw new IngestException("INGEST_IN_PROGRESS", "该资料正在处理中，请稍后再试");
+        }
         try {
-            FetchedPage page = pageFetcher.fetch(normalized.normalizedUrl());
-            articleMapper.updateStatus(articleId, userId, ArticleStatus.PARSING.name());
-            ingestTaskService.advance(taskId, "PARSE");
+            if (existed) {
+                articleMapper.updateStatus(articleId, userId, ArticleStatus.PENDING.name());
+            }
+            long taskId = ingestTaskService.begin(userId, articleId,
+                    sourceType == null ? "MANUAL" : sourceType, "FETCH");
+            try {
+                FetchedPage page = pageFetcher.fetch(normalized.normalizedUrl());
+                articleMapper.updateStatus(articleId, userId, ArticleStatus.PARSING.name());
+                ingestTaskService.advance(taskId, "PARSE");
 
-            ParsedArticle parsed = articleParser.parse(
-                    page.body(), page.finalUrl(), bookmarkTitle);
-            persistContent(
-                    userId,
-                    articleId,
-                    parsed.title(),
-                    parsed.author(),
-                    parsed.summary(),
-                    parsed.contentText(),
-                    parsed.language(),
-                    parsed.wordCount(),
-                    taskId
-            );
-            return new IngestOutcome(articleId, false);
-        } catch (IngestException ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw ex;
-        } catch (EmbeddingException ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw new IngestException(ex.getCode(), ex.getMessage(), ex);
-        } catch (VectorStoreException ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw new IngestException("VECTOR_STORE_UNAVAILABLE", "向量库暂不可用", ex);
-        } catch (Exception ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw new IngestException("INGEST_FAILED", "入库失败", ex);
+                ParsedArticle parsed = articleParser.parse(
+                        page.body(), page.finalUrl(), bookmarkTitle);
+                persistContent(
+                        userId,
+                        articleId,
+                        parsed.title(),
+                        parsed.author(),
+                        parsed.summary(),
+                        parsed.contentText(),
+                        parsed.language(),
+                        parsed.wordCount(),
+                        taskId
+                );
+                return new IngestOutcome(articleId, false);
+            } catch (IngestException ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw ex;
+            } catch (EmbeddingException ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw new IngestException(ex.getCode(), ex.getMessage(), ex);
+            } catch (VectorStoreException ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw new IngestException("VECTOR_STORE_UNAVAILABLE", "向量库暂不可用", ex);
+            } catch (Exception ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw new IngestException("INGEST_FAILED", "入库失败", ex);
+            }
+        } finally {
+            ingestLockService.release(articleId, lockToken);
         }
     }
 
