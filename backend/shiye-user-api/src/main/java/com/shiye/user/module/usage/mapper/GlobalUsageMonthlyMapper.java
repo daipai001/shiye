@@ -22,10 +22,14 @@ public interface GlobalUsageMonthlyMapper {
     UsageTotals find(@Param("month") String month);
 
     @Insert("""
-            INSERT IGNORE INTO global_usage_monthly (month, tokens, cost, calls)
-            VALUES (#{month}, 0, 0, 0)
+            INSERT INTO global_usage_monthly (month, tokens, cost, calls)
+            SELECT #{month}, COALESCE(SUM(tokens), 0), COALESCE(SUM(cost), 0),
+                   COALESCE(SUM(calls), 0)
+            FROM user_usage_monthly
+            WHERE month = #{month}
+            ON DUPLICATE KEY UPDATE month = #{month}
             """)
-    int ensureRow(@Param("month") String month);
+    int initRow(@Param("month") String month);
 
     @Insert("""
             INSERT INTO global_usage_monthly (month, tokens, cost, calls)

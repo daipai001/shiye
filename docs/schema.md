@@ -870,6 +870,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | `rerank` | TINYINT(1) | 否 | 0 | 是否 rerank |
 | `metrics` | JSON | 是 | NULL | 汇总指标 |
 | `started_at` | DATETIME(3) | 是 | NULL | 开始 |
+| `last_progress_at` | DATETIME(3) | 是 | NULL | 最近进度心跳 |
 | `finished_at` | DATETIME(3) | 是 | NULL | 结束 |
 | `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
 
@@ -1185,7 +1186,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 ## 8. 迁移策略
 
-- 迁移文件：`deploy/sql/migrations/V001__init.sql`、`V002__chunk_fulltext.sql`、`V003__plugin_default_scope.sql`、`V004__eval_answer_details.sql`、`V005__plugin_general_mode.sql`。
+- 迁移文件：`deploy/sql/migrations/V001__init.sql`、`V002__chunk_fulltext.sql`、`V003__plugin_default_scope.sql`、`V004__eval_answer_details.sql`、`V005__plugin_general_mode.sql`、`2026-11-26-global-usage.sql`、`2026-11-26-invite-cleanup.sql`、`2026-11-26-eval-progress.sql`。
 - 每个迁移必须幂等/可重复执行；记录到 `schema_migrations`。
 - 不修改已发布的迁移；新增迁移。
 - 大表加字段用 `ALGORITHM=INPLACE` 或分批回填。

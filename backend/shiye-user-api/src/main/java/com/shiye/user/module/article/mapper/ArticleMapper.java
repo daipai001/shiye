@@ -199,6 +199,20 @@ public interface ArticleMapper {
     List<ArticleEntity> findByIdsAndUser(@Param("userId") long userId,
                                          @Param("ids") List<Long> ids);
 
+    @Select("""
+            <script>
+            SELECT id
+            FROM articles
+            WHERE user_id = #{userId} AND deleted_at IS NULL AND status = 'READY'
+              AND id IN
+              <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+              </foreach>
+            </script>
+            """)
+    List<Long> findReadyIdsByIdsAndUser(@Param("userId") long userId,
+                                        @Param("ids") List<Long> ids);
+
     @Update("""
             UPDATE articles
             SET deleted_at = NULL,

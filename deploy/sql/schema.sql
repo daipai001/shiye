@@ -658,6 +658,7 @@ CREATE TABLE IF NOT EXISTS `rag_eval_runs` (
   `rerank`          TINYINT(1)      NOT NULL DEFAULT 0,
   `metrics`         JSON            NULL DEFAULT NULL,
   `started_at`      DATETIME(3)     NULL DEFAULT NULL,
+  `last_progress_at` DATETIME(3)    NULL DEFAULT NULL,
   `finished_at`     DATETIME(3)     NULL DEFAULT NULL,
   `created_at`      DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (`id`),

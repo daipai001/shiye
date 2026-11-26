@@ -7,11 +7,12 @@ CREATE TABLE IF NOT EXISTS `global_usage_monthly` (
   PRIMARY KEY (`month`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='全站月度 AI 用量与预算预留';
 
+-- 只补缺失月份，避免迁移重跑时覆盖已经包含预留的实时计数。
 INSERT INTO `global_usage_monthly` (`month`, `tokens`, `cost`, `calls`)
-SELECT `month`, COALESCE(SUM(`tokens`), 0), COALESCE(SUM(`cost`), 0), COALESCE(SUM(`calls`), 0)
-FROM `user_usage_monthly`
-GROUP BY `month`
-ON DUPLICATE KEY UPDATE
-  `tokens` = VALUES(`tokens`),
-  `cost` = VALUES(`cost`),
-  `calls` = VALUES(`calls`);
+SELECT u.`month`, COALESCE(SUM(u.`tokens`), 0), COALESCE(SUM(u.`cost`), 0),
+       COALESCE(SUM(u.`calls`), 0)
+FROM `user_usage_monthly` u
+WHERE NOT EXISTS (
+  SELECT 1 FROM `global_usage_monthly` g WHERE g.`month` = u.`month`
+)
+GROUP BY u.`month`;

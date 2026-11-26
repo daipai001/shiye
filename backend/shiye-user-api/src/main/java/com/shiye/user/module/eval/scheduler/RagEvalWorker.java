@@ -184,6 +184,7 @@ public class RagEvalWorker {
                     latency,
                     caseCost
             );
+            mapper.touchRun(run.getId());
         }
 
         Map<String, Object> metrics = new LinkedHashMap<>();

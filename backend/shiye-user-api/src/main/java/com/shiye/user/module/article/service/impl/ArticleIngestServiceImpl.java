@@ -139,45 +139,55 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
                 && contentHash.equals(article.getContentHash())) {
             return new IngestOutcome(article.getId(), true);
         }
+        boolean existed = article != null;
         if (article == null) {
             article = createArticle(userId, normalized, title, "MANUAL");
-        } else {
-            articleMapper.updateStatus(article.getId(), userId, ArticleStatus.PENDING.name());
         }
 
         long articleId = article.getId();
-        long taskId = ingestTaskService.begin(userId, articleId, "MANUAL", "CHUNK");
+        String lockToken = ingestLockService.tryAcquire(articleId);
+        if (lockToken == null) {
+            throw new IngestException("INGEST_IN_PROGRESS", "该资料正在处理中，请稍后再试");
+        }
         String finalTitle = title == null || title.isBlank()
                 ? normalized.host() : title.trim();
         try {
-            persistContent(
-                    userId,
-                    articleId,
-                    finalTitle,
-                    null,
-                    TextStats.summary(trimmed, 220),
-                    trimmed,
-                    TextStats.language(trimmed),
-                    TextStats.wordCount(trimmed),
-                    taskId
-            );
-            return new IngestOutcome(articleId, false);
-        } catch (IngestException ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw ex;
-        } catch (EmbeddingException ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw new IngestException(ex.getCode(), ex.getMessage(), ex);
-        } catch (VectorStoreException ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw new IngestException("VECTOR_STORE_UNAVAILABLE", "向量库暂不可用", ex);
-        } catch (Exception ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw new IngestException("INGEST_FAILED", "入库失败", ex);
+            if (existed) {
+                articleMapper.updateStatus(articleId, userId, ArticleStatus.PENDING.name());
+            }
+            long taskId = ingestTaskService.begin(userId, articleId, "MANUAL", "CHUNK");
+            try {
+                persistContent(
+                        userId,
+                        articleId,
+                        finalTitle,
+                        null,
+                        TextStats.summary(trimmed, 220),
+                        trimmed,
+                        TextStats.language(trimmed),
+                        TextStats.wordCount(trimmed),
+                        taskId
+                );
+                return new IngestOutcome(articleId, false);
+            } catch (IngestException ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw ex;
+            } catch (EmbeddingException ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw new IngestException(ex.getCode(), ex.getMessage(), ex);
+            } catch (VectorStoreException ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw new IngestException("VECTOR_STORE_UNAVAILABLE", "向量库暂不可用", ex);
+            } catch (Exception ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw new IngestException("INGEST_FAILED", "入库失败", ex);
+            }
+        } finally {
+            ingestLockService.release(articleId, lockToken);
         }
     }
 

@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,6 +54,9 @@ public class ChunkRetrievalService {
     private static final Logger log = LoggerFactory.getLogger(ChunkRetrievalService.class);
     private static final int MAX_RERANK_DOC_CHARS = 4000;
     private static final int VECTOR_PIPELINE_BATCH = 500;
+    private static final List<String> VECTOR_FIELDS = List.of(
+            "embedding_model", "article_id", "chunk_id", "content",
+            "char_start", "char_end", "vector");
 
     private final EmbeddingService embeddingService;
     private final StringRedisTemplate redisTemplate;
@@ -199,14 +203,24 @@ public class ChunkRetrievalService {
         }
         float[] queryVector = queryVectors.get(0);
         String model = embeddingService.model();
-        if (teamId == null && allowedArticleIds == null && rediSearchVectorSearcher.isEnabled()) {
+        if (teamId == null && allowedArticleIds == null && rediSearchVectorSearcher.isAuthoritative()) {
             List<VectorSearchHit> hits = rediSearchVectorSearcher.search(
                     userId, model, queryVector, vectorCandidates);
             if (!hits.isEmpty()) {
+                List<Long> hitArticleIds = hits.stream()
+                        .map(VectorSearchHit::articleId)
+                        .filter(id -> id > 0)
+                        .distinct()
+                        .toList();
+                Set<Long> readyArticleIds = hitArticleIds.isEmpty()
+                        ? Set.of()
+                        : new HashSet<>(articleMapper.findReadyIdsByIdsAndUser(
+                                userId, hitArticleIds));
                 double effectiveMinScore = model.startsWith("DEV-HASH") ? -1.0 : minScore;
                 List<Candidate> candidates = new ArrayList<>(hits.size());
                 for (VectorSearchHit hit : hits) {
-                    if (hit.articleId() == 0 || hit.score() < effectiveMinScore) {
+                    if (hit.articleId() == 0 || !readyArticleIds.contains(hit.articleId())
+                            || hit.score() < effectiveMinScore) {
                         continue;
                     }
                     Candidate candidate = new Candidate(
@@ -284,14 +298,16 @@ public class ChunkRetrievalService {
                         @SuppressWarnings({"rawtypes", "unchecked"})
                         public Object execute(RedisOperations operations) {
                             for (String chunkId : chunkIds) {
-                                operations.opsForHash().entries(chunkKey(chunkId));
+                                operations.opsForHash().multiGet(chunkKey(chunkId), vectorFields());
                             }
                             return null;
                         }
                     });
-            for (int i = 0; i < chunkIds.size(); i++) {
-                Object value = i < pipelineResults.size() ? pipelineResults.get(i) : null;
-                fields.add(value instanceof Map<?, ?> map ? map : Map.of());
+            for (Object value : pipelineResults) {
+                fields.add(multiGetMap(value));
+            }
+            while (fields.size() < chunkIds.size()) {
+                fields.add(Map.of());
             }
             return fields;
         } catch (RuntimeException ex) {
@@ -299,9 +315,29 @@ public class ChunkRetrievalService {
         }
         for (String chunkId : chunkIds) {
             try {
-                fields.add(redisTemplate.opsForHash().entries(chunkKey(chunkId)));
+                fields.add(multiGetMap(
+                        redisTemplate.opsForHash().multiGet(chunkKey(chunkId), vectorFields())));
             } catch (RuntimeException ex) {
                 fields.add(Map.of());
+            }
+        }
+        return fields;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Collection<Object> vectorFields() {
+        return (Collection<Object>) (Collection<?>) VECTOR_FIELDS;
+    }
+
+    private Map<?, ?> multiGetMap(Object values) {
+        if (!(values instanceof List<?> list)) {
+            return Map.of();
+        }
+        Map<String, Object> fields = new LinkedHashMap<>();
+        for (int i = 0; i < VECTOR_FIELDS.size() && i < list.size(); i++) {
+            Object value = list.get(i);
+            if (value != null) {
+                fields.put(VECTOR_FIELDS.get(i), value);
             }
         }
         return fields;

@@ -41,6 +41,14 @@ public class RediSearchVectorSearcher {
         return index.isEnabled();
     }
 
+    /**
+     * 只有索引健康且旧向量回填完成时才使用 HNSW；否则整条链路回退 hash，
+     * 避免“索引里只有一部分 chunk”导致静默丢召回。
+     */
+    public boolean isAuthoritative() {
+        return index.isEnabled() && index.isBackfillComplete();
+    }
+
     public List<VectorSearchHit> search(long userId, String model, float[] queryVector,
                                         int topK) {
         if (!isEnabled() || queryVector == null) {
@@ -66,6 +74,7 @@ public class RediSearchVectorSearcher {
                     new NestedMultiOutput<>(ByteArrayCodec.INSTANCE), args).get();
             return parse(result);
         } catch (Exception ex) {
+            index.markUnavailable();
             log.warn("RediSearch KNN failed, fallback to hash search: {}", ex.getMessage());
             return List.of();
         } finally {

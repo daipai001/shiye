@@ -49,9 +49,11 @@ APP_PUBLIC_URL=https://shiye.example.com
 
 ```bash
 mysql -h ... -u ... -p shiye < deploy/sql/migrations/2026-11-26-global-usage.sql
+mysql -h ... -u ... -p shiye < deploy/sql/migrations/2026-11-26-invite-cleanup.sql
+mysql -h ... -u ... -p shiye < deploy/sql/migrations/2026-11-26-eval-progress.sql
 ```
 
-该迁移创建 `global_usage_monthly` 并从 `user_usage_monthly` 回填历史月份。先迁移再启动新版 user-api；未执行时新版会回退旧的预算检查，不阻塞启动，但全站预算不会走原子预留。
+`global-usage` 创建 `global_usage_monthly` 并从 `user_usage_monthly` 回填缺失月份；`invite-cleanup` 清理已被移除成员留下的未使用邀请码。先迁移再启动新版 user-api；未执行 global 迁移时新版会回退旧的预算检查，不阻塞启动，但全站预算不会走原子预留。
 
 ## RediSearch HNSW（可选）
 
@@ -64,6 +66,7 @@ VECTOR_BACKFILL=true   # 首次启用时回填旧 base64 向量，完成后可�
 
 说明：
 
+- 只有 `VECTOR_BACKFILL=true` 回填完成并写入完成标记后，检索才会使用 HNSW；未完成、索引异常或维度不匹配时自动回退 Hash pipeline，避免只召回部分切片。
 - HNSW 目前覆盖个人 `ALL` 范围；团队、标签、文件夹范围继续走 Redis Hash pipeline。
 - Redis 不带 search 模块时会自动回退到原 pipeline，不影响启动。
 - 旧的 `vector` 字段保留；新切片同时写 `vector_bin`。

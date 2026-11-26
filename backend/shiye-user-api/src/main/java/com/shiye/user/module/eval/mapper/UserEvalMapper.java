@@ -25,18 +25,25 @@ public interface UserEvalMapper {
 
     @Update("""
             UPDATE rag_eval_runs
-            SET started_at = UTC_TIMESTAMP(3)
+            SET started_at = UTC_TIMESTAMP(3),
+                last_progress_at = UTC_TIMESTAMP(3)
             WHERE id = #{id} AND started_at IS NULL
             """)
     int markStarted(@Param("id") long id);
 
     @Update("""
             UPDATE rag_eval_runs
+            SET last_progress_at = UTC_TIMESTAMP(3)
+            WHERE id = #{id} AND finished_at IS NULL
+            """)
+    int touchRun(@Param("id") long id);
+
+    @Update("""
+            UPDATE rag_eval_runs
             SET finished_at = UTC_TIMESTAMP(3),
                 metrics = JSON_OBJECT('error', '评测 worker 中断或超时', 'stale', TRUE)
-            WHERE started_at IS NOT NULL
-              AND finished_at IS NULL
-              AND started_at < #{before}
+            WHERE finished_at IS NULL
+              AND COALESCE(last_progress_at, started_at) < #{before}
             """)
     int recoverStaleRuns(@Param("before") java.time.LocalDateTime before);
 
@@ -74,7 +81,7 @@ public interface UserEvalMapper {
                 model = #{model},
                 top_k = #{topK},
                 finished_at = UTC_TIMESTAMP(3)
-            WHERE id = #{id}
+            WHERE id = #{id} AND finished_at IS NULL
             """)
     int finishRun(@Param("id") long id,
                   @Param("metrics") String metrics,

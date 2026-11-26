@@ -76,6 +76,10 @@ mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V0
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V003__plugin_default_scope.sql
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V004__eval_answer_details.sql
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/V005__plugin_general_mode.sql
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/2026-11-20-team-space.sql
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/2026-11-26-global-usage.sql
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/2026-11-26-invite-cleanup.sql
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/2026-11-26-eval-progress.sql
 ```
 
 - 管理员：`admin@shiye.local`

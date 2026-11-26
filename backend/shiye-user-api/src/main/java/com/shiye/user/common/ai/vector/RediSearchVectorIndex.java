@@ -29,12 +29,14 @@ public class RediSearchVectorIndex {
 
     private static final Logger log = LoggerFactory.getLogger(RediSearchVectorIndex.class);
     public static final String INDEX_NAME = "idx:kb_chunks";
+    private static final String BACKFILL_DONE_KEY = "shiye:vector:backfill:done";
 
     private final StringRedisTemplate redisTemplate;
     private final boolean redisearchEnabled;
     private final int dimension;
 
     private volatile Boolean available;
+    private volatile long retryAt;
 
     public RediSearchVectorIndex(
             StringRedisTemplate redisTemplate,
@@ -49,14 +51,45 @@ public class RediSearchVectorIndex {
         if (!redisearchEnabled) {
             return false;
         }
-        if (available == null) {
+        if (Boolean.TRUE.equals(available)) {
+            return true;
+        }
+        if (available == null || System.currentTimeMillis() >= retryAt) {
             synchronized (this) {
-                if (available == null) {
+                if (available == null || System.currentTimeMillis() >= retryAt) {
                     available = ensureIndex();
+                    retryAt = Boolean.TRUE.equals(available)
+                            ? 0 : System.currentTimeMillis() + 60_000L;
                 }
             }
         }
         return Boolean.TRUE.equals(available);
+    }
+
+    public void markUnavailable() {
+        available = false;
+        retryAt = System.currentTimeMillis() + 60_000L;
+    }
+
+    public boolean isBackfillComplete() {
+        try {
+            String value = redisTemplate.opsForValue().get(BACKFILL_DONE_KEY);
+            return String.valueOf(dimension).equals(value);
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    public void markBackfillComplete() {
+        try {
+            redisTemplate.opsForValue().set(BACKFILL_DONE_KEY, String.valueOf(dimension));
+        } catch (RuntimeException ex) {
+            log.warn("mark vector backfill complete failed: {}", ex.getMessage());
+        }
+    }
+
+    public int dimension() {
+        return dimension;
     }
 
     private boolean ensureIndex() {
@@ -107,30 +140,40 @@ public class RediSearchVectorIndex {
             return 0;
         }
         int migrated = 0;
+        int failed = 0;
         try (Cursor<String> cursor = redisTemplate.scan(
                 ScanOptions.scanOptions().match("kb:chunk:*").count(500).build())) {
             while (cursor.hasNext()) {
                 String key = cursor.next();
-                if (Boolean.TRUE.equals(redisTemplate.opsForHash().hasKey(key, "vector_bin"))) {
-                    continue;
+                try {
+                    if (Boolean.TRUE.equals(redisTemplate.opsForHash().hasKey(key, "vector_bin"))) {
+                        continue;
+                    }
+                    Object encoded = redisTemplate.opsForHash().get(key, "vector");
+                    if (encoded == null) {
+                        continue;
+                    }
+                    byte[] binary = Base64.getDecoder().decode(encoded.toString());
+                    if (binary.length != dimension * Float.BYTES) {
+                        failed++;
+                        continue;
+                    }
+                    byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+                    byte[] field = "vector_bin".getBytes(StandardCharsets.UTF_8);
+                    redisTemplate.execute((org.springframework.data.redis.core.RedisCallback<Object>) connection -> {
+                        connection.hSet(keyBytes, field, binary);
+                        return null;
+                    });
+                    migrated++;
+                } catch (RuntimeException ex) {
+                    failed++;
+                    log.warn("backfill vector failed for {}: {}", key, ex.getMessage());
                 }
-                Object encoded = redisTemplate.opsForHash().get(key, "vector");
-                if (encoded == null) {
-                    continue;
-                }
-                byte[] binary = Base64.getDecoder().decode(encoded.toString());
-                if (binary.length != dimension * Float.BYTES) {
-                    continue;
-                }
-                byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
-                byte[] field = "vector_bin".getBytes(StandardCharsets.UTF_8);
-                redisTemplate.execute((org.springframework.data.redis.core.RedisCallback<Object>) connection -> {
-                    connection.hSet(keyBytes, field, binary);
-                    return null;
-                });
-                migrated++;
             }
-            log.info("backfilled {} vectors into RediSearch index", migrated);
+            log.info("backfilled {} vectors into RediSearch index, failed={}", migrated, failed);
+            if (failed == 0) {
+                markBackfillComplete();
+            }
         } catch (RuntimeException ex) {
             log.warn("vector backfill failed: {}", ex.getMessage());
         }

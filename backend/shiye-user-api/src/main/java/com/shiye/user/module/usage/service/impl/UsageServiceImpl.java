@@ -241,13 +241,12 @@ public class UsageServiceImpl implements UsageService {
         }
         UserReservation userReservation = new UserReservation(
                 userId, month, chatReserveTokens, chatReserveCost);
+        // 锁顺序与 recordChat 保持一致：user -> team -> global，避免死锁。
+        TeamReservation teamReservation = teamId == null
+                ? null
+                : reserveTeamChat(userId, teamId, 12_000, new BigDecimal("0.12"));
         GlobalReservation globalReservation = reserveGlobalChat(
                 month, chatReserveTokens, chatReserveCost);
-        if (teamId == null) {
-            return new ChatReservation(userReservation, null, globalReservation);
-        }
-        TeamReservation teamReservation = reserveTeamChat(
-                userId, teamId, 12_000, new BigDecimal("0.12"));
         return new ChatReservation(userReservation, teamReservation, globalReservation);
     }
 
@@ -279,7 +278,8 @@ public class UsageServiceImpl implements UsageService {
         String lock = "shiye:global_usage:" + month;
         Integer acquired = globalUsageMapper.acquireLock(lock);
         try {
-            globalUsageMapper.ensureRow(month);
+            // 首次建行时从用户月用量回填，避免升级后全站预算从 0 重新开始。
+            globalUsageMapper.initRow(month);
         } finally {
             if (acquired != null && acquired == 1) {
                 globalUsageMapper.releaseLock(lock);
@@ -289,7 +289,12 @@ public class UsageServiceImpl implements UsageService {
 
     private UsageTotals globalTotalsWithFallback() {
         try {
-            return globalUsageMapper.find(currentMonth());
+            UsageTotals totals = globalUsageMapper.find(currentMonth());
+            if (totals != null) {
+                return totals;
+            }
+            // 月度行还未初始化时，用用户月用量之和兜底，避免预算从 0 重新开始。
+            return monthlyMapper.sumByMonth(currentMonth());
         } catch (RuntimeException ex) {
             log.warn("global usage table unavailable, fallback to user totals: {}", ex.getMessage());
             return monthlyMapper.sumByMonth(currentMonth());
@@ -309,14 +314,7 @@ public class UsageServiceImpl implements UsageService {
         if (reservation == null) {
             return;
         }
-        GlobalReservation global = reservation.global();
-        if (global != null) {
-            try {
-                globalUsageMapper.release(global.month(), global.tokens(), global.cost());
-            } catch (RuntimeException ex) {
-                log.warn("release global budget reservation failed: {}", ex.getMessage());
-            }
-        }
+        // 释放也保持 user -> team -> global 顺序，降低与 record/reserve 的死锁概率。
         UserReservation user = reservation.user();
         if (user != null) {
             try {
@@ -326,6 +324,14 @@ public class UsageServiceImpl implements UsageService {
             }
         }
         releaseTeamChat(reservation.team());
+        GlobalReservation global = reservation.global();
+        if (global != null) {
+            try {
+                globalUsageMapper.release(global.month(), global.tokens(), global.cost());
+            } catch (RuntimeException ex) {
+                log.warn("release global budget reservation failed: {}", ex.getMessage());
+            }
+        }
     }
 
     @Override
