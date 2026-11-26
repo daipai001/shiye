@@ -143,6 +143,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | AI | `ai_usage` | 每次 AI 调用明细 | P0 |
 | AI | `ai_usage_daily` | 日汇总（定时从 `ai_usage` 聚合） | 已启用 |
 | AI | `user_usage_monthly` | 用户月用量（配额） | P0 |
+| AI | `global_usage_monthly` | 全站月用量/预算预留 | 已启用 |
 | AI | `model_prices` | 模型价格（预留，当前单价来自 `system_settings` 并快照到 `ai_usage`） | 预留 |
 | 配置 | `system_settings` | 全局配置 | P0 |
 | 运维 | `admin_audit_logs` | 管理员审计 | 已启用 |
@@ -749,6 +750,20 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 - `idx_user_usage_monthly_month (month)`
 
 **说明**：配额检查优先读这张表；从 `ai_usage` 增量更新，月末对账。
+
+---
+
+### 4.22.1 `global_usage_monthly`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `month` | CHAR(7) | 否 | — | `2026-11`，主键 |
+| `tokens` | BIGINT | 否 | 0 | 全站月 tokens（实际 + 预留） |
+| `cost` | DECIMAL(18,8) | 否 | 0 | 全站月成本（实际 + 预留） |
+| `calls` | BIGINT | 否 | 0 | 全站 AI 调用数 |
+| `updated_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) ON UPDATE | 更新 |
+
+**说明**：全站预算的唯一原子计数器。流式问答前按预留额度原子增加，结束后释放；实际 AI 调用完成后再按实际 token/成本累加。升级迁移会从 `user_usage_monthly` 回填历史月份，避免预算从 0 重新开始。
 
 ---
 

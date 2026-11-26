@@ -15,6 +15,7 @@ import com.shiye.user.module.usage.domain.entity.TeamUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.entity.UsageRangeTotalsRow;
 import com.shiye.user.module.usage.domain.entity.UserUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.vo.ChatReservation;
+import com.shiye.user.module.usage.domain.vo.GlobalReservation;
 import com.shiye.user.module.usage.domain.vo.QuotaVO;
 import com.shiye.user.module.usage.domain.vo.RecordedUsage;
 import com.shiye.user.module.usage.domain.vo.TeamReservation;
@@ -25,6 +26,7 @@ import com.shiye.user.module.usage.domain.vo.UsageRecordVO;
 import com.shiye.user.module.usage.domain.vo.UsageSummaryVO;
 import com.shiye.user.module.usage.domain.vo.UsageTotals;
 import com.shiye.user.module.usage.mapper.AiUsageMapper;
+import com.shiye.user.module.usage.mapper.GlobalUsageMonthlyMapper;
 import com.shiye.user.module.usage.mapper.TeamUsageMonthlyMapper;
 import com.shiye.user.module.usage.mapper.UserUsageMonthlyMapper;
 import com.shiye.user.module.usage.service.UsageService;
@@ -59,6 +61,7 @@ public class UsageServiceImpl implements UsageService {
     private final AiUsageMapper aiUsageMapper;
     private final UserUsageMonthlyMapper monthlyMapper;
     private final TeamUsageMonthlyMapper teamUsageMapper;
+    private final GlobalUsageMonthlyMapper globalUsageMapper;
     private final TeamService teamService;
     private final RuntimeSystemSettingsService systemSettingsService;
     private final Counter chatSuccess;
@@ -71,6 +74,7 @@ public class UsageServiceImpl implements UsageService {
             AiUsageMapper aiUsageMapper,
             UserUsageMonthlyMapper monthlyMapper,
             TeamUsageMonthlyMapper teamUsageMapper,
+            GlobalUsageMonthlyMapper globalUsageMapper,
             TeamService teamService,
             RuntimeSystemSettingsService systemSettingsService,
             MeterRegistry meterRegistry,
@@ -80,6 +84,7 @@ public class UsageServiceImpl implements UsageService {
         this.aiUsageMapper = aiUsageMapper;
         this.monthlyMapper = monthlyMapper;
         this.teamUsageMapper = teamUsageMapper;
+        this.globalUsageMapper = globalUsageMapper;
         this.teamService = teamService;
         this.systemSettingsService = systemSettingsService;
         this.chatSuccess = Counter.builder("shiye.ai.calls")
@@ -164,13 +169,14 @@ public class UsageServiceImpl implements UsageService {
             }
         }
 
-        UsageTotals totals = monthlyMapper.sumByMonth(currentMonth());
+        UsageTotals totals = globalTotalsWithFallback();
         if (totals != null
                 && BigDecimal.valueOf(totals.tokens())
                 .compareTo(BigDecimal.valueOf(settings.globalMonthlyTokens())) >= 0) {
             throw new BizException(ErrorCode.GLOBAL_BUDGET_EXCEEDED, "全站 token 预算已用完");
         }
-        if (totals != null && totals.cost().compareTo(settings.globalMonthlyCost()) >= 0) {
+        if (totals != null && totals.cost() != null
+                && totals.cost().compareTo(settings.globalMonthlyCost()) >= 0) {
             throw new BizException(ErrorCode.GLOBAL_BUDGET_EXCEEDED, "全站成本预算已用完");
         }
     }
@@ -235,18 +241,81 @@ public class UsageServiceImpl implements UsageService {
         }
         UserReservation userReservation = new UserReservation(
                 userId, month, chatReserveTokens, chatReserveCost);
+        GlobalReservation globalReservation = reserveGlobalChat(
+                month, chatReserveTokens, chatReserveCost);
         if (teamId == null) {
-            return new ChatReservation(userReservation, null);
+            return new ChatReservation(userReservation, null, globalReservation);
         }
         TeamReservation teamReservation = reserveTeamChat(
                 userId, teamId, 12_000, new BigDecimal("0.12"));
-        return new ChatReservation(userReservation, teamReservation);
+        return new ChatReservation(userReservation, teamReservation, globalReservation);
+    }
+
+    private GlobalReservation reserveGlobalChat(String month, long tokens, BigDecimal cost) {
+        try {
+            SystemSettings settings = systemSettingsService.current();
+            ensureGlobalRow(month);
+            int reserved = globalUsageMapper.reserve(
+                    month, tokens, cost,
+                    settings.globalMonthlyTokens(), settings.globalMonthlyCost());
+            if (reserved == 0) {
+                throw new BizException(ErrorCode.GLOBAL_BUDGET_EXCEEDED,
+                        "全站预算不足以开始本次问答");
+            }
+            return new GlobalReservation(month, tokens, cost);
+        } catch (BizException ex) {
+            throw ex;
+        } catch (RuntimeException ex) {
+            // 迁移未执行/表暂不可用时回退到旧的全站总量检查，避免问答整体不可用。
+            log.error("global budget reservation unavailable, fallback: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private void ensureGlobalRow(String month) {
+        if (globalUsageMapper.find(month) != null) {
+            return;
+        }
+        String lock = "shiye:global_usage:" + month;
+        Integer acquired = globalUsageMapper.acquireLock(lock);
+        try {
+            globalUsageMapper.ensureRow(month);
+        } finally {
+            if (acquired != null && acquired == 1) {
+                globalUsageMapper.releaseLock(lock);
+            }
+        }
+    }
+
+    private UsageTotals globalTotalsWithFallback() {
+        try {
+            return globalUsageMapper.find(currentMonth());
+        } catch (RuntimeException ex) {
+            log.warn("global usage table unavailable, fallback to user totals: {}", ex.getMessage());
+            return monthlyMapper.sumByMonth(currentMonth());
+        }
+    }
+
+    private void recordGlobalUsage(long tokens, BigDecimal cost, long calls) {
+        try {
+            globalUsageMapper.add(currentMonth(), tokens, cost, calls);
+        } catch (RuntimeException ex) {
+            log.error("record global usage failed: {}", ex.getMessage());
+        }
     }
 
     @Override
     public void releaseChat(ChatReservation reservation) {
         if (reservation == null) {
             return;
+        }
+        GlobalReservation global = reservation.global();
+        if (global != null) {
+            try {
+                globalUsageMapper.release(global.month(), global.tokens(), global.cost());
+            } catch (RuntimeException ex) {
+                log.warn("release global budget reservation failed: {}", ex.getMessage());
+            }
         }
         UserReservation user = reservation.user();
         if (user != null) {
@@ -297,6 +366,7 @@ public class UsageServiceImpl implements UsageService {
         if (teamId != null) {
             teamUsageMapper.increment(teamId, currentMonth(), totalTokens, cost);
         }
+        recordGlobalUsage(totalTokens, cost, 1);
         chatSuccess.increment();
         return new RecordedUsage(promptTokens, completionTokens, totalTokens, cost, "CNY", estimated);
     }
@@ -332,6 +402,7 @@ public class UsageServiceImpl implements UsageService {
         aiUsageMapper.insert(entity);
 
         monthlyMapper.increment(userId, currentMonth(), totalTokens, cost);
+        recordGlobalUsage(totalTokens, cost, 1);
         return new RecordedUsage(promptTokens, completionTokens, totalTokens, cost, "CNY", estimated);
     }
 
@@ -374,6 +445,7 @@ public class UsageServiceImpl implements UsageService {
         if (teamId != null) {
             teamUsageMapper.increment(teamId, currentMonth(), 0, BigDecimal.ZERO);
         }
+        recordGlobalUsage(0, BigDecimal.ZERO, 1);
         chatFailed.increment();
     }
 
@@ -405,6 +477,7 @@ public class UsageServiceImpl implements UsageService {
         if (teamId != null) {
             teamUsageMapper.increment(teamId, currentMonth(), Math.max(0, tokens), BigDecimal.ZERO);
         }
+        recordGlobalUsage(Math.max(0, tokens), BigDecimal.ZERO, 1);
     }
 
     @Override
@@ -438,6 +511,7 @@ public class UsageServiceImpl implements UsageService {
         entity.setArticleId(articleId);
         aiUsageMapper.insert(entity);
         monthlyMapper.increment(userId, currentMonth(), totalTokens, cost);
+        recordGlobalUsage(totalTokens, cost, 1);
     }
 
     @Override
@@ -465,6 +539,7 @@ public class UsageServiceImpl implements UsageService {
         entity.setArticleId(articleId);
         aiUsageMapper.insert(entity);
         monthlyMapper.increment(userId, currentMonth(), safeTokens, BigDecimal.ZERO);
+        recordGlobalUsage(safeTokens, BigDecimal.ZERO, 1);
     }
 
     @Override
