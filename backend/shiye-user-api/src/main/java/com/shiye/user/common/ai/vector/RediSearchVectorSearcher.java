@@ -78,34 +78,51 @@ public class RediSearchVectorSearcher {
     private List<VectorSearchHit> parse(Object result) {
         Map<String, Object> root = toMap(result);
         Object results = root.get("results");
-        if (!(results instanceof List<?> list)) {
+        if (results instanceof List<?> list) {
+            List<VectorSearchHit> hits = new ArrayList<>(list.size());
+            for (Object item : list) {
+                Map<String, Object> entry = toMap(item);
+                Map<String, Object> attrs = toMap(entry.get("extra_attributes"));
+                addHit(hits, string(entry.get("id")), attrs);
+            }
+            return hits;
+        }
+        return parseLegacy(result);
+    }
+
+    /**
+     * 兼容 RESP2：FT.SEARCH 返回 [count, key, [field, value, ...], ...]。
+     */
+    private List<VectorSearchHit> parseLegacy(Object result) {
+        if (!(result instanceof List<?> list) || list.size() < 2) {
             return List.of();
         }
-        List<VectorSearchHit> hits = new ArrayList<>(list.size());
-        for (Object item : list) {
-            Map<String, Object> entry = toMap(item);
-            Map<String, Object> attrs = toMap(entry.get("extra_attributes"));
-            String id = string(entry.get("id"));
-            Long articleId = longValue(attrs.get("article_id"));
-            Long chunkId = longValue(attrs.get("chunk_id"));
-            if (articleId == null || chunkId == null) {
-                Long fromKey = parseChunkId(id);
-                if (fromKey == null) {
-                    continue;
-                }
-                chunkId = fromKey;
-            }
-            double distance = doubleValue(attrs.get("score"));
-            double score = Math.max(0, Math.min(1, 1.0 - distance));
-            hits.add(new VectorSearchHit(
-                    articleId == null ? 0 : articleId,
-                    chunkId,
-                    string(attrs.get("content")),
-                    intValue(attrs.get("char_start")),
-                    intValue(attrs.get("char_end")),
-                    score));
+        List<VectorSearchHit> hits = new ArrayList<>();
+        for (int i = 1; i + 1 < list.size(); i += 2) {
+            addHit(hits, string(list.get(i)), toMap(list.get(i + 1)));
         }
         return hits;
+    }
+
+    private void addHit(List<VectorSearchHit> hits, String key, Map<String, Object> attrs) {
+        Long articleId = longValue(attrs.get("article_id"));
+        Long chunkId = longValue(attrs.get("chunk_id"));
+        if (articleId == null || chunkId == null) {
+            Long fromKey = parseChunkId(key);
+            if (fromKey == null) {
+                return;
+            }
+            chunkId = fromKey;
+        }
+        double distance = doubleValue(attrs.get("score"));
+        double score = Math.max(0, Math.min(1, 1.0 - distance));
+        hits.add(new VectorSearchHit(
+                articleId == null ? 0 : articleId,
+                chunkId,
+                string(attrs.get("content")),
+                intValue(attrs.get("char_start")),
+                intValue(attrs.get("char_end")),
+                score));
     }
 
     private Long parseChunkId(String key) {

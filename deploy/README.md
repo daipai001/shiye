@@ -43,6 +43,16 @@ APP_PUBLIC_URL=https://shiye.example.com
 
 未配置时 `MAIL_ENABLED=false`，相关接口仍返回成功，但不签发邮件 token、不实际发信。生产建议使用独立发信账号并配置 SPF/DKIM。
 
+## 升级迁移
+
+从 `v0.41.x` 升级到 `v0.42.x` 时，现有数据库需要先执行：
+
+```bash
+mysql -h ... -u ... -p shiye < deploy/sql/migrations/2026-11-26-global-usage.sql
+```
+
+该迁移创建 `global_usage_monthly` 并从 `user_usage_monthly` 回填历史月份。先迁移再启动新版 user-api；未执行时新版会回退旧的预算检查，不阻塞启动，但全站预算不会走原子预留。
+
 ## RediSearch HNSW（可选）
 
 Docker 默认使用 `redis/redis-stack-server`，带 RediSearch：

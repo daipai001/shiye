@@ -207,6 +207,7 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
             return new UploadOutcome(asset.getId(), article.getId(), true);
         }
         String finalTitle = defaultTitle(title, fileName);
+        boolean existed = article != null;
         if (article == null) {
             article = new ArticleEntity();
             article.setUserId(userId);
@@ -215,41 +216,50 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
             article.setStatus(ArticleStatus.PENDING.name());
             article.setFileAssetId(asset.getId());
             articleMapper.insert(article);
-        } else {
-            articleMapper.updateStatus(article.getId(), userId, ArticleStatus.PENDING.name());
         }
 
         long articleId = article.getId();
-        long taskId = ingestTaskService.begin(userId, articleId, "UPLOAD", "CHUNK");
+        String lockToken = ingestLockService.tryAcquire(articleId);
+        if (lockToken == null) {
+            throw new IngestException("INGEST_IN_PROGRESS", "该资料正在处理中，请稍后再试");
+        }
         try {
-            persistContent(
-                    userId,
-                    articleId,
-                    finalTitle,
-                    null,
-                    TextStats.summary(content, 220),
-                    content,
-                    TextStats.language(content),
-                    TextStats.wordCount(content),
-                    taskId
-            );
-            return new UploadOutcome(asset.getId(), articleId, false);
-        } catch (IngestException ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw ex;
-        } catch (EmbeddingException ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw new IngestException(ex.getCode(), ex.getMessage(), ex);
-        } catch (VectorStoreException ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw new IngestException("VECTOR_STORE_UNAVAILABLE", "向量库暂不可用", ex);
-        } catch (Exception ex) {
-            failTask(taskId, ex);
-            markFailed(articleId, userId);
-            throw new IngestException("INGEST_FAILED", "入库失败", ex);
+            if (existed) {
+                articleMapper.updateStatus(articleId, userId, ArticleStatus.PENDING.name());
+            }
+            long taskId = ingestTaskService.begin(userId, articleId, "UPLOAD", "CHUNK");
+            try {
+                persistContent(
+                        userId,
+                        articleId,
+                        finalTitle,
+                        null,
+                        TextStats.summary(content, 220),
+                        content,
+                        TextStats.language(content),
+                        TextStats.wordCount(content),
+                        taskId
+                );
+                return new UploadOutcome(asset.getId(), articleId, false);
+            } catch (IngestException ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw ex;
+            } catch (EmbeddingException ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw new IngestException(ex.getCode(), ex.getMessage(), ex);
+            } catch (VectorStoreException ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw new IngestException("VECTOR_STORE_UNAVAILABLE", "向量库暂不可用", ex);
+            } catch (Exception ex) {
+                failTask(taskId, ex);
+                markFailed(articleId, userId);
+                throw new IngestException("INGEST_FAILED", "入库失败", ex);
+            }
+        } finally {
+            ingestLockService.release(articleId, lockToken);
         }
     }
 
