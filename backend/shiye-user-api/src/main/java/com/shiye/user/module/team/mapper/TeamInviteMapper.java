@@ -38,4 +38,13 @@ public interface TeamInviteMapper {
 
     @Delete("DELETE FROM team_invites WHERE team_id = #{teamId}")
     int deleteByTeam(@Param("teamId") long teamId);
+
+    @Delete("""
+            DELETE FROM team_invites
+            WHERE team_id = #{teamId}
+              AND inviter_user_id = #{inviterUserId}
+              AND used_at IS NULL
+            """)
+    int deleteUnusedByInviter(@Param("teamId") long teamId,
+                              @Param("inviterUserId") long inviterUserId);
 }

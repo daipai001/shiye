@@ -249,6 +249,7 @@ public class TeamServiceImpl implements TeamService {
             throw new BizException(ErrorCode.FORBIDDEN, "只有团队所有者可以移除管理员");
         }
         memberMapper.delete(teamId, targetUserId);
+        inviteMapper.deleteUnusedByInviter(teamId, targetUserId);
     }
 
     @Override
@@ -276,6 +277,7 @@ public class TeamServiceImpl implements TeamService {
             throw new BizException(ErrorCode.CONFLICT, "团队所有者不能退出团队");
         }
         memberMapper.delete(teamId, userId);
+        inviteMapper.deleteUnusedByInviter(teamId, userId);
     }
 
     @Override

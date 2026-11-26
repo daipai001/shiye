@@ -62,6 +62,18 @@ class TeamServiceImplTest {
     }
 
     @Test
+    void removingMemberRevokesTheirUnusedInvites() {
+        when(teamMapper.findById(1L)).thenReturn(team());
+        when(memberMapper.findActive(1L, 10L)).thenReturn(member(10L, "OWNER"));
+        when(memberMapper.findActive(1L, 11L)).thenReturn(member(11L, "MEMBER"));
+
+        service.removeMember(10L, 1L, 11L);
+
+        verify(memberMapper).delete(1L, 11L);
+        verify(inviteMapper).deleteUnusedByInviter(1L, 11L);
+    }
+
+    @Test
     void ownerCanPromoteMemberToAdmin() {
         when(teamMapper.findById(1L)).thenReturn(team());
         when(memberMapper.findActive(1L, 10L)).thenReturn(member(10L, "OWNER"));
