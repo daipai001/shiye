@@ -79,6 +79,12 @@ public class RedisChunkVectorStore implements ChunkVectorStore {
     @Override
     public void addToTeam(long teamId, long chunkId) {
         try {
+            String key = chunkKey(chunkId);
+            // HNSW 团队范围按 team_id TAG 过滤，必须在共享时写回 chunk hash。
+            redisTemplate.opsForHash().put(key, "team_id", String.valueOf(teamId));
+            if (searchIndex.isEnabled()) {
+                ensureVectorBin(key);
+            }
             redisTemplate.opsForSet().add(teamChunksKey(teamId), String.valueOf(chunkId));
         } catch (RuntimeException ex) {
             log.warn("add vector to team {} failed for chunk {}: {}",
@@ -90,7 +96,14 @@ public class RedisChunkVectorStore implements ChunkVectorStore {
     @Override
     public void clearTeam(long teamId) {
         try {
-            redisTemplate.delete(teamChunksKey(teamId));
+            String teamKey = teamChunksKey(teamId);
+            var chunkIds = redisTemplate.opsForSet().members(teamKey);
+            if (chunkIds != null) {
+                for (String chunkId : chunkIds) {
+                    redisTemplate.opsForHash().delete(chunkKey(Long.parseLong(chunkId)), "team_id");
+                }
+            }
+            redisTemplate.delete(teamKey);
         } catch (RuntimeException ex) {
             log.warn("clear team {} vector set failed: {}", teamId, ex.getMessage());
         }
@@ -99,10 +112,35 @@ public class RedisChunkVectorStore implements ChunkVectorStore {
     @Override
     public void removeFromTeam(long teamId, long chunkId) {
         try {
+            redisTemplate.opsForHash().delete(chunkKey(chunkId), "team_id");
             redisTemplate.opsForSet().remove(teamChunksKey(teamId), String.valueOf(chunkId));
         } catch (RuntimeException ex) {
             log.warn("remove vector from team {} failed for chunk {}: {}",
                     teamId, chunkId, ex.getMessage());
+        }
+    }
+
+    private void ensureVectorBin(String key) {
+        try {
+            if (Boolean.TRUE.equals(redisTemplate.opsForHash().hasKey(key, "vector_bin"))) {
+                return;
+            }
+            Object encoded = redisTemplate.opsForHash().get(key, "vector");
+            if (encoded == null) {
+                return;
+            }
+            byte[] binary = Base64.getDecoder().decode(encoded.toString());
+            if (binary.length != searchIndex.dimension() * Float.BYTES) {
+                return;
+            }
+            byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+            byte[] field = "vector_bin".getBytes(StandardCharsets.UTF_8);
+            redisTemplate.execute((RedisCallback<Object>) connection -> {
+                connection.hSet(keyBytes, field, binary);
+                return null;
+            });
+        } catch (RuntimeException ex) {
+            log.warn("ensure vector_bin for {} failed: {}", key, ex.getMessage());
         }
     }
 

@@ -18,15 +18,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * RediSearch KNN 检索。只覆盖个人 ALL 范围；团队/标签/文件夹仍走原 pipeline，
- * 索引不可用或没有 vector_bin 时由调用方回退。
+ * RediSearch KNN 检索。覆盖个人 ALL、团队、标签/文件夹/单篇资料；
+ * 索引不可用、回填未完成或过滤条件过大时由调用方回退 pipeline。
  */
 @Component
 public class RediSearchVectorSearcher {
 
     private static final Logger log = LoggerFactory.getLogger(RediSearchVectorSearcher.class);
+    public static final int MAX_ARTICLE_FILTER = 200;
+    private static final int MAX_KNN = 500;
 
     private final StringRedisTemplate redisTemplate;
     private final RediSearchVectorIndex index;
@@ -41,35 +45,45 @@ public class RediSearchVectorSearcher {
         return index.isEnabled();
     }
 
-    /**
-     * 只有索引健康且旧向量回填完成时才使用 HNSW；否则整条链路回退 hash，
-     * 避免“索引里只有一部分 chunk”导致静默丢召回。
-     */
     public boolean isAuthoritative() {
-        return index.isEnabled() && index.isBackfillComplete();
+        return isAuthoritative(null);
     }
 
-    public List<VectorSearchHit> search(long userId, String model, float[] queryVector,
-                                        int topK) {
-        if (!isEnabled() || queryVector == null) {
+    /**
+     * 只有索引健康且对应范围回填完成时才使用 HNSW；否则整条链路回退 hash，
+     * 避免“索引里只有一部分 chunk”导致静默丢召回。团队范围还要求 team_id
+     * 回填完成。
+     */
+    public boolean isAuthoritative(Long teamId) {
+        return index.isEnabled()
+                && index.isBackfillComplete()
+                && (teamId == null || index.isTeamBackfillComplete());
+    }
+
+    public List<VectorSearchHit> search(long userId, Long teamId, Set<Long> articleFilter,
+                                        String model, float[] queryVector, int topK) {
+        if (!isEnabled() || queryVector == null || topK <= 0) {
             return List.of();
         }
+        if (articleFilter != null && articleFilter.size() > MAX_ARTICLE_FILTER) {
+            return List.of();
+        }
+        int knn = Math.min(MAX_KNN, Math.max(topK, topK * 2));
+        String query = buildQuery(userId, teamId, articleFilter, model, knn);
         RedisConnection connection = null;
         try {
             connection = redisTemplate.getConnectionFactory().getConnection();
             RedisAsyncCommands<byte[], byte[]> commands = RediSearchVectorIndex.async(connection);
             CommandArgs<byte[], byte[]> args = new CommandArgs<>(ByteArrayCodec.INSTANCE)
                     .add(RediSearchVectorIndex.INDEX_NAME)
-                    .add("(@user_id:{" + userId + "} @embedding_model:{"
-                            + escapeTag(model) + "})=>[KNN " + topK
-                            + " @vector_bin $vec AS score]")
+                    .add(query)
                     .add("PARAMS").add(2).add("vec").add(binary(queryVector))
                     .add("SORTBY").add("score")
                     .add("RETURN").add(7)
                     .add("__key").add("article_id").add("chunk_id").add("content")
                     .add("char_start").add("char_end").add("score")
                     .add("DIALECT").add(2)
-                    .add("LIMIT").add(0).add(topK);
+                    .add("LIMIT").add(0).add(knn);
             Object result = commands.dispatch(RediSearchVectorIndex.Ft.FT_SEARCH,
                     new NestedMultiOutput<>(ByteArrayCodec.INSTANCE), args).get();
             return parse(result);
@@ -82,6 +96,23 @@ public class RediSearchVectorSearcher {
                 connection.close();
             }
         }
+    }
+
+    static String buildQuery(long userId, Long teamId, Set<Long> articleFilter,
+                             String model, int knn) {
+        StringBuilder filter = new StringBuilder();
+        filter.append(teamId == null
+                ? "@user_id:{" + userId + "}"
+                : "@team_id:{" + teamId + "}");
+        filter.append(" @embedding_model:{").append(escapeTag(model)).append("}");
+        if (articleFilter != null && !articleFilter.isEmpty()) {
+            filter.append(" @article_id:{")
+                    .append(articleFilter.stream()
+                            .map(String::valueOf)
+                            .collect(Collectors.joining("|")))
+                    .append("}");
+        }
+        return "(" + filter + ")=>[KNN " + knn + " @vector_bin $vec AS score]";
     }
 
     List<VectorSearchHit> parse(Object result) {

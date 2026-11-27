@@ -284,6 +284,20 @@ public interface ArticleMapper {
 
     @Select("""
             <script>
+            SELECT id
+            FROM articles
+            WHERE team_id = #{teamId} AND deleted_at IS NULL AND status = 'READY'
+              AND id IN
+              <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+              </foreach>
+            </script>
+            """)
+    List<Long> findReadyIdsByTeamAndIds(@Param("teamId") long teamId,
+                                        @Param("ids") List<Long> ids);
+
+    @Select("""
+            <script>
             SELECT a.id, a.user_id, a.team_id, a.title, a.url, a.url_hash, a.domain,
                    a.source_type, a.author, a.published_at, a.fetched_at, a.summary,
                    a.content_hash, a.word_count, a.language, a.status, a.file_asset_id,

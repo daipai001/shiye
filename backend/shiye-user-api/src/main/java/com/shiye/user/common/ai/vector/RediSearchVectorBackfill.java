@@ -27,10 +27,16 @@ public class RediSearchVectorBackfill {
 
     @EventListener(ApplicationReadyEvent.class)
     public void backfill() {
-        if (!enabled || index.isBackfillComplete()) {
+        if (!enabled) {
             return;
         }
-        int migrated = index.backfillExistingVectors();
-        log.info("RediSearch vector backfill finished, migrated={}", migrated);
+        if (!index.isBackfillComplete()) {
+            int migrated = index.backfillExistingVectors();
+            log.info("RediSearch vector backfill finished, migrated={}", migrated);
+        }
+        if (index.isBackfillComplete() && !index.isTeamBackfillComplete()) {
+            int linked = index.backfillTeamMemberships();
+            log.info("RediSearch team backfill finished, linked={}", linked);
+        }
     }
 }

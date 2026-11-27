@@ -138,7 +138,7 @@ public class ChunkRetrievalService {
                 ? rerankOverride : Boolean.TRUE.equals(settings.ragRerankEnabled());
 
         List<Candidate> vectorResults = vectorCandidates(
-                userId, resolution.teamId(), query, allowedArticleIds);
+                userId, resolution.teamId(), scope, query, allowedArticleIds);
         List<Candidate> keywordResults = hybridEnabled
                 ? keywordCandidates(userId, query, scope, scopeId, allowedArticleIds,
                 resolution.teamId())
@@ -195,27 +195,41 @@ public class ChunkRetrievalService {
                 rerankResult.inputTokens(), rerankResult.latencyMs());
     }
 
-    private List<Candidate> vectorCandidates(long userId, Long teamId, String query,
-                                             Set<Long> allowedArticleIds) {
+    private List<Candidate> vectorCandidates(long userId, Long teamId, String scope,
+                                             String query, Set<Long> allowedArticleIds) {
         List<float[]> queryVectors = embeddingService.embed(List.of(query));
         if (queryVectors.isEmpty()) {
             return List.of();
         }
         float[] queryVector = queryVectors.get(0);
         String model = embeddingService.model();
-        if (teamId == null && allowedArticleIds == null && rediSearchVectorSearcher.isAuthoritative()) {
+        // 团队范围只按 team_id 过滤；标签/文件夹/单篇资料额外按 article_id 过滤。
+        boolean useArticleFilter = allowedArticleIds != null && !"TEAM".equals(scope);
+        boolean filterWithinLimit = !useArticleFilter
+                || allowedArticleIds.size() <= RediSearchVectorSearcher.MAX_ARTICLE_FILTER;
+        if (filterWithinLimit && rediSearchVectorSearcher.isAuthoritative(teamId)) {
             List<VectorSearchHit> hits = rediSearchVectorSearcher.search(
-                    userId, model, queryVector, vectorCandidates);
+                    userId, teamId,
+                    useArticleFilter ? allowedArticleIds : null,
+                    model, queryVector, vectorCandidates);
             if (!hits.isEmpty()) {
                 List<Long> hitArticleIds = hits.stream()
                         .map(VectorSearchHit::articleId)
                         .filter(id -> id > 0)
                         .distinct()
                         .toList();
-                Set<Long> readyArticleIds = hitArticleIds.isEmpty()
-                        ? Set.of()
-                        : new HashSet<>(articleMapper.findReadyIdsByIdsAndUser(
-                                userId, hitArticleIds));
+                Set<Long> readyArticleIds;
+                if (teamId == null) {
+                    readyArticleIds = hitArticleIds.isEmpty()
+                            ? Set.of()
+                            : new HashSet<>(articleMapper.findReadyIdsByIdsAndUser(
+                                    userId, hitArticleIds));
+                } else {
+                    readyArticleIds = hitArticleIds.isEmpty()
+                            ? Set.of()
+                            : new HashSet<>(articleMapper.findReadyIdsByTeamAndIds(
+                                    teamId, hitArticleIds));
+                }
                 double effectiveMinScore = model.startsWith("DEV-HASH") ? -1.0 : minScore;
                 List<Candidate> candidates = new ArrayList<>(hits.size());
                 for (VectorSearchHit hit : hits) {
@@ -228,6 +242,9 @@ public class ChunkRetrievalService {
                             hit.charStart(), hit.charEnd());
                     candidate.vectorScore = hit.score();
                     candidates.add(candidate);
+                    if (candidates.size() >= vectorCandidates) {
+                        break;
+                    }
                 }
                 if (!candidates.isEmpty()) {
                     return candidates;

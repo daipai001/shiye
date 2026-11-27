@@ -74,11 +74,13 @@ VECTOR_BACKFILL=true   # 首次启用时回填旧 base64 向量，完成后可�
 
 说明：
 
-- 只有 `VECTOR_BACKFILL=true` 回填完成并写入完成标记后，检索才会使用 HNSW；未完成、索引异常或维度不匹配时自动回退 Hash pipeline，避免只召回部分切片。
-- HNSW 目前覆盖个人 `ALL` 范围；团队、标签、文件夹范围继续走 Redis Hash pipeline。
+- 只有 `VECTOR_BACKFILL=true` 回填完成并写入完成标记后，检索才会使用 HNSW；未完成、索引异常或维度/字段不匹配时自动回退 Hash pipeline，避免只召回部分切片。
+- HNSW 覆盖个人 `ALL`、团队 `TEAM`、`TEAM_TAG` / `TEAM_FOLDER`、`TAG` / `FOLDER` / `ARTICLE`。标签/文件夹/单篇资料的 article_id 过滤超过 200 条时自动回退 pipeline。
+- 团队范围需要 `team_id` 回填完成；升级后首次启用请保持 `VECTOR_BACKFILL=true`，启动时会补齐 `vector_bin` 和已有团队集合的 `team_id`，完成后写入独立标记。
+- 启动时会用 `FT.INFO` 校验索引字段和向量维度；旧索引缺少 `team_id` 或维度不一致时自动 `FT.DROPINDEX`（保留 Hash 数据）并按当前配置重建。
 - Redis 不带 search 模块时会自动回退到原 pipeline，不影响启动。
 - 旧的 `vector` 字段保留；新切片同时写 `vector_bin`。
-- 切换 embedding 模型/维度后需要重建索引并重新入库。
+- 切换 embedding 模型后，旧切片会被 `embedding_model` TAG 过滤；切换维度会触发索引自动重建，但旧切片需要重新入库/删除后回填标记才会重新置为完成。
 
 ## AI/RAG 压测（mock）
 
