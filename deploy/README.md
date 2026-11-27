@@ -51,7 +51,7 @@ APP_PUBLIC_URL=https://shiye.example.com
 
 ## 升级迁移
 
-从 `v0.41.x` 升级到 `v0.42.x` 时，现有数据库需要先执行：
+从 `v0.41.x` 升级到 `v0.43.x` 时，现有数据库需要先执行：
 
 ```bash
 mysql -h ... -u ... -p shiye < deploy/sql/migrations/2026-11-26-global-usage.sql
