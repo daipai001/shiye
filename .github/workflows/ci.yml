@@ -153,7 +153,7 @@ jobs:
         shell: bash
         run: |
           for attempt in 1 2 3; do
-            if mvn -B -DskipTests clean package; then
+            if mvn -B -DskipTests -pl shiye-user-api -am clean package; then
               exit 0
             fi
             echo "Maven package failed (attempt ${attempt}); retrying..."
