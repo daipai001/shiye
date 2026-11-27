@@ -147,10 +147,16 @@ run_migration "2026-11-27-team-audit" \
   "$ROOT_DIR/deploy/sql/migrations/2026-11-27-team-audit.sql"
 
 echo "[deploy] build/start services"
+SERVICES=(mysql redis user-api admin-api user-web admin-web)
+if [ "${INCLUDE_MONITORING:-false}" = "true" ]; then
+  SERVICES+=(prometheus alertmanager)
+fi
 if [ "${BUILD_IMAGES:-true}" = "true" ]; then
-  "${COMPOSE[@]}" up -d --build
+  "${COMPOSE[@]}" up -d --build "${SERVICES[@]}"
 else
-  "${COMPOSE[@]}" up -d
+  echo "[deploy] pull prebuilt images"
+  "${COMPOSE[@]}" pull "${SERVICES[@]}"
+  "${COMPOSE[@]}" up -d "${SERVICES[@]}"
 fi
 
 wait_http() {

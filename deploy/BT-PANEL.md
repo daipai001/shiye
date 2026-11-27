@@ -55,7 +55,15 @@ vi deploy/.env.production
 bash deploy/scripts/deploy-production.sh
 ```
 
-脚本顺序：启动 MySQL/Redis → 备份（已有库）→ schema/seed → 迁移 → 构建/启动 → 健康检查。
+镜像默认使用 `ghcr.io/daipai001/shiye-*:latest`（GitHub Actions CD 推送）。如果 GHCR 包是私有的：
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
+```
+
+没有 GHCR 访问权限时，把 `BUILD_IMAGES` 改为 `true` 并在服务器准备 Maven/Node 产物；不推荐在 2C4G 服务器上现场构建前端。
+
+脚本顺序：启动 MySQL/Redis → 备份（已有库）→ schema/seed → 迁移 → 构建/启动 → 健康检查。4GB 服务器默认 `INCLUDE_MONITORING=false`，不启动 Prometheus/Alertmanager；需要时再设 true。
 
 首次启动后立即登录 `https://admin.shiye.myhyw.asia` 修改管理员初始密码。
 
