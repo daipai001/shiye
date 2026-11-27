@@ -28,6 +28,15 @@ public interface TeamUsageMonthlyMapper {
             """)
     Long lockTeamRow(@Param("teamId") long teamId);
 
+    @Select("""
+            SELECT id, team_id, month, tokens, cost, calls, updated_at
+            FROM team_usage_monthly
+            WHERE team_id = #{teamId} AND month = #{month}
+            FOR UPDATE
+            """)
+    TeamUsageMonthlyEntity findForUpdate(@Param("teamId") long teamId,
+                                         @Param("month") String month);
+
     @Insert("""
             INSERT INTO team_usage_monthly (team_id, month, tokens, cost, calls)
             VALUES (#{teamId}, #{month}, #{tokens}, #{cost}, 1)

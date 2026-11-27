@@ -4,15 +4,18 @@ import com.shiye.common.exception.BizException;
 import com.shiye.common.settings.SystemSettings;
 import com.shiye.user.module.auth.domain.vo.UserQuotaVO;
 import com.shiye.user.module.auth.service.AuthService;
+import com.shiye.user.module.usage.domain.entity.TeamUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.entity.UsageReservationEntity;
 import com.shiye.user.module.usage.domain.entity.UserUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.vo.ChatReservation;
+import com.shiye.user.module.usage.domain.vo.TeamReservation;
 import com.shiye.user.module.usage.domain.vo.UsageTotals;
 import com.shiye.user.module.usage.mapper.AiUsageMapper;
 import com.shiye.user.module.usage.mapper.GlobalUsageMonthlyMapper;
 import com.shiye.user.module.usage.mapper.TeamUsageMonthlyMapper;
 import com.shiye.user.module.usage.mapper.UsageReservationMapper;
 import com.shiye.user.module.usage.mapper.UserUsageMonthlyMapper;
+import com.shiye.user.module.team.domain.vo.TeamQuota;
 import com.shiye.user.module.team.service.TeamService;
 import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -51,7 +54,8 @@ class UsageServiceImplTest {
     private final UsageServiceImpl service = new UsageServiceImpl(
             authService, aiUsageMapper, monthlyMapper, teamUsageMapper, globalUsageMapper,
             reservationMapper, transactionTemplate, teamService, settingsService,
-            new SimpleMeterRegistry(), 8000, new BigDecimal("0.06"), 15);
+            new SimpleMeterRegistry(), 8000, new BigDecimal("0.06"),
+            12000, new BigDecimal("0.12"), 15);
 
     @Test
     void reserveChatAtomicallyAddsPersonalReservation() {
@@ -123,11 +127,51 @@ class UsageServiceImplTest {
     }
 
     @Test
-    void reserveChatRejectsWhenPersonalQuotaCannotCoverReservation() {
+    void reserveChatClampsPersonalReservationToRemainingQuota() {
         when(authService.quota(1L)).thenReturn(quota(10000, new BigDecimal("5")));
         when(monthlyMapper.lockUserRow(1L)).thenReturn(1L);
         UserUsageMonthlyEntity usage = new UserUsageMonthlyEntity();
+        usage.setTokens(9500L);
+        usage.setCost(new BigDecimal("0.10"));
+        when(monthlyMapper.findForUpdate(1L, month())).thenReturn(usage);
+        when(monthlyMapper.add(1L, month(), 500, new BigDecimal("0.06"))).thenReturn(1);
+        when(settingsService.current()).thenReturn(settings());
+        when(globalUsageMapper.find(month())).thenReturn(new UsageTotals(0, BigDecimal.ZERO, 0));
+        when(globalUsageMapper.findForUpdate(month()))
+                .thenReturn(new UsageTotals(0, BigDecimal.ZERO, 0));
+        when(globalUsageMapper.reserve(month(), 500, new BigDecimal("0.06"),
+                1_000_000, new BigDecimal("20"))).thenReturn(1);
+
+        ChatReservation reservation = service.reserveChat(1L, null);
+
+        assertEquals(500, reservation.user().tokens());
+        verify(monthlyMapper).add(1L, month(), 500, new BigDecimal("0.06"));
+    }
+
+    @Test
+    void reserveTeamChatClampsToRemainingQuota() {
+        when(teamService.quota(2L)).thenReturn(new TeamQuota(10000, new BigDecimal("5")));
+        when(teamUsageMapper.lockTeamRow(2L)).thenReturn(2L);
+        TeamUsageMonthlyEntity usage = new TeamUsageMonthlyEntity();
         usage.setTokens(9000L);
+        usage.setCost(BigDecimal.ZERO);
+        when(teamUsageMapper.findForUpdate(2L, month())).thenReturn(usage);
+        when(teamUsageMapper.reserve(2L, month(), 1000, new BigDecimal("0.12"),
+                10000, new BigDecimal("5"))).thenReturn(1);
+
+        TeamReservation reservation = service.reserveTeamChat(
+                1L, 2L, 12000, new BigDecimal("0.12"));
+
+        assertEquals(1000, reservation.tokens());
+        assertEquals(0, reservation.cost().compareTo(new BigDecimal("0.12")));
+    }
+
+    @Test
+    void reserveChatRejectsWhenPersonalQuotaExhausted() {
+        when(authService.quota(1L)).thenReturn(quota(10000, new BigDecimal("5")));
+        when(monthlyMapper.lockUserRow(1L)).thenReturn(1L);
+        UserUsageMonthlyEntity usage = new UserUsageMonthlyEntity();
+        usage.setTokens(10000L);
         usage.setCost(BigDecimal.ZERO);
         when(monthlyMapper.findForUpdate(1L, month())).thenReturn(usage);
 

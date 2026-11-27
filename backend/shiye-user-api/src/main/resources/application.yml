@@ -151,6 +151,9 @@ shiye:
     # 每次流式问答开始前预留的个人配额，结束后释放
     chat-reserve-tokens: ${CHAT_RESERVE_TOKENS:8000}
     chat-reserve-cost: ${CHAT_RESERVE_COST:0.06}
+    # 团队问答预留上限；剩余额度不足时按剩余额度预留
+    team-chat-reserve-tokens: ${TEAM_CHAT_RESERVE_TOKENS:12000}
+    team-chat-reserve-cost: ${TEAM_CHAT_RESERVE_COST:0.12}
     # 预留流水 TTL；进程崩溃后由定时任务回收过期预留
     reservation-ttl-minutes: ${USAGE_RESERVATION_TTL_MINUTES:15}
     reservation-reap-delay-ms: ${USAGE_RESERVATION_REAP_DELAY_MS:60000}

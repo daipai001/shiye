@@ -75,6 +75,8 @@ public class UsageServiceImpl implements UsageService {
     private final Counter chatFailed;
     private final long chatReserveTokens;
     private final BigDecimal chatReserveCost;
+    private final long teamChatReserveTokens;
+    private final BigDecimal teamChatReserveCost;
     private final long reservationTtlMinutes;
 
     public UsageServiceImpl(
@@ -90,6 +92,8 @@ public class UsageServiceImpl implements UsageService {
             MeterRegistry meterRegistry,
             @Value("${shiye.usage.chat-reserve-tokens:8000}") long chatReserveTokens,
             @Value("${shiye.usage.chat-reserve-cost:0.06}") BigDecimal chatReserveCost,
+            @Value("${shiye.usage.team-chat-reserve-tokens:12000}") long teamChatReserveTokens,
+            @Value("${shiye.usage.team-chat-reserve-cost:0.12}") BigDecimal teamChatReserveCost,
             @Value("${shiye.usage.reservation-ttl-minutes:15}") long reservationTtlMinutes) {
         this.authService = authService;
         this.aiUsageMapper = aiUsageMapper;
@@ -107,6 +111,10 @@ public class UsageServiceImpl implements UsageService {
         this.chatReserveTokens = Math.max(1000, chatReserveTokens);
         this.chatReserveCost = chatReserveCost == null || chatReserveCost.signum() < 0
                 ? BigDecimal.ZERO : chatReserveCost;
+        this.teamChatReserveTokens = Math.max(1000, teamChatReserveTokens);
+        this.teamChatReserveCost = teamChatReserveCost == null
+                || teamChatReserveCost.signum() < 0
+                ? BigDecimal.ZERO : teamChatReserveCost;
         this.reservationTtlMinutes = Math.max(5, reservationTtlMinutes);
     }
 
@@ -197,8 +205,8 @@ public class UsageServiceImpl implements UsageService {
 
     @Override
     @Transactional
-    public TeamReservation reserveTeamChat(long userId, long teamId, long tokens,
-                                           BigDecimal cost) {
+    public TeamReservation reserveTeamChat(long userId, long teamId, long maxTokens,
+                                           BigDecimal maxCost) {
         teamService.requireMember(userId, teamId);
         TeamQuota quota = teamService.quota(teamId);
         String month = currentMonth();
@@ -207,12 +215,29 @@ public class UsageServiceImpl implements UsageService {
             throw new BizException(ErrorCode.TEAM_QUOTA_EXCEEDED, "团队不存在或已解散");
         }
         teamUsageMapper.ensureRow(teamId, month);
+        TeamUsageMonthlyEntity usage = teamUsageMapper.findForUpdate(teamId, month);
+        long usedTokens = usage == null || usage.getTokens() == null ? 0 : usage.getTokens();
+        BigDecimal usedCost = usage == null || usage.getCost() == null
+                ? BigDecimal.ZERO : usage.getCost();
+        long tokenRemaining = Math.max(0, quota.tokenQuota() - usedTokens);
+        BigDecimal costRemaining = remainingCost(quota.costQuota(), usedCost);
+        if (tokenRemaining <= 0 || costRemaining.signum() <= 0) {
+            throw new BizException(ErrorCode.TEAM_QUOTA_EXCEEDED, "团队本月配额已用完");
+        }
+        // 剩余额度不足固定预留时按剩余额度预留，避免短请求被提前拒绝。
+        long reserveTokens = Math.min(Math.max(0, maxTokens), tokenRemaining);
+        BigDecimal reserveCost = maxCost == null
+                ? BigDecimal.ZERO : maxCost.min(costRemaining);
+        if (reserveTokens <= 0 || reserveCost.signum() <= 0) {
+            throw new BizException(ErrorCode.TEAM_QUOTA_EXCEEDED, "团队本月配额已用完");
+        }
         int reserved = teamUsageMapper.reserve(
-                teamId, month, tokens, cost, quota.tokenQuota(), quota.costQuota());
+                teamId, month, reserveTokens, reserveCost,
+                quota.tokenQuota(), quota.costQuota());
         if (reserved == 0) {
             throw new BizException(ErrorCode.TEAM_QUOTA_EXCEEDED, "团队本月配额已用完");
         }
-        return new TeamReservation(teamId, month, tokens, cost);
+        return new TeamReservation(teamId, month, reserveTokens, reserveCost);
     }
 
     @Override
@@ -246,21 +271,30 @@ public class UsageServiceImpl implements UsageService {
         long usedTokens = usage == null || usage.getTokens() == null ? 0 : usage.getTokens();
         BigDecimal usedCost = usage == null || usage.getCost() == null
                 ? BigDecimal.ZERO : usage.getCost();
-        if (usedTokens + chatReserveTokens > quota.monthlyTokenQuota()
-                || usedCost.add(chatReserveCost).compareTo(quota.monthlyCostQuota()) > 0) {
-            throw new BizException(ErrorCode.USER_QUOTA_EXCEEDED, "本月配额不足以开始本次问答");
+        long tokenRemaining = Math.max(0, quota.monthlyTokenQuota() - usedTokens);
+        BigDecimal costRemaining = remainingCost(quota.monthlyCostQuota(), usedCost);
+        if (tokenRemaining <= 0 || costRemaining.signum() <= 0) {
+            throw new BizException(ErrorCode.USER_QUOTA_EXCEEDED, "本月配额已用完");
         }
-        if (monthlyMapper.add(userId, month, chatReserveTokens, chatReserveCost) == 0) {
+        // 剩余额度不足固定预留时按剩余额度预留，避免短请求被提前拒绝；
+        // 原子 add 仍保证并发下只有能覆盖预留的请求可以开始。
+        long reserveTokens = Math.min(chatReserveTokens, tokenRemaining);
+        BigDecimal reserveCost = chatReserveCost.min(costRemaining);
+        if (reserveTokens <= 0 || reserveCost.signum() <= 0) {
+            throw new BizException(ErrorCode.USER_QUOTA_EXCEEDED, "本月配额已用完");
+        }
+        if (monthlyMapper.add(userId, month, reserveTokens, reserveCost) == 0) {
             throw new BizException(ErrorCode.USER_QUOTA_EXCEEDED, "本月配额预留失败，请稍后重试");
         }
         UserReservation userReservation = new UserReservation(
-                userId, month, chatReserveTokens, chatReserveCost);
+                userId, month, reserveTokens, reserveCost);
         // 锁顺序与 recordChat 保持一致：user -> team -> global，避免死锁。
         TeamReservation teamReservation = teamId == null
                 ? null
-                : reserveTeamChat(userId, teamId, 12_000, new BigDecimal("0.12"));
+                : reserveTeamChat(userId, teamId,
+                        teamChatReserveTokens, teamChatReserveCost);
         GlobalReservation globalReservation = reserveGlobalChat(
-                month, chatReserveTokens, chatReserveCost);
+                month, reserveTokens, reserveCost);
         Long reservationId = insertLedger(userId, teamId, month,
                 userReservation, teamReservation, globalReservation);
         return new ChatReservation(
@@ -298,25 +332,51 @@ public class UsageServiceImpl implements UsageService {
         }
     }
 
-    private GlobalReservation reserveGlobalChat(String month, long tokens, BigDecimal cost) {
+    private GlobalReservation reserveGlobalChat(String month, long maxTokens,
+                                                 BigDecimal maxCost) {
         try {
             SystemSettings settings = systemSettingsService.current();
             ensureGlobalRow(month);
+            UsageTotals current = globalUsageMapper.findForUpdate(month);
+            long usedTokens = current == null ? 0 : current.tokens();
+            BigDecimal usedCost = current == null ? BigDecimal.ZERO : money(current.cost());
+            long tokenRemaining = Math.max(
+                    0, settings.globalMonthlyTokens() - usedTokens);
+            BigDecimal costRemaining = remainingCost(
+                    settings.globalMonthlyCost(), usedCost);
+            if (tokenRemaining <= 0 || costRemaining.signum() <= 0) {
+                throw new BizException(ErrorCode.GLOBAL_BUDGET_EXCEEDED,
+                        "全站预算已用完");
+            }
+            long reserveTokens = Math.min(maxTokens, tokenRemaining);
+            BigDecimal reserveCost = maxCost.min(costRemaining);
+            if (reserveTokens <= 0 || reserveCost.signum() <= 0) {
+                throw new BizException(ErrorCode.GLOBAL_BUDGET_EXCEEDED,
+                        "全站预算已用完");
+            }
             int reserved = globalUsageMapper.reserve(
-                    month, tokens, cost,
+                    month, reserveTokens, reserveCost,
                     settings.globalMonthlyTokens(), settings.globalMonthlyCost());
             if (reserved == 0) {
                 throw new BizException(ErrorCode.GLOBAL_BUDGET_EXCEEDED,
                         "全站预算不足以开始本次问答");
             }
-            return new GlobalReservation(month, tokens, cost);
+            return new GlobalReservation(month, reserveTokens, reserveCost);
         } catch (BizException ex) {
             throw ex;
-        } catch (RuntimeException ex) {
-            // 迁移未执行/表暂不可用时回退到旧的全站总量检查，避免问答整体不可用。
-            log.error("global budget reservation unavailable, fallback: {}", ex.getMessage());
+        } catch (BadSqlGrammarException ex) {
+            // 迁移未执行时回退到旧的全站总量检查，避免问答整体不可用。
+            log.error("global_usage_monthly missing, run migration "
+                    + "2026-11-26-global-usage.sql: {}", ex.getMessage());
             return null;
         }
+    }
+
+    private BigDecimal remainingCost(BigDecimal limit, BigDecimal used) {
+        BigDecimal safeLimit = limit == null ? BigDecimal.ZERO : limit;
+        BigDecimal safeUsed = used == null ? BigDecimal.ZERO : used;
+        BigDecimal remaining = safeLimit.subtract(safeUsed);
+        return remaining.signum() < 0 ? BigDecimal.ZERO : remaining;
     }
 
     private void ensureGlobalRow(String month) {

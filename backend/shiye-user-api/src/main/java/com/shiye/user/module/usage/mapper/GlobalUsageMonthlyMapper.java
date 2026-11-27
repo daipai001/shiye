@@ -21,6 +21,16 @@ public interface GlobalUsageMonthlyMapper {
             """)
     UsageTotals find(@Param("month") String month);
 
+    @Select("""
+            SELECT COALESCE(tokens, 0) AS tokens,
+                   COALESCE(cost, 0) AS cost,
+                   COALESCE(calls, 0) AS calls
+            FROM global_usage_monthly
+            WHERE month = #{month}
+            FOR UPDATE
+            """)
+    UsageTotals findForUpdate(@Param("month") String month);
+
     @Insert("""
             INSERT INTO global_usage_monthly (month, tokens, cost, calls)
             SELECT #{month}, COALESCE(SUM(tokens), 0), COALESCE(SUM(cost), 0),
