@@ -15,7 +15,7 @@
 |---|---|
 | `mvn test` | 104 个测试，0 失败 |
 | user-web / admin-web `npm run build` | 通过 |
-| Playwright 登录 E2E | 4 个用例通过 |
+| Playwright E2E | 登录 4 个 + 用户业务 1 个（注册→上传→问答→引用→用量）+ 管理端 1 个（登录→团队审计→审计→团队）通过 |
 | `scripts/ci-smoke.sh` | 通过 |
 | `scripts/ci-team-smoke.sh` | 通过 |
 | 用户端页面（资料库/问答/团队/用量/设置/插件） | 均可打开，无控制台错误 |

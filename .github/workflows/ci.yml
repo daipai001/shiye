@@ -77,7 +77,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run auth E2E
         working-directory: frontend/user-web
-        run: npm run test:e2e
+        run: npx playwright test e2e/auth.spec.ts
 
   monitoring-check:
     runs-on: ubuntu-latest
@@ -192,6 +192,181 @@ jobs:
       - name: Stop API
         if: always()
         run: kill "$(cat /tmp/shiye-hnsw-api.pid)" || true
+
+  business-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: shiye
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
+      - name: Initialize schema
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot shiye < deploy/sql/schema.sql
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot shiye < deploy/sql/seed.sql
+      - name: Build API
+        working-directory: backend
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if mvn -B -DskipTests clean package; then
+              exit 0
+            fi
+            echo "Maven package failed (attempt ${attempt}); retrying..."
+            sleep 10
+          done
+          exit 1
+      - name: Start mock AI
+        run: |
+          nohup node scripts/mock-ai.mjs 19091 > /tmp/mock-ai.log 2>&1 &
+          echo $! > /tmp/mock-ai.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:19091/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo 'mock AI did not become healthy'
+          exit 1
+      - name: Start user API
+        run: |
+          nohup java -jar backend/shiye-user-api/target/shiye-user-api-0.1.0-SNAPSHOT.jar \
+            --spring.datasource.url='jdbc:mysql://127.0.0.1:3306/shiye?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true' \
+            --spring.datasource.username=root \
+            --spring.datasource.password=root \
+            --spring.data.redis.host=127.0.0.1 \
+            --spring.data.redis.port=6379 \
+            --shiye.jwt.user-secret=ci-user-secret-0123456789-abcdefghijklmnopqrstuvwxyz \
+            --shiye.ai.enabled=true \
+            --shiye.ai.chat.base-url=http://127.0.0.1:19091/v1 \
+            --shiye.ai.chat.api-key=mock \
+            --shiye.ai.chat.model=mock-chat \
+            --shiye.ai.embedding.provider=http \
+            --shiye.ai.embedding.base-url=http://127.0.0.1:19091/v1 \
+            --shiye.ai.embedding.api-key=mock \
+            --shiye.ai.embedding.model=mock-embedding \
+            --shiye.ai.embedding.dimension=1024 \
+            --shiye.ai.rerank.enabled=false \
+            --shiye.ai.enrichment.enabled=false \
+            --shiye.bookmark.worker-enabled=false \
+            --shiye.eval.worker-enabled=false \
+            > /tmp/shiye-business-api.log 2>&1 &
+          echo $! > /tmp/shiye-business-api.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18080/api/v1/health >/tmp/shiye-business-health.json; then
+              cat /tmp/shiye-business-health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'user API did not become healthy'
+          exit 1
+      - name: Start admin API
+        run: |
+          nohup java -jar backend/shiye-admin-api/target/shiye-admin-api-0.1.0-SNAPSHOT.jar \
+            --spring.datasource.url='jdbc:mysql://127.0.0.1:3306/shiye?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true' \
+            --spring.datasource.username=root \
+            --spring.datasource.password=root \
+            --spring.data.redis.host=127.0.0.1 \
+            --spring.data.redis.port=6379 \
+            --shiye.jwt.admin-secret=ci-admin-secret-0123456789-abcdefghijklmnopqrstuvwxyz \
+            --shiye.ai.enabled=true \
+            --shiye.ai.chat.base-url=http://127.0.0.1:19091/v1 \
+            --shiye.ai.chat.api-key=mock \
+            --shiye.ai.chat.model=mock-chat \
+            > /tmp/shiye-business-admin.log 2>&1 &
+          echo $! > /tmp/shiye-business-admin.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18081/actuator/health >/tmp/shiye-business-admin-health.json; then
+              cat /tmp/shiye-business-admin-health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'admin API did not become healthy'
+          exit 1
+      - name: Install user-web dependencies
+        working-directory: frontend/user-web
+        run: npm ci
+      - name: Install admin-web dependencies
+        working-directory: frontend/admin-web
+        run: npm ci
+      - name: Install Chromium
+        working-directory: frontend/user-web
+        run: npx playwright install --with-deps chromium
+      - name: Start web dev servers
+        run: |
+          (cd frontend/user-web && \
+            VITE_API_BASE_URL=http://127.0.0.1:18080/api/v1 \
+            nohup npm run dev -- --host 127.0.0.1 --port 15173 > /tmp/user-web.log 2>&1 & \
+            echo $! > /tmp/user-web.pid)
+          (cd frontend/admin-web && \
+            VITE_ADMIN_API_BASE_URL=http://127.0.0.1:18081/admin/api/v1 \
+            nohup npm run dev -- --host 127.0.0.1 --port 15174 > /tmp/admin-web.log 2>&1 & \
+            echo $! > /tmp/admin-web.pid)
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:15173 > /dev/null \
+              && curl -fsS http://127.0.0.1:15174 > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo 'web dev servers did not become healthy'
+          exit 1
+      - name: User business E2E
+        working-directory: frontend/user-web
+        env:
+          E2E_BASE_URL: http://127.0.0.1:15173
+        run: npx playwright test e2e/business.spec.ts
+      - name: Admin E2E
+        working-directory: frontend/admin-web
+        env:
+          E2E_BASE_URL: http://127.0.0.1:15174
+        run: npx playwright test e2e/admin.spec.ts
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          tail -n 200 /tmp/shiye-business-api.log || true
+          tail -n 200 /tmp/shiye-business-admin.log || true
+          tail -n 100 /tmp/mock-ai.log || true
+      - name: Stop services
+        if: always()
+        run: |
+          kill "$(cat /tmp/shiye-business-api.pid)" || true
+          kill "$(cat /tmp/shiye-business-admin.pid)" || true
+          kill "$(cat /tmp/mock-ai.pid)" || true
+          kill "$(cat /tmp/user-web.pid)" || true
+          kill "$(cat /tmp/admin-web.pid)" || true
 
   integration-smoke:
     runs-on: ubuntu-latest

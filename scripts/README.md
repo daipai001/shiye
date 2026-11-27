@@ -6,17 +6,21 @@
 cd frontend/user-web
 npm install
 npx playwright install chromium   # 首次运行；本机也可用系统 Chrome
-npm run test:e2e
+npx playwright test e2e/auth.spec.ts
+E2E_BASE_URL=http://localhost:15173 npx playwright test e2e/business.spec.ts
+
+cd ../admin-web
+npm install
+E2E_BASE_URL=http://localhost:15174 npx playwright test e2e/admin.spec.ts
 ```
 
-默认启动/复用 `http://localhost:15173` 的 Vite dev server，覆盖：
+默认启动/复用 `http://localhost:15173` / `http://localhost:15174` 的 Vite dev server，覆盖：
 
-- 登录页桌面布局
-- 登录/注册切换
-- 表单校验
-- 移动端单列布局
+- 登录页桌面布局、登录/注册切换、表单校验、移动端单列布局
+- 用户业务链路：注册 → 上传资料 → 问答 → 引用 → 用量
+- 管理端：登录 → 团队审计 → 审计日志 → 团队与配额
 
-CI 的 `playwright-e2e` job 会自动安装 Chromium 并执行。
+CI 的 `playwright-e2e` job 执行登录 E2E；`business-e2e` job 使用 mock AI、MySQL/Redis 和两个 API 执行用户业务与管理端 E2E。
 
 ## 基础压测
 

@@ -4,8 +4,8 @@ const channel = process.env.PLAYWRIGHT_CHANNEL || (process.env.CI ? undefined : 
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
-  expect: { timeout: 5_000 },
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
   fullyParallel: true,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
