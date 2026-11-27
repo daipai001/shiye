@@ -207,15 +207,14 @@ public class ChunkRetrievalService {
         boolean useArticleFilter = allowedArticleIds != null && !"TEAM".equals(scope);
         boolean filterWithinLimit = !useArticleFilter
                 || allowedArticleIds.size() <= RediSearchVectorSearcher.MAX_ARTICLE_FILTER;
-        if (rediSearchVectorSearcher.isConfigured()) {
-            if (!filterWithinLimit) {
-                rediSearchVectorSearcher.recordFallback("article_filter_too_large");
-            } else if (!rediSearchVectorSearcher.isAuthoritative(teamId)) {
-                rediSearchVectorSearcher.recordFallback(
-                        teamId == null ? "personal_not_ready" : "team_not_ready");
-            }
+        boolean hnswAuthoritative = filterWithinLimit
+                && rediSearchVectorSearcher.isAuthoritative(teamId);
+        if (rediSearchVectorSearcher.isConfigured() && !hnswAuthoritative) {
+            rediSearchVectorSearcher.recordFallback(!filterWithinLimit
+                    ? "article_filter_too_large"
+                    : (teamId == null ? "personal_not_ready" : "team_not_ready"));
         }
-        if (filterWithinLimit && rediSearchVectorSearcher.isAuthoritative(teamId)) {
+        if (hnswAuthoritative) {
             List<VectorSearchHit> hits = rediSearchVectorSearcher.search(
                     userId, teamId,
                     useArticleFilter ? allowedArticleIds : null,
