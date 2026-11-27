@@ -89,6 +89,21 @@ mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/20
 - 迁移：`deploy/sql/migrations/`
 - Docker 方式：`mvn -f backend/pom.xml package -DskipTests` 后 `docker compose -f deploy/docker-compose.yml up -d --build`
 
+### 生产部署（myhyw.asia）
+
+生产服务器已有宝塔面板和 `offerdesk` 项目，拾页使用独立 Compose 项目、`shiye-*` 容器和子域名，避免端口冲突：
+
+```bash
+cp deploy/.env.production.example deploy/.env.production
+# 修改 DB_PASSWORD、JWT、AI key、SMTP、域名
+bash deploy/scripts/deploy-production.sh
+```
+
+- 用户端：`https://shiye.myhyw.asia`
+- 管理端：`https://admin.shiye.myhyw.asia`
+- 宝塔反代、DNS、SSL、防火墙步骤见 `deploy/BT-PANEL.md`。
+- 已有库升级与回滚见 `docs/migration-runbook-2026-11-27.md`。
+
 ### 2. 后端
 
 ```bash

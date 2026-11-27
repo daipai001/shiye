@@ -14,6 +14,7 @@ dist-ssr/
 .env
 .env.*
 !.env.example
+!deploy/.env.production.example
 backend/config/application-local.yml
 backend/config/application-local.yaml
 backend/**/src/main/resources/application-local.yml

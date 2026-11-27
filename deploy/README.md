@@ -1,5 +1,7 @@
 # 部署运维
 
+> 当前生产服务器已有宝塔和 `offerdesk` 项目，请优先阅读 `deploy/BT-PANEL.md`：拾页使用独立 Compose 项目、`shiye-*` 容器和 `myhyw.asia` 子域名，避免端口/容器冲突。
+
 ## 数据库迁移
 
 - 新库：执行 `deploy/sql/schema.sql`，再执行 `deploy/sql/seed.sql`。
@@ -8,14 +10,16 @@
 
 ## HTTPS 入口
 
-`deploy/docker-compose.https.yml` 叠加 Caddy：
+生产服务器已有宝塔 Nginx 时，使用 `deploy/BT-PANEL.md` 的宝塔反代方案，**不要**启动 Caddy 叠加文件（会抢 80/443）。
+
+没有宝塔、80/443 空闲时可用 `deploy/docker-compose.https.yml` 叠加 Caddy：
 
 ```bash
 # 本地：https://localhost / https://admin.localhost（内部 CA，浏览器会提示证书）
 DOMAIN=localhost docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
 
 # 生产：域名 A/AAAA 指向服务器，开放 80/443
-DOMAIN=shiye.example.com ACME_EMAIL=ops@example.com \
+DOMAIN=shiye.myhyw.asia ACME_EMAIL=ops@myhyw.asia \
   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
 ```
 
@@ -37,14 +41,14 @@ Caddy 负责 TLS 和 80→443 跳转；`user-web` / `admin-web` 的 nginx 继续
 
 ```text
 MAIL_ENABLED=true
-MAIL_HOST=smtp.example.com
+MAIL_HOST=smtp.myhyw.asia
 MAIL_PORT=587
 MAIL_USERNAME=...
 MAIL_PASSWORD=...
-MAIL_FROM=no-reply@example.com
+MAIL_FROM=no-reply@myhyw.asia
 MAIL_SMTP_AUTH=true
 MAIL_STARTTLS=true
-APP_PUBLIC_URL=https://shiye.example.com
+APP_PUBLIC_URL=https://shiye.myhyw.asia
 ```
 
 未配置时 `MAIL_ENABLED=false`，相关接口仍返回成功，但不签发邮件 token、不实际发信。生产建议使用独立发信账号并配置 SPF/DKIM。

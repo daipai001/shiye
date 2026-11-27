@@ -26,12 +26,12 @@
 
 ## 生产环境配置
 
-1. 后端部署到 HTTPS 域名，例如 `https://shiye.example.com`。
+1. 后端部署到 HTTPS 域名，例如 `https://shiye.myhyw.asia`。
 2. 配置 `CORS_ALLOWED_ORIGINS`：
    ```text
-   https://shiye.example.com,chrome-extension://*
+   https://shiye.myhyw.asia,chrome-extension://*
    ```
-3. 插件设置页填写 `https://shiye.example.com/api/v1`。
+3. 插件设置页填写 `https://shiye.myhyw.asia/api/v1`。
 4. 首次保存会请求该域名的 host 权限；用户同意后才能访问。
 
 ## 打包
