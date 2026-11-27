@@ -1,3 +1,4 @@
+-- 回滚：ALTER TABLE `rag_eval_runs` DROP COLUMN `last_progress_at`;
 ALTER TABLE `rag_eval_runs`
   ADD COLUMN `last_progress_at` DATETIME(3) NULL DEFAULT NULL AFTER `started_at`;
 

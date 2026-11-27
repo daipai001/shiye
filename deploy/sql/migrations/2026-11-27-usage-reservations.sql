@@ -1,3 +1,4 @@
+-- 回滚：先回滚到不写流水的版本，再执行 DROP TABLE `usage_reservations`;
 CREATE TABLE IF NOT EXISTS `usage_reservations` (
   `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id`      BIGINT UNSIGNED NOT NULL,

@@ -1,5 +1,6 @@
 -- 清理升级前已被移除成员留下的未使用邀请码。
 -- 只删除邀请人当前不是该团队 ACTIVE 成员的记录。
+-- 回滚：数据删除不可逆；执行前备份 team_invites，回滚时从备份恢复。
 DELETE ti
 FROM `team_invites` ti
 JOIN `teams` t ON t.`id` = ti.`team_id` AND t.`deleted_at` IS NULL

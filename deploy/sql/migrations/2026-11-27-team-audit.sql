@@ -1,5 +1,6 @@
 -- 团队操作独立审计流水：邀请、加入、移除、退出、角色变更、转让、解散、资料共享。
 -- 仅追加，不提供修改/删除接口；管理员通过 admin-api 查询。
+-- 回滚：先回滚到不写团队审计的版本，再执行 DROP TABLE `team_audit_logs`;
 CREATE TABLE IF NOT EXISTS `team_audit_logs` (
   `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `team_id`     BIGINT UNSIGNED NOT NULL,

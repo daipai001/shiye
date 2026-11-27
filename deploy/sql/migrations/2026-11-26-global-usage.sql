@@ -1,3 +1,4 @@
+-- 回滚：先回滚到不读/写 global_usage_monthly 的版本，再执行 DROP TABLE `global_usage_monthly`;
 CREATE TABLE IF NOT EXISTS `global_usage_monthly` (
   `month`      CHAR(7)         NOT NULL,
   `tokens`     BIGINT          NOT NULL DEFAULT 0,
