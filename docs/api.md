@@ -162,6 +162,7 @@
 | 40901 | 409 | CONFLICT | 唯一冲突/重复 |
 | 40902 | 409 | IDEMPOTENCY_CONFLICT | 幂等键冲突 |
 | 40903 | 409 | IMPORT_ALREADY_RUNNING | 导入任务运行中 |
+| 40904 | 409 | INGEST_IN_PROGRESS | 资料正在入库/重建索引 |
 | 42901 | 429 | RATE_LIMITED | 限流 |
 | 42902 | 429 | USER_QUOTA_EXCEEDED | 用户配额超限 |
 | 42903 | 429 | GLOBAL_BUDGET_EXCEEDED | 全局预算超限 |
@@ -176,6 +177,7 @@
 | 50204 | 502 | PARSE_FAILED | 解析失败 |
 | 50205 | 502 | VECTOR_STORE_UNAVAILABLE | 向量库不可用 |
 | 50301 | 503 | MAINTENANCE | 维护中 |
+| 50302 | 503 | SERVER_BUSY | 服务繁忙，请稍后重试 |
 
 ### 1.9 SSE 约定
 
