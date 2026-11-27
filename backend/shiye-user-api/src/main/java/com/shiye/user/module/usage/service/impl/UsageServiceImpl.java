@@ -73,6 +73,9 @@ public class UsageServiceImpl implements UsageService {
     private final RuntimeSystemSettingsService systemSettingsService;
     private final Counter chatSuccess;
     private final Counter chatFailed;
+    private final Counter reservationReleased;
+    private final Counter reservationReleaseFailed;
+    private final Counter reservationReapFailed;
     private final long chatReserveTokens;
     private final BigDecimal chatReserveCost;
     private final long teamChatReserveTokens;
@@ -108,6 +111,12 @@ public class UsageServiceImpl implements UsageService {
                 .tag("scene", "CHAT").tag("status", "SUCCESS").register(meterRegistry);
         this.chatFailed = Counter.builder("shiye.ai.calls")
                 .tag("scene", "CHAT").tag("status", "FAILED").register(meterRegistry);
+        this.reservationReleased = Counter.builder("shiye.usage.reservations.released")
+                .description("成功释放的配额预留").register(meterRegistry);
+        this.reservationReleaseFailed = Counter.builder("shiye.usage.reservations.failed")
+                .tag("stage", "release").register(meterRegistry);
+        this.reservationReapFailed = Counter.builder("shiye.usage.reservations.failed")
+                .tag("stage", "reap").register(meterRegistry);
         this.chatReserveTokens = Math.max(1000, chatReserveTokens);
         this.chatReserveCost = chatReserveCost == null || chatReserveCost.signum() < 0
                 ? BigDecimal.ZERO : chatReserveCost;
@@ -437,10 +446,13 @@ public class UsageServiceImpl implements UsageService {
                 releaseAggregates(reservation);
                 return true;
             });
-            if (Boolean.FALSE.equals(released)) {
+            if (Boolean.TRUE.equals(released)) {
+                reservationReleased.increment();
+            } else {
                 log.debug("reservation {} already released or reaped", reservationId);
             }
         } catch (RuntimeException ex) {
+            reservationReleaseFailed.increment();
             // 标记和聚合释放同一事务，失败时留待过期回收任务重试。
             log.error("release reservation {} failed, reaper will retry: {}",
                     reservationId, ex.getMessage());
@@ -471,10 +483,12 @@ public class UsageServiceImpl implements UsageService {
                     return true;
                 });
                 if (Boolean.TRUE.equals(released)) {
+                    reservationReleased.increment();
                     log.warn("released expired usage reservation {} for user {} month {}",
                             entity.getId(), entity.getUserId(), entity.getMonth());
                 }
             } catch (RuntimeException ex) {
+                reservationReapFailed.increment();
                 log.error("release expired reservation {} failed: {}",
                         entity.getId(), ex.getMessage());
             }

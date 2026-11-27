@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shiye.common.web.ClientIpResolver;
 import com.shiye.user.module.team.mapper.TeamAuditLogMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,12 +26,16 @@ public class TeamAuditService {
     private final TeamAuditLogMapper auditMapper;
     private final ObjectMapper objectMapper;
     private final ClientIpResolver clientIpResolver;
+    private final Counter missingTableFailures;
+    private final Counter serializeFailures;
 
     public TeamAuditService(TeamAuditLogMapper auditMapper, ObjectMapper objectMapper,
-                            ClientIpResolver clientIpResolver) {
+                            ClientIpResolver clientIpResolver, MeterRegistry meterRegistry) {
         this.auditMapper = auditMapper;
         this.objectMapper = objectMapper;
         this.clientIpResolver = clientIpResolver;
+        this.missingTableFailures = failureCounter(meterRegistry, "missing_table");
+        this.serializeFailures = failureCounter(meterRegistry, "serialize");
     }
 
     public void record(long teamId, long operatorId, String action,
@@ -50,11 +56,19 @@ public class TeamAuditService {
                     truncate(userAgent, 512)
             );
         } catch (BadSqlGrammarException ex) {
+            missingTableFailures.increment();
             log.error("team_audit_logs missing, run migration "
                     + "2026-11-27-team-audit.sql: {}", ex.getMessage());
         } catch (JsonProcessingException ex) {
+            serializeFailures.increment();
             log.error("serialize team audit detail failed: {}", ex.getMessage());
         }
+    }
+
+    private Counter failureCounter(MeterRegistry meterRegistry, String reason) {
+        return Counter.builder("shiye.team.audit.write_failures")
+                .tag("reason", reason)
+                .register(meterRegistry);
     }
 
     private HttpServletRequest currentRequest() {

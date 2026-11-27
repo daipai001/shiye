@@ -1,5 +1,7 @@
 package com.shiye.user.module.article.service;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,12 +27,21 @@ public class ArticleIngestLockService {
 
     private final StringRedisTemplate redisTemplate;
     private final int lockMinutes;
+    private final Counter acquired;
+    private final Counter busy;
+    private final Counter failOpen;
+    private final Counter releaseFailed;
 
     public ArticleIngestLockService(
             StringRedisTemplate redisTemplate,
-            @Value("${shiye.article.ingest-lock-minutes:30}") int lockMinutes) {
+            @Value("${shiye.article.ingest-lock-minutes:30}") int lockMinutes,
+            MeterRegistry meterRegistry) {
         this.redisTemplate = redisTemplate;
         this.lockMinutes = Math.max(1, lockMinutes);
+        this.acquired = lockCounter(meterRegistry, "acquired");
+        this.busy = lockCounter(meterRegistry, "busy");
+        this.failOpen = lockCounter(meterRegistry, "fail_open");
+        this.releaseFailed = lockCounter(meterRegistry, "release_failed");
     }
 
     /**
@@ -40,13 +51,16 @@ public class ArticleIngestLockService {
         String key = key(articleId);
         String token = UUID.randomUUID().toString();
         try {
-            Boolean acquired = redisTemplate.opsForValue().setIfAbsent(
+            Boolean locked = redisTemplate.opsForValue().setIfAbsent(
                     key, token, Duration.ofMinutes(lockMinutes));
-            if (Boolean.TRUE.equals(acquired)) {
+            if (Boolean.TRUE.equals(locked)) {
+                acquired.increment();
                 return token;
             }
+            busy.increment();
             return null;
         } catch (RuntimeException ex) {
+            failOpen.increment();
             log.warn("ingest lock unavailable, fail open for article {}: {}",
                     articleId, ex.getMessage());
             return "";
@@ -60,8 +74,15 @@ public class ArticleIngestLockService {
         try {
             redisTemplate.execute(RELEASE_SCRIPT, List.of(key(articleId)), token);
         } catch (RuntimeException ex) {
+            releaseFailed.increment();
             log.warn("release ingest lock failed for article {}: {}", articleId, ex.getMessage());
         }
+    }
+
+    private Counter lockCounter(MeterRegistry meterRegistry, String result) {
+        return Counter.builder("shiye.ingest.lock")
+                .tag("result", result)
+                .register(meterRegistry);
     }
 
     private String key(long articleId) {

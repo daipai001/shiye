@@ -55,6 +55,10 @@ public class RediSearchVectorIndex {
         this.dimension = Math.max(1, dimension);
     }
 
+    public boolean isRedisearchEnabled() {
+        return redisearchEnabled;
+    }
+
     public boolean isEnabled() {
         if (!redisearchEnabled) {
             return false;

@@ -1,5 +1,6 @@
 package com.shiye.user.module.article.service;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -18,7 +19,8 @@ class ArticleIngestLockServiceTest {
 
     private final StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
     private final ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
-    private final ArticleIngestLockService service = new ArticleIngestLockService(redisTemplate, 30);
+    private final ArticleIngestLockService service =
+            new ArticleIngestLockService(redisTemplate, 30, new SimpleMeterRegistry());
 
     @Test
     void returnsTokenWhenLockAcquired() {

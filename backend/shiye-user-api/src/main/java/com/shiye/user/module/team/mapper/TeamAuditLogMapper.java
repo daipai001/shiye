@@ -1,8 +1,11 @@
 package com.shiye.user.module.team.mapper;
 
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
+import java.time.LocalDateTime;
 
 @Mapper
 public interface TeamAuditLogMapper {
@@ -23,4 +26,13 @@ public interface TeamAuditLogMapper {
                @Param("detail") String detail,
                @Param("ip") String ip,
                @Param("userAgent") String userAgent);
+
+    @Delete("""
+            DELETE FROM team_audit_logs
+            WHERE created_at < #{before}
+            ORDER BY id
+            LIMIT #{limit}
+            """)
+    int deleteBefore(@Param("before") LocalDateTime before,
+                     @Param("limit") int limit);
 }

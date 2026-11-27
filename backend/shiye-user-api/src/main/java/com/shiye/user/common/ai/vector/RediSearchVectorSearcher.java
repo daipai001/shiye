@@ -4,6 +4,7 @@ import io.lettuce.core.api.async.RedisAsyncCommands;
 import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.output.NestedMultiOutput;
 import io.lettuce.core.protocol.CommandArgs;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.RedisConnection;
@@ -34,15 +35,29 @@ public class RediSearchVectorSearcher {
 
     private final StringRedisTemplate redisTemplate;
     private final RediSearchVectorIndex index;
+    private final MeterRegistry meterRegistry;
 
     public RediSearchVectorSearcher(StringRedisTemplate redisTemplate,
-                                    RediSearchVectorIndex index) {
+                                    RediSearchVectorIndex index,
+                                    MeterRegistry meterRegistry) {
         this.redisTemplate = redisTemplate;
         this.index = index;
+        this.meterRegistry = meterRegistry;
     }
 
     public boolean isEnabled() {
         return index.isEnabled();
+    }
+
+    public boolean isConfigured() {
+        return index.isRedisearchEnabled();
+    }
+
+    public void recordFallback(String reason) {
+        if (meterRegistry != null) {
+            meterRegistry.counter("shiye.vector.hnsw.fallback",
+                    "reason", reason == null ? "unknown" : reason).increment();
+        }
     }
 
     public boolean isAuthoritative() {
@@ -89,6 +104,7 @@ public class RediSearchVectorSearcher {
             return parse(result);
         } catch (Exception ex) {
             index.markUnavailable();
+            recordFallback("knn_error");
             log.warn("RediSearch KNN failed, fallback to hash search: {}", ex.getMessage());
             return List.of();
         } finally {

@@ -40,3 +40,42 @@ groups:
         annotations:
           summary: "预算告警 Webhook 发送失败"
           description: "15 分钟内存在预算告警发送失败，检查 Webhook URL、网络和管理端配置。"
+
+      - alert: ShiyeReservationReleaseFailures
+        expr: increase(shiye_usage_reservations_failed_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "配额预留释放失败"
+          description: "存在 release/reap 失败，预留会由 TTL 回收任务重试；检查 MySQL 和 usage_reservations 表。"
+
+      - alert: ShiyeHnswFallbackSpike
+        expr: |
+          sum(rate(shiye_vector_hnsw_fallback_total{
+            reason=~"knn_error|personal_not_ready|team_not_ready"
+          }[10m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HNSW 检索持续回退"
+          description: "HNSW 索引不可用或回填未完成，检索回退 Hash pipeline；检查 Redis Stack、FT.INFO 和 VECTOR_BACKFILL。"
+
+      - alert: ShiyeIngestLockFailOpen
+        expr: increase(shiye_ingest_lock_total{result="fail_open"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "入库锁 Redis 不可用"
+          description: "单文章锁已 fail-open，Redis 恢复前并发入库可能重复切片。"
+
+      - alert: ShiyeTeamAuditWriteFailures
+        expr: increase(shiye_team_audit_write_failures_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "团队审计写入失败"
+          description: "检查 team_audit_logs 迁移是否执行，以及 JSON 详情序列化是否正常。"

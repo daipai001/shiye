@@ -108,6 +108,12 @@ docker compose -f docker-compose.yml -f docker-compose.https.yml \
 - `hikaricp_connections_*`：数据库连接池
 - `redis_*`：Redis 客户端指标
 - `http_server_requests_seconds_count{status="500"}`：5xx
+- `shiye_usage_reservations_failed_total{stage="release|reap"}`：预留释放/回收到期失败
+- `shiye_vector_hnsw_fallback_total{reason=...}`：HNSW 回退（索引异常/回填未完成/过滤过大）
+- `shiye_ingest_lock_total{result="fail_open"}`：入库锁 Redis 不可用
+- `shiye_team_audit_write_failures_total`：团队审计写入失败
+
+`deploy/monitoring/alerts.yml` 已包含上述告警。`usage_reservations` 默认保留 90 天、`team_audit_logs` 默认保留 180 天，可通过 `USAGE_RESERVATION_RETENTION_*`、`TEAM_AUDIT_RETENTION_*` 调整。
 
 `deploy/docker-compose.yml` 已包含 Prometheus（默认 `http://localhost:9090`）和 Alertmanager（默认 `http://localhost:9093`），规则在 `monitoring/alerts.yml`：
 

@@ -161,10 +161,21 @@ shiye:
     reservation-ttl-minutes: ${USAGE_RESERVATION_TTL_MINUTES:15}
     reservation-reap-delay-ms: ${USAGE_RESERVATION_REAP_DELAY_MS:60000}
     reservation-reap-initial-delay-ms: ${USAGE_RESERVATION_REAP_INITIAL_DELAY_MS:30000}
+    # 已释放流水保留策略，避免无限增长
+    reservation-retention-enabled: ${USAGE_RESERVATION_RETENTION_ENABLED:true}
+    reservation-retention-days: ${USAGE_RESERVATION_RETENTION_DAYS:90}
+    reservation-retention-cron: "${USAGE_RESERVATION_RETENTION_CRON:0 40 3 * * *}"
+    reservation-retention-batch: ${USAGE_RESERVATION_RETENTION_BATCH:5000}
     daily-token-limit: ${USAGE_DAILY_TOKEN_LIMIT:0}
     daily-aggregation-enabled: ${USAGE_DAILY_AGGREGATION_ENABLED:true}
     daily-cron: "${USAGE_DAILY_CRON:0 15 0 * * *}"
     daily-backfill-days: ${USAGE_DAILY_BACKFILL_DAYS:7}
+  team:
+    # 团队审计流水保留策略
+    audit-retention-enabled: ${TEAM_AUDIT_RETENTION_ENABLED:true}
+    audit-retention-days: ${TEAM_AUDIT_RETENTION_DAYS:180}
+    audit-retention-cron: "${TEAM_AUDIT_RETENTION_CRON:0 50 3 * * *}"
+    audit-retention-batch: ${TEAM_AUDIT_RETENTION_BATCH:5000}
   file:
     upload-dir: ${FILE_UPLOAD_DIR:./data/uploads}
   retention:

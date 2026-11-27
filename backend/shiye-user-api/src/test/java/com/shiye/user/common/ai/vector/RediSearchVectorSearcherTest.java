@@ -1,5 +1,6 @@
 package com.shiye.user.common.ai.vector;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -26,7 +27,8 @@ class RediSearchVectorSearcherTest {
                 bytes("extra_attributes"), attrs);
         Object reply = List.of(bytes("results"), List.of(entry));
 
-        List<VectorSearchHit> hits = new RediSearchVectorSearcher(null, null).parse(reply);
+        List<VectorSearchHit> hits = new RediSearchVectorSearcher(
+                null, null, new SimpleMeterRegistry()).parse(reply);
 
         assertEquals(1, hits.size());
         assertEquals(3, hits.get(0).articleId());

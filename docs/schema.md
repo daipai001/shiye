@@ -787,7 +787,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 **索引**：`idx_usage_reservations_reap (status, expires_at)`、`idx_usage_reservations_user (user_id, month)`。
 
-**说明**：一次问答的预留流水。正常结束时先原子执行 `ACTIVE -> RELEASED`，只有更新成功的请求才扣减三层聚合计数；进程崩溃或释放失败时，定时任务按 `expires_at` 回收过期 `ACTIVE` 流水。默认 TTL 15 分钟，`USAGE_RESERVATION_TTL_MINUTES` 可调。
+**说明**：一次问答的预留流水。正常结束时先原子执行 `ACTIVE -> RELEASED`，只有更新成功的请求才扣减三层聚合计数；进程崩溃或释放失败时，定时任务按 `expires_at` 回收过期 `ACTIVE` 流水。默认 TTL 15 分钟，`USAGE_RESERVATION_TTL_MINUTES` 可调。`RELEASED` 流水默认保留 90 天，`USAGE_RESERVATION_RETENTION_DAYS` 可调，每日 03:40 UTC 分批清理。
 
 ---
 
@@ -1078,7 +1078,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 **动作**：`TEAM_CREATE`、`TEAM_UPDATE`、`TEAM_DISSOLVE`、`MEMBER_ADD`、`MEMBER_INVITE`、`MEMBER_JOIN`、`MEMBER_ROLE_UPDATE`、`MEMBER_REMOVE`、`MEMBER_LEAVE`、`OWNER_TRANSFER`、`ARTICLE_SHARE`、`ARTICLE_UNSHARE`。
 
-**说明**：与业务操作同事务写入；管理员通过 admin-api `GET /admin/api/v1/team-audits` 查询。流水表缺失时记录错误日志并降级，不阻塞团队操作。
+**说明**：与业务操作同事务写入；管理员通过 admin-api `GET /admin/api/v1/team-audits` 查询。流水表缺失时记录错误日志并降级，不阻塞团队操作。默认保留 180 天，`TEAM_AUDIT_RETENTION_DAYS` 可调，每日 03:50 UTC 分批清理。
 
 ---
 
