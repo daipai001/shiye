@@ -220,7 +220,7 @@ RAG 问答闭环已打通：
 >
 > 本机已切换到 BGE-M3 并验证：切片 `embedding_model=BAAI/bge-m3`、维度 1024，中文查询能命中相关英文切片（相似度约 0.60/0.49/0.46）。key 只存在于本地忽略配置，不提交仓库。
 >
-> 切换模型后旧切片需要重建索引；`POST /articles/{id}/reindex` 已接入。本机 Redis 8 没有 RediSearch，当前用 Hash 存向量，检索阶段先走应用层余弦；部署 Redis Stack 后可替换为 HNSW 索引。
+> 切换模型后旧切片需要重建索引；`POST /articles/{id}/reindex` 已接入。默认用 Redis Hash 存向量并走应用层余弦；部署 Redis Stack 后可用 `VECTOR_STORE=redisearch` 启用 HNSW，启动时会校验索引维度/字段并自动重建。
 >
 > 可选开启 BGE-reranker（配置 `RERANK_*`，本地配置已开启）：
 >
@@ -255,6 +255,7 @@ RAG 问答闭环已打通：
 - 系统设置：注册开关、邀请码、默认新用户配额、全站月度预算、告警阈值、问答限流、每日 token 上限，以及 chunk 字数/重叠、topK、混合检索、rerank、强制引用；保存后 user-api 5 秒内生效
 - RAG 评测：维护评测用例、创建异步运行，复用线上检索生成回答，计算 recall@5、引用准确率、LLM-as-judge 答案正确率、延迟和成本
 - 审计日志：模型、系统设置、用户、导入、任务和评测操作的审计记录；支持 CSV 导出
+- 团队审计：邀请、加入、移除、退出、角色变更、转让、解散和资料共享的独立流水
 - 管理员与角色：`SUPER_ADMIN` / `OPERATOR` / `VIEWER`；创建管理员、编辑角色、启用/禁用、重置密码；降权/禁用下一次请求立即生效
 - 团队与配额：查看团队所有者、成员数、本月 tokens/成本和配额，运营可调整团队配额
 
@@ -281,24 +282,24 @@ RAG 问答闭环已打通：
 ## 已知缺口（下一阶段）
 
 - 仓库默认 embedding 仍是 `dev`；新环境需按上面说明配置 BGE-M3 API Key。本机已配置并验证。
-- 本机 Redis 没有 RediSearch，向量检索走应用层余弦；数据量大后应换 Redis Stack HNSW。
+- 默认仍是 Hash 向量 + 应用层余弦；数据量大时可启用 Redis Stack HNSW（个人/团队/标签/文件夹/单篇资料），未回填或索引异常时自动回退。
 - 已做向量 + 关键词 + RRF 混合检索、BGE-reranker 二次重排、资料 AI 摘要/自动标签、插件当前页问答、书签新增/修改/删除自动同步和管理端模型在线配置。
 - 管理端模型和系统设置均已支持在线编辑；预算告警已支持 Webhook，可在管理端测试发送。
 - 邀请码注册已接入；邮箱验证、邮件找回密码和团队邀请邮件已接入，需配置 SMTP（`MAIL_ENABLED=true`）；未配置时只记录日志、不阻塞主流程。
 - 扫描版 PDF：可选 Tesseract OCR 已接入，默认关闭；启用需要安装 tesseract 和中文语言包。
 - 插件商店上架：插件 1.0.0 包、图标和上架文档已就绪；还需要开发者账号、商店截图、隐私政策 URL 和审核。
-- RediSearch HNSW 仍待数据量上来后接入；本机向量检索仍为应用层余弦。
+- RediSearch HNSW 已接入并有 CI 集成测试；生产规模（百万级切片、索引重建时间、内存）仍需真实数据验证。
 - 数据清理任务已接入：过期 refresh token、授权码、幂等键和结束超过 30 天的入库任务。
-- 监控指标、告警规则、Alertmanager 转发、备份/恢复演练、团队 API smoke、Playwright 登录 E2E、读接口和 AI/RAG 压测基线已接入；团队配额已加入流式问答前的预留/释放；仍缺真实用户数据下的 RAG 评测。
+- 监控指标、告警规则、Alertmanager 转发、备份/恢复演练、团队 API smoke、Playwright 登录/业务/管理端 E2E、读接口和 AI/RAG 压测基线已接入；个人/团队/全站配额已加入预留流水与 15 分钟 TTL 回收；仍缺真实用户数据下的 RAG 评测。
 - 流式问答线程池已可配置（默认 core=16 / max=32 / queue=100）；流结束后同步写入消息/引用/用量，数据库写入会影响端到端延迟。
 - 账号邮件能力已接入（邀请邮件、邮箱验证、邮件找回密码）；默认 `MAIL_ENABLED=false`，生产需配置 SMTP 并验证投递。
 - 问答限流（10 次/分钟/用户）和管理端操作限流（60 次/分钟/管理员）已接入；管理员登录/刷新另有 10 次/分钟 IP 限流。
 - 2026-11-22 代码审查修复了管理端编码路径权限绕过、团队会话配额绕过、GENERAL 问答、成员移除后团队历史访问、禁用用户立即失效、SSE 拒绝静默、未知接口 404 等问题，详见 `docs/code-review-2026-11-22.md`。
 - 向量召回已改为每 500 个切片一次 Redis pipeline，团队关键词改为 JOIN `articles.team_id`，检索只取 READY 文章；入库 `vector_id` 改为一条 SQL 批量写入；重新抓取在 FETCH/PARSE 失败时保留旧 READY 资料；个人/团队配额和全站预算都已加入原子预留/释放；同一资料的入库/重建索引已加 Redis 单文章锁；评测 worker 会将超时 RUNNING 自动标记为 FAILED；移除/退出成员会撤销其未使用邀请码。
-- Redis Stack 环境可启用 RediSearch HNSW：`VECTOR_STORE=redisearch`，首次启用时设 `VECTOR_BACKFILL=true` 回填旧向量；目前 HNSW 覆盖个人 ALL 范围，团队/标签/文件夹仍走 pipeline。未启用时保持原行为。
+- Redis Stack 环境可启用 RediSearch HNSW：`VECTOR_STORE=redisearch`，首次启用时设 `VECTOR_BACKFILL=true` 回填 `vector_bin` 和团队 `team_id`；覆盖个人 ALL、团队、团队标签/文件夹、个人标签/文件夹/单篇资料，article 过滤超过 200 条或回填未完成时自动回退 pipeline。未启用时保持原行为。
 
 ## 下一步
 
 1. 部署到服务器（Caddy HTTPS 配置已就绪，需要域名、服务器和 secrets）
-2. 用真实用户资料重跑 30 条评测，并把个人/全局配额也改为原子预留/扣减
+2. 用真实用户资料重跑 30 条评测，并用真实 DeepSeek/BGE 验证延迟、限流和成本
 3. 生产 SMTP 投递验证与退信处理

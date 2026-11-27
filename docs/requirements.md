@@ -794,7 +794,7 @@ V1 的限制是：
 - M2a（已完成）：书签文件夹、导入任务、逐条记录、任务列表/详情、暂停/恢复/取消/重试、幂等键、创建限流、插件设置页导入流程。
 - M2b（已完成，2026-11-13）：抓取/解析/切片/embedding worker、失败原因、跨导入去重、资料列表/统计/详情/切片/删除、资料库 UI。
 - M2b 默认使用 `DEV-HASH-1024` 联调向量；本机已通过 `EMBEDDING_PROVIDER=http` 接入真实 BGE-M3 并验证 1024 维与检索效果。切换模型后需 reindex。
-- 本机 Redis 无 RediSearch，向量暂存 Hash（`kb:chunk:{id}` + 用户集合）；RAG 检索阶段先做应用层余弦，部署 Redis Stack 后替换 HNSW。
+- 默认仍用 Redis Hash（`kb:chunk:{id}` + 用户集合）+ 应用层余弦；Redis Stack 可启用 `VECTOR_STORE=redisearch`，覆盖个人/团队/标签/文件夹/单篇资料，启动时校验索引维度/字段并在不匹配时重建。
 - 主文件夹自动同步（`chrome.bookmarks.onCreated/onChanged/onMoved/onRemoved`）已在插件端接入；主文件夹保存在扩展本地，服务端 `is_primary` 字段预留给后续 Web 端统一管理。
 - 大于 50 条的文件夹：插件先创建任务，再用 `importId` 分批追加，服务端按规范化 URL 去重；worker 只消费 `PENDING` 条目，追加中的任务不会被提前处理。
 - 跨导入去重：创建 `articles` 时按 `(user_id, url_hash)` 唯一键判断，已存在 `READY` 资料则把条目置为 `SKIPPED / DUPLICATE_URL`。
