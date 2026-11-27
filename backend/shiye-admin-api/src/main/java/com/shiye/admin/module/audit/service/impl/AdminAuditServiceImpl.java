@@ -9,6 +9,7 @@ import com.shiye.admin.module.audit.mapper.AdminAuditMapper;
 import com.shiye.admin.module.audit.service.AdminAuditService;
 import com.shiye.common.api.PageResult;
 import com.shiye.common.util.Csv;
+import com.shiye.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,10 +28,13 @@ public class AdminAuditServiceImpl implements AdminAuditService {
 
     private final AdminAuditMapper auditMapper;
     private final ObjectMapper objectMapper;
+    private final ClientIpResolver clientIpResolver;
 
-    public AdminAuditServiceImpl(AdminAuditMapper auditMapper, ObjectMapper objectMapper) {
+    public AdminAuditServiceImpl(AdminAuditMapper auditMapper, ObjectMapper objectMapper,
+                                 ClientIpResolver clientIpResolver) {
         this.auditMapper = auditMapper;
         this.objectMapper = objectMapper;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @Override
@@ -116,11 +120,7 @@ public class AdminAuditServiceImpl implements AdminAuditService {
     }
 
     private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+        return clientIpResolver.resolve(request);
     }
 
     private String truncate(String value, int max) {

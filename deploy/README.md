@@ -25,6 +25,12 @@ Caddy 负责 TLS 和 80→443 跳转；`user-web` / `admin-web` 的 nginx 继续
 
 > `MAIL_ENABLED=false` 时 user-api 默认关闭邮件健康检查（`MAIL_HEALTH_ENABLED=false`），避免 `/actuator/health` 因 SMTP 不可用变成 DOWN。
 
+## 客户端 IP 与 X-Forwarded-For
+
+- user-api/admin-api 只在直连对端属于 `TRUSTED_PROXIES` 时读取 `X-Forwarded-For`，并从右向左取第一个不受信任地址；直连对端不受信任时完全忽略该头。
+- 默认只信任 `127.0.0.1/32,::1/128`。Compose 中 nginx 是 API 的直连对端，因此两个 API 默认设为 `172.16.0.0/12`；自定义 Docker 网段时需要覆盖 `TRUSTED_PROXIES`。
+- 生产必须通过防火墙/安全组禁止公网访问 18080/18081；否则来自受信任网段的直连请求仍可能伪造 XFF。登录限流和审计日志都使用解析后的客户端 IP。
+
 ## SMTP
 
 邮箱验证、邮件找回密码和团队邀请邮件通过 SMTP 发送。至少配置：

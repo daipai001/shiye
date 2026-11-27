@@ -11,6 +11,7 @@ import com.shiye.admin.module.auth.service.AdminAuthService;
 import com.shiye.common.api.ErrorCode;
 import com.shiye.common.api.Result;
 import com.shiye.common.exception.BizException;
+import com.shiye.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -26,11 +27,14 @@ public class AdminAuthController {
 
     private final AdminAuthService adminAuthService;
     private final AdminRateLimitService rateLimitService;
+    private final ClientIpResolver clientIpResolver;
 
     public AdminAuthController(AdminAuthService adminAuthService,
-                               AdminRateLimitService rateLimitService) {
+                               AdminRateLimitService rateLimitService,
+                               ClientIpResolver clientIpResolver) {
         this.adminAuthService = adminAuthService;
         this.rateLimitService = rateLimitService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @PostMapping("/login")
@@ -82,10 +86,6 @@ public class AdminAuthController {
     }
 
     private String ip(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+        return clientIpResolver.resolve(request);
     }
 }

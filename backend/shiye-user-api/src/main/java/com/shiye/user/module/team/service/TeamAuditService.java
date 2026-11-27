@@ -2,6 +2,7 @@ package com.shiye.user.module.team.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shiye.common.web.ClientIpResolver;
 import com.shiye.user.module.team.mapper.TeamAuditLogMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -22,10 +23,13 @@ public class TeamAuditService {
 
     private final TeamAuditLogMapper auditMapper;
     private final ObjectMapper objectMapper;
+    private final ClientIpResolver clientIpResolver;
 
-    public TeamAuditService(TeamAuditLogMapper auditMapper, ObjectMapper objectMapper) {
+    public TeamAuditService(TeamAuditLogMapper auditMapper, ObjectMapper objectMapper,
+                            ClientIpResolver clientIpResolver) {
         this.auditMapper = auditMapper;
         this.objectMapper = objectMapper;
+        this.clientIpResolver = clientIpResolver;
     }
 
     public void record(long teamId, long operatorId, String action,
@@ -33,7 +37,7 @@ public class TeamAuditService {
         try {
             String json = detail == null ? null : objectMapper.writeValueAsString(detail);
             HttpServletRequest request = currentRequest();
-            String ip = request == null ? null : request.getRemoteAddr();
+            String ip = request == null ? null : clientIpResolver.resolve(request);
             String userAgent = request == null ? null : request.getHeader("User-Agent");
             auditMapper.insert(
                     teamId,

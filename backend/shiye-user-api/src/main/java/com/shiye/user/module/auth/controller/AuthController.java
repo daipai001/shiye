@@ -3,6 +3,7 @@ package com.shiye.user.module.auth.controller;
 import com.shiye.common.api.ErrorCode;
 import com.shiye.common.api.Result;
 import com.shiye.common.exception.BizException;
+import com.shiye.common.web.ClientIpResolver;
 import com.shiye.user.common.ratelimit.MinuteRateLimiter;
 import com.shiye.user.common.security.UserContext;
 import com.shiye.user.module.auth.domain.dto.ExtensionTokenRequest;
@@ -32,11 +33,14 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthRateLimitService rateLimitService;
+    private final ClientIpResolver clientIpResolver;
 
     public AuthController(AuthService authService,
-                          AuthRateLimitService rateLimitService) {
+                          AuthRateLimitService rateLimitService,
+                          ClientIpResolver clientIpResolver) {
         this.authService = authService;
         this.rateLimitService = rateLimitService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @PostMapping("/register")
@@ -136,10 +140,6 @@ public class AuthController {
     }
 
     private String ip(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+        return clientIpResolver.resolve(request);
     }
 }

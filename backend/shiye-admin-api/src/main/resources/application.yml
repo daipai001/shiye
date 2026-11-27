@@ -40,6 +40,9 @@ management:
       application: ${spring.application.name}
 
 shiye:
+  http:
+    # 只有这些直连代理可携带 X-Forwarded-For；默认仅本机回环
+    trusted-proxies: ${TRUSTED_PROXIES:127.0.0.1/32,::1/128}
   jwt:
     # 必须与 USER_JWT_SECRET 不同；生产通过环境变量覆盖，至少 32 字节
     admin-secret: ${ADMIN_JWT_SECRET:dev-admin-secret-change-me-32-bytes-minimum}
