@@ -20,19 +20,23 @@ import com.shiye.user.module.team.service.TeamService;
 import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -103,6 +107,20 @@ class UsageServiceImplTest {
         verify(globalUsageMapper, times(1))
                 .release(month(), 8000, new BigDecimal("0.06"));
         verify(reservationMapper, times(2)).markReleased(9L);
+    }
+
+    @Test
+    void reserveChatFallsBackWhenLedgerTableIsMissing() {
+        stubPersonalReservation();
+        doThrow(new BadSqlGrammarException("insert", "sql",
+                new SQLException("Table 'usage_reservations' doesn't exist")))
+                .when(reservationMapper).insert(any(UsageReservationEntity.class));
+
+        ChatReservation reservation = service.reserveChat(1L, null);
+
+        assertNull(reservation.id());
+        assertEquals(8000, reservation.user().tokens());
+        verify(monthlyMapper).add(1L, month(), 8000, new BigDecimal("0.06"));
     }
 
     @Test
