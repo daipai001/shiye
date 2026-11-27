@@ -23,6 +23,7 @@ public class ArticleExceptionHandler {
         }
         return switch (code) {
             case "INVALID_URL" -> ErrorCode.INVALID_URL;
+            case "INGEST_IN_PROGRESS" -> ErrorCode.INGEST_IN_PROGRESS;
             case "FILE_TOO_LARGE" -> ErrorCode.FILE_TOO_LARGE;
             case "UNSUPPORTED_FILE_TYPE" -> ErrorCode.UNSUPPORTED_FILE_TYPE;
             case "EMPTY_CONTENT", "EMPTY_FILE", "PARSE_EMPTY", "CHUNK_EMPTY" ->

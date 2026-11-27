@@ -35,6 +35,7 @@ public enum ErrorCode {
     CONFLICT(40901, "资源冲突或重复", 409),
     IDEMPOTENCY_CONFLICT(40902, "幂等键冲突", 409),
     IMPORT_ALREADY_RUNNING(40903, "导入任务正在运行", 409),
+    INGEST_IN_PROGRESS(40904, "资料正在处理中", 409),
 
     RATE_LIMITED(42901, "请求过于频繁", 429),
     USER_QUOTA_EXCEEDED(42902, "个人配额已用完", 429),
@@ -52,7 +53,8 @@ public enum ErrorCode {
     PARSE_FAILED(50204, "内容解析失败", 502),
     VECTOR_STORE_UNAVAILABLE(50205, "向量库暂不可用", 502),
 
-    MAINTENANCE(50301, "服务维护中", 503);
+    MAINTENANCE(50301, "服务维护中", 503),
+    SERVER_BUSY(50302, "服务繁忙，请稍后再试", 503);
 
     private final int code;
     private final String message;

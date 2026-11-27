@@ -286,14 +286,27 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         boolean wasReady = ArticleStatus.READY.name().equals(article.getStatus());
         String title = article.getTitle();
         String sourceType = article.getSourceType() == null ? "MANUAL" : article.getSourceType();
-        ingestExecutor.execute(() -> {
-            try {
-                ingestResolved(userId, 0, null, normalized, title, false, sourceType);
-            } catch (Exception ex) {
-                log.warn("reindex article {} failed: {}", articleId, ex.getMessage());
-                restoreReadyAfterReindexFailure(userId, articleId, wasReady, ex);
-            }
-        });
+        // 同步抢占单文章锁：锁定失败直接 409，不返回没有任务的 PENDING。
+        String lockToken = ingestLockService.tryAcquire(articleId);
+        if (lockToken == null) {
+            throw new BizException(ErrorCode.INGEST_IN_PROGRESS, "该资料正在处理中，请稍后再试");
+        }
+        try {
+            ingestExecutor.execute(() -> {
+                try {
+                    ingestWithLock(userId, articleId, true, normalized, title,
+                            sourceType, lockToken);
+                } catch (Exception ex) {
+                    log.warn("reindex article {} failed: {}", articleId, ex.getMessage());
+                    restoreReadyAfterReindexFailure(userId, articleId, wasReady, ex);
+                }
+            });
+        } catch (RuntimeException ex) {
+            ingestLockService.release(articleId, lockToken);
+            log.warn("submit reindex task for article {} failed: {}",
+                    articleId, ex.getMessage());
+            throw new BizException(ErrorCode.SERVER_BUSY, "服务繁忙，请稍后再试");
+        }
     }
 
     /**
@@ -339,6 +352,17 @@ public class ArticleIngestServiceImpl implements ArticleIngestService {
         if (lockToken == null) {
             throw new IngestException("INGEST_IN_PROGRESS", "该资料正在处理中，请稍后再试");
         }
+        return ingestWithLock(userId, articleId, existed, normalized,
+                bookmarkTitle, sourceType, lockToken);
+    }
+
+    /**
+     * 调用方必须已经持有单文章锁；本方法在 finally 中释放锁。
+     */
+    private IngestOutcome ingestWithLock(long userId, long articleId, boolean existed,
+                                         UrlNormalizer.Normalized normalized,
+                                         String bookmarkTitle, String sourceType,
+                                         String lockToken) {
         try {
             if (existed) {
                 articleMapper.updateStatus(articleId, userId, ArticleStatus.PENDING.name());
