@@ -13,7 +13,7 @@
 
 | 项 | 结果 |
 |---|---|
-| `mvn test` | 88 个测试，0 失败 |
+| `mvn test` | 90 个测试，0 失败 |
 | user-web / admin-web `npm run build` | 通过 |
 | Playwright 登录 E2E | 4 个用例通过 |
 | `scripts/ci-smoke.sh` | 通过 |

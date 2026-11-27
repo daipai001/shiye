@@ -51,6 +51,7 @@ APP_PUBLIC_URL=https://shiye.example.com
 mysql -h ... -u ... -p shiye < deploy/sql/migrations/2026-11-26-global-usage.sql
 mysql -h ... -u ... -p shiye < deploy/sql/migrations/2026-11-26-invite-cleanup.sql
 mysql -h ... -u ... -p shiye < deploy/sql/migrations/2026-11-26-eval-progress.sql
+mysql -h ... -u ... -p shiye < deploy/sql/migrations/2026-11-27-usage-reservations.sql
 ```
 
 `global-usage` 创建 `global_usage_monthly` 并从 `user_usage_monthly` 回填缺失月份；`invite-cleanup` 清理已被移除成员留下的未使用邀请码。先迁移再启动新版 user-api；未执行 global 迁移时新版会回退旧的预算检查，不阻塞启动，但全站预算不会走原子预留。

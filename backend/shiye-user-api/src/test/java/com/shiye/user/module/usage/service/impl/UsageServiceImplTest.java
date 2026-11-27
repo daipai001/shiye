@@ -4,27 +4,35 @@ import com.shiye.common.exception.BizException;
 import com.shiye.common.settings.SystemSettings;
 import com.shiye.user.module.auth.domain.vo.UserQuotaVO;
 import com.shiye.user.module.auth.service.AuthService;
+import com.shiye.user.module.usage.domain.entity.UsageReservationEntity;
 import com.shiye.user.module.usage.domain.entity.UserUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.vo.ChatReservation;
 import com.shiye.user.module.usage.domain.vo.UsageTotals;
 import com.shiye.user.module.usage.mapper.AiUsageMapper;
 import com.shiye.user.module.usage.mapper.GlobalUsageMonthlyMapper;
 import com.shiye.user.module.usage.mapper.TeamUsageMonthlyMapper;
+import com.shiye.user.module.usage.mapper.UsageReservationMapper;
 import com.shiye.user.module.usage.mapper.UserUsageMonthlyMapper;
 import com.shiye.user.module.team.service.TeamService;
 import com.shiye.user.common.settings.RuntimeSystemSettingsService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,11 +43,15 @@ class UsageServiceImplTest {
     private final UserUsageMonthlyMapper monthlyMapper = mock(UserUsageMonthlyMapper.class);
     private final TeamUsageMonthlyMapper teamUsageMapper = mock(TeamUsageMonthlyMapper.class);
     private final GlobalUsageMonthlyMapper globalUsageMapper = mock(GlobalUsageMonthlyMapper.class);
+    private final UsageReservationMapper reservationMapper = mock(UsageReservationMapper.class);
+    private final TransactionTemplate transactionTemplate = new TransactionTemplate(
+            mock(PlatformTransactionManager.class));
     private final TeamService teamService = mock(TeamService.class);
     private final RuntimeSystemSettingsService settingsService = mock(RuntimeSystemSettingsService.class);
     private final UsageServiceImpl service = new UsageServiceImpl(
             authService, aiUsageMapper, monthlyMapper, teamUsageMapper, globalUsageMapper,
-            teamService, settingsService, new SimpleMeterRegistry(), 8000, new BigDecimal("0.06"));
+            reservationMapper, transactionTemplate, teamService, settingsService,
+            new SimpleMeterRegistry(), 8000, new BigDecimal("0.06"), 15);
 
     @Test
     void reserveChatAtomicallyAddsPersonalReservation() {
@@ -65,6 +77,52 @@ class UsageServiceImplTest {
     }
 
     @Test
+    void reserveChatWritesLedgerAndReleaseIsIdempotent() {
+        stubPersonalReservation();
+        doAnswer(invocation -> {
+            UsageReservationEntity entity = invocation.getArgument(0);
+            entity.setId(9L);
+            return 1;
+        }).when(reservationMapper).insert(any(UsageReservationEntity.class));
+        when(reservationMapper.markReleased(9L)).thenReturn(1, 0);
+
+        ChatReservation reservation = service.reserveChat(1L, null);
+
+        assertEquals(9L, reservation.id());
+        verify(reservationMapper).insert(any(UsageReservationEntity.class));
+
+        service.releaseChat(reservation);
+        service.releaseChat(reservation);
+
+        verify(monthlyMapper, times(1))
+                .release(1L, month(), 8000, new BigDecimal("0.06"));
+        verify(globalUsageMapper, times(1))
+                .release(month(), 8000, new BigDecimal("0.06"));
+        verify(reservationMapper, times(2)).markReleased(9L);
+    }
+
+    @Test
+    void reaperReleasesExpiredReservationOnce() {
+        UsageReservationEntity expired = new UsageReservationEntity();
+        expired.setId(12L);
+        expired.setUserId(1L);
+        expired.setMonth(month());
+        expired.setUserTokens(8000L);
+        expired.setUserCost(new BigDecimal("0.06"));
+        expired.setGlobalTokens(8000L);
+        expired.setGlobalCost(new BigDecimal("0.06"));
+        expired.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        when(reservationMapper.findExpired(200)).thenReturn(List.of(expired));
+        when(reservationMapper.markReleased(12L)).thenReturn(1, 0);
+
+        service.reapExpiredReservations();
+
+        verify(monthlyMapper).release(1L, month(), 8000, new BigDecimal("0.06"));
+        verify(globalUsageMapper).release(month(), 8000, new BigDecimal("0.06"));
+        verify(reservationMapper).markReleased(12L);
+    }
+
+    @Test
     void reserveChatRejectsWhenPersonalQuotaCannotCoverReservation() {
         when(authService.quota(1L)).thenReturn(quota(10000, new BigDecimal("5")));
         when(monthlyMapper.lockUserRow(1L)).thenReturn(1L);
@@ -75,6 +133,20 @@ class UsageServiceImplTest {
 
         assertThrows(BizException.class, () -> service.reserveChat(1L, null));
         verify(monthlyMapper, never()).add(anyLong(), any(), anyLong(), any());
+    }
+
+    private void stubPersonalReservation() {
+        when(authService.quota(1L)).thenReturn(quota(10000, new BigDecimal("5")));
+        when(monthlyMapper.lockUserRow(1L)).thenReturn(1L);
+        UserUsageMonthlyEntity usage = new UserUsageMonthlyEntity();
+        usage.setTokens(1000L);
+        usage.setCost(new BigDecimal("0.10"));
+        when(monthlyMapper.findForUpdate(1L, month())).thenReturn(usage);
+        when(monthlyMapper.add(1L, month(), 8000, new BigDecimal("0.06"))).thenReturn(1);
+        when(settingsService.current()).thenReturn(settings());
+        when(globalUsageMapper.find(month())).thenReturn(new UsageTotals(0, BigDecimal.ZERO, 0));
+        when(globalUsageMapper.reserve(month(), 8000, new BigDecimal("0.06"),
+                1_000_000, new BigDecimal("20"))).thenReturn(1);
     }
 
     private UserQuotaVO quota(long tokens, BigDecimal cost) {

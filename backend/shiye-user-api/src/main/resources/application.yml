@@ -151,6 +151,10 @@ shiye:
     # 每次流式问答开始前预留的个人配额，结束后释放
     chat-reserve-tokens: ${CHAT_RESERVE_TOKENS:8000}
     chat-reserve-cost: ${CHAT_RESERVE_COST:0.06}
+    # 预留流水 TTL；进程崩溃后由定时任务回收过期预留
+    reservation-ttl-minutes: ${USAGE_RESERVATION_TTL_MINUTES:15}
+    reservation-reap-delay-ms: ${USAGE_RESERVATION_REAP_DELAY_MS:60000}
+    reservation-reap-initial-delay-ms: ${USAGE_RESERVATION_REAP_INITIAL_DELAY_MS:30000}
     daily-token-limit: ${USAGE_DAILY_TOKEN_LIMIT:0}
     daily-aggregation-enabled: ${USAGE_DAILY_AGGREGATION_ENABLED:true}
     daily-cron: "${USAGE_DAILY_CRON:0 15 0 * * *}"

@@ -144,6 +144,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | AI | `ai_usage_daily` | 日汇总（定时从 `ai_usage` 聚合） | 已启用 |
 | AI | `user_usage_monthly` | 用户月用量（配额） | P0 |
 | AI | `global_usage_monthly` | 全站月用量/预算预留 | 已启用 |
+| AI | `usage_reservations` | 问答配额预留流水（崩溃回收） | 已启用 |
 | AI | `model_prices` | 模型价格（预留，当前单价来自 `system_settings` 并快照到 `ai_usage`） | 预留 |
 | 配置 | `system_settings` | 全局配置 | P0 |
 | 运维 | `admin_audit_logs` | 管理员审计 | 已启用 |
@@ -767,6 +768,28 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 ---
 
+### 4.22.2 `usage_reservations`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `user_id` | BIGINT UNSIGNED | 否 | — | 发起用户 |
+| `team_id` | BIGINT UNSIGNED | 是 | NULL | 团队问答时的团队 |
+| `month` | CHAR(7) | 否 | — | 预留所属月份 |
+| `user_tokens` / `user_cost` | BIGINT / DECIMAL(18,8) | 否 | 0 | 个人预留额度 |
+| `team_tokens` / `team_cost` | BIGINT / DECIMAL(18,8) | 否 | 0 | 团队预留额度 |
+| `global_tokens` / `global_cost` | BIGINT / DECIMAL(18,8) | 否 | 0 | 全站预留额度 |
+| `status` | VARCHAR(16) | 否 | `ACTIVE` | ACTIVE / RELEASED |
+| `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
+| `expires_at` | DATETIME(3) | 否 | — | 过期时间（UTC） |
+| `released_at` | DATETIME(3) | 是 | NULL | 释放时间 |
+
+**索引**：`idx_usage_reservations_reap (status, expires_at)`、`idx_usage_reservations_user (user_id, month)`。
+
+**说明**：一次问答的预留流水。正常结束时先原子执行 `ACTIVE -> RELEASED`，只有更新成功的请求才扣减三层聚合计数；进程崩溃或释放失败时，定时任务按 `expires_at` 回收过期 `ACTIVE` 流水。默认 TTL 15 分钟，`USAGE_RESERVATION_TTL_MINUTES` 可调。
+
+---
+
 ### 4.23 `model_prices`
 
 | 字段 | 类型 | 空 | 默认 | 说明 |
@@ -1186,7 +1209,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 ## 8. 迁移策略
 
-- 迁移文件：`deploy/sql/migrations/V001__init.sql`、`V002__chunk_fulltext.sql`、`V003__plugin_default_scope.sql`、`V004__eval_answer_details.sql`、`V005__plugin_general_mode.sql`、`2026-11-26-global-usage.sql`、`2026-11-26-invite-cleanup.sql`、`2026-11-26-eval-progress.sql`。
+- 迁移文件：`deploy/sql/migrations/V001__init.sql`、`V002__chunk_fulltext.sql`、`V003__plugin_default_scope.sql`、`V004__eval_answer_details.sql`、`V005__plugin_general_mode.sql`、`2026-11-26-global-usage.sql`、`2026-11-26-invite-cleanup.sql`、`2026-11-26-eval-progress.sql`、`2026-11-27-usage-reservations.sql`。
 - 每个迁移必须幂等/可重复执行；记录到 `schema_migrations`。
 - 不修改已发布的迁移；新增迁移。
 - 大表加字段用 `ALGORITHM=INPLACE` 或分批回填。

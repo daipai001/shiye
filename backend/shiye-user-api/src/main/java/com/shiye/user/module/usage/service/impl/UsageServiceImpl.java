@@ -13,6 +13,7 @@ import com.shiye.user.module.usage.domain.entity.UsageBreakdownRow;
 import com.shiye.user.module.usage.domain.entity.UsageDailyRow;
 import com.shiye.user.module.usage.domain.entity.TeamUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.entity.UsageRangeTotalsRow;
+import com.shiye.user.module.usage.domain.entity.UsageReservationEntity;
 import com.shiye.user.module.usage.domain.entity.UserUsageMonthlyEntity;
 import com.shiye.user.module.usage.domain.vo.ChatReservation;
 import com.shiye.user.module.usage.domain.vo.GlobalReservation;
@@ -28,6 +29,7 @@ import com.shiye.user.module.usage.domain.vo.UsageTotals;
 import com.shiye.user.module.usage.mapper.AiUsageMapper;
 import com.shiye.user.module.usage.mapper.GlobalUsageMonthlyMapper;
 import com.shiye.user.module.usage.mapper.TeamUsageMonthlyMapper;
+import com.shiye.user.module.usage.mapper.UsageReservationMapper;
 import com.shiye.user.module.usage.mapper.UserUsageMonthlyMapper;
 import com.shiye.user.module.usage.service.UsageService;
 import com.shiye.user.module.team.domain.vo.TeamQuota;
@@ -37,8 +39,11 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.BadSqlGrammarException;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -62,12 +67,15 @@ public class UsageServiceImpl implements UsageService {
     private final UserUsageMonthlyMapper monthlyMapper;
     private final TeamUsageMonthlyMapper teamUsageMapper;
     private final GlobalUsageMonthlyMapper globalUsageMapper;
+    private final UsageReservationMapper reservationMapper;
+    private final TransactionTemplate transactionTemplate;
     private final TeamService teamService;
     private final RuntimeSystemSettingsService systemSettingsService;
     private final Counter chatSuccess;
     private final Counter chatFailed;
     private final long chatReserveTokens;
     private final BigDecimal chatReserveCost;
+    private final long reservationTtlMinutes;
 
     public UsageServiceImpl(
             AuthService authService,
@@ -75,16 +83,21 @@ public class UsageServiceImpl implements UsageService {
             UserUsageMonthlyMapper monthlyMapper,
             TeamUsageMonthlyMapper teamUsageMapper,
             GlobalUsageMonthlyMapper globalUsageMapper,
+            UsageReservationMapper reservationMapper,
+            TransactionTemplate transactionTemplate,
             TeamService teamService,
             RuntimeSystemSettingsService systemSettingsService,
             MeterRegistry meterRegistry,
             @Value("${shiye.usage.chat-reserve-tokens:8000}") long chatReserveTokens,
-            @Value("${shiye.usage.chat-reserve-cost:0.06}") BigDecimal chatReserveCost) {
+            @Value("${shiye.usage.chat-reserve-cost:0.06}") BigDecimal chatReserveCost,
+            @Value("${shiye.usage.reservation-ttl-minutes:15}") long reservationTtlMinutes) {
         this.authService = authService;
         this.aiUsageMapper = aiUsageMapper;
         this.monthlyMapper = monthlyMapper;
         this.teamUsageMapper = teamUsageMapper;
         this.globalUsageMapper = globalUsageMapper;
+        this.reservationMapper = reservationMapper;
+        this.transactionTemplate = transactionTemplate;
         this.teamService = teamService;
         this.systemSettingsService = systemSettingsService;
         this.chatSuccess = Counter.builder("shiye.ai.calls")
@@ -94,6 +107,7 @@ public class UsageServiceImpl implements UsageService {
         this.chatReserveTokens = Math.max(1000, chatReserveTokens);
         this.chatReserveCost = chatReserveCost == null || chatReserveCost.signum() < 0
                 ? BigDecimal.ZERO : chatReserveCost;
+        this.reservationTtlMinutes = Math.max(5, reservationTtlMinutes);
     }
 
     @Override
@@ -247,7 +261,41 @@ public class UsageServiceImpl implements UsageService {
                 : reserveTeamChat(userId, teamId, 12_000, new BigDecimal("0.12"));
         GlobalReservation globalReservation = reserveGlobalChat(
                 month, chatReserveTokens, chatReserveCost);
-        return new ChatReservation(userReservation, teamReservation, globalReservation);
+        Long reservationId = insertLedger(userId, teamId, month,
+                userReservation, teamReservation, globalReservation);
+        return new ChatReservation(
+                reservationId, userReservation, teamReservation, globalReservation);
+    }
+
+    /**
+     * 写入预留流水。迁移未执行时只记录错误并继续，保持旧版可用性；
+     * 此时释放走兼容路径，崩溃残留只能等月末。
+     */
+    private Long insertLedger(long userId, Long teamId, String month,
+                              UserReservation user,
+                              TeamReservation team,
+                              GlobalReservation global) {
+        UsageReservationEntity entity = new UsageReservationEntity();
+        entity.setUserId(userId);
+        entity.setTeamId(teamId);
+        entity.setMonth(month);
+        entity.setUserTokens(user == null ? 0 : user.tokens());
+        entity.setUserCost(user == null ? BigDecimal.ZERO : user.cost());
+        entity.setTeamTokens(team == null ? 0 : team.tokens());
+        entity.setTeamCost(team == null ? BigDecimal.ZERO : team.cost());
+        entity.setGlobalTokens(global == null ? 0 : global.tokens());
+        entity.setGlobalCost(global == null ? BigDecimal.ZERO : global.cost());
+        entity.setStatus("ACTIVE");
+        entity.setExpiresAt(LocalDateTime.now(ZoneOffset.UTC)
+                .plusMinutes(reservationTtlMinutes));
+        try {
+            reservationMapper.insert(entity);
+            return entity.getId();
+        } catch (BadSqlGrammarException ex) {
+            log.error("usage_reservations table missing, run migration "
+                    + "2026-11-27-usage-reservations.sql: {}", ex.getMessage());
+            return null;
+        }
     }
 
     private GlobalReservation reserveGlobalChat(String month, long tokens, BigDecimal cost) {
@@ -314,23 +362,106 @@ public class UsageServiceImpl implements UsageService {
         if (reservation == null) {
             return;
         }
+        Long reservationId = reservation.id();
+        try {
+            if (reservationId == null) {
+                // 流水表不可用时的兼容释放，无法保证崩溃恢复。
+                transactionTemplate.executeWithoutResult(
+                        status -> releaseAggregates(reservation));
+                return;
+            }
+            Boolean released = transactionTemplate.execute(status -> {
+                if (reservationMapper.markReleased(reservationId) == 0) {
+                    return false;
+                }
+                releaseAggregates(reservation);
+                return true;
+            });
+            if (Boolean.FALSE.equals(released)) {
+                log.debug("reservation {} already released or reaped", reservationId);
+            }
+        } catch (RuntimeException ex) {
+            // 标记和聚合释放同一事务，失败时留待过期回收任务重试。
+            log.error("release reservation {} failed, reaper will retry: {}",
+                    reservationId, ex.getMessage());
+        }
+    }
+
+    /**
+     * 回收进程崩溃或异常路径遗留的过期预留。
+     * 只有成功把流水从 ACTIVE 改为 RELEASED 的实例才会扣减聚合计数，避免重复释放。
+     */
+    @Scheduled(fixedDelayString = "${shiye.usage.reservation-reap-delay-ms:60000}",
+            initialDelayString = "${shiye.usage.reservation-reap-initial-delay-ms:30000}")
+    public void reapExpiredReservations() {
+        List<UsageReservationEntity> expired;
+        try {
+            expired = reservationMapper.findExpired(200);
+        } catch (RuntimeException ex) {
+            log.warn("load expired usage reservations failed: {}", ex.getMessage());
+            return;
+        }
+        for (UsageReservationEntity entity : expired) {
+            try {
+                Boolean released = transactionTemplate.execute(status -> {
+                    if (reservationMapper.markReleased(entity.getId()) == 0) {
+                        return false;
+                    }
+                    releaseAggregates(entity);
+                    return true;
+                });
+                if (Boolean.TRUE.equals(released)) {
+                    log.warn("released expired usage reservation {} for user {} month {}",
+                            entity.getId(), entity.getUserId(), entity.getMonth());
+                }
+            } catch (RuntimeException ex) {
+                log.error("release expired reservation {} failed: {}",
+                        entity.getId(), ex.getMessage());
+            }
+        }
+    }
+
+    private void releaseAggregates(ChatReservation reservation) {
         // 释放也保持 user -> team -> global 顺序，降低与 record/reserve 的死锁概率。
         UserReservation user = reservation.user();
         if (user != null) {
-            try {
-                monthlyMapper.release(user.userId(), user.month(), user.tokens(), user.cost());
-            } catch (RuntimeException ex) {
-                log.warn("release user quota reservation failed: {}", ex.getMessage());
-            }
+            monthlyMapper.release(user.userId(), user.month(), user.tokens(), user.cost());
         }
-        releaseTeamChat(reservation.team());
+        TeamReservation team = reservation.team();
+        if (team != null) {
+            teamUsageMapper.release(team.teamId(), team.month(), team.tokens(), team.cost());
+        }
         GlobalReservation global = reservation.global();
         if (global != null) {
-            try {
-                globalUsageMapper.release(global.month(), global.tokens(), global.cost());
-            } catch (RuntimeException ex) {
-                log.warn("release global budget reservation failed: {}", ex.getMessage());
-            }
+            globalUsageMapper.release(global.month(), global.tokens(), global.cost());
+        }
+    }
+
+    private void releaseAggregates(UsageReservationEntity reservation) {
+        boolean hasUser = (reservation.getUserTokens() != null
+                && reservation.getUserTokens() > 0)
+                || (reservation.getUserCost() != null
+                && reservation.getUserCost().signum() > 0);
+        if (hasUser) {
+            monthlyMapper.release(reservation.getUserId(), reservation.getMonth(),
+                    longValue(reservation.getUserTokens()), money(reservation.getUserCost()));
+        }
+        boolean hasTeam = reservation.getTeamId() != null
+                && ((reservation.getTeamTokens() != null && reservation.getTeamTokens() > 0)
+                || (reservation.getTeamCost() != null
+                && reservation.getTeamCost().signum() > 0));
+        if (hasTeam) {
+            teamUsageMapper.release(reservation.getTeamId(), reservation.getMonth(),
+                    longValue(reservation.getTeamTokens()), money(reservation.getTeamCost()));
+        }
+        boolean hasGlobal = (reservation.getGlobalTokens() != null
+                && reservation.getGlobalTokens() > 0)
+                || (reservation.getGlobalCost() != null
+                && reservation.getGlobalCost().signum() > 0);
+        if (hasGlobal) {
+            globalUsageMapper.release(reservation.getMonth(),
+                    longValue(reservation.getGlobalTokens()),
+                    money(reservation.getGlobalCost()));
         }
     }
 

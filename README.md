@@ -80,6 +80,7 @@ mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/20
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/2026-11-26-global-usage.sql
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/2026-11-26-invite-cleanup.sql
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/2026-11-26-eval-progress.sql
+mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/migrations/2026-11-27-usage-reservations.sql
 ```
 
 - 管理员：`admin@shiye.local`
