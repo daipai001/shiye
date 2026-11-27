@@ -24,7 +24,7 @@ services:
       retries: 30
 
   redis:
-    image: redis/redis-stack-server:latest
+    image: redis/redis-stack-server:7.4.0-v8
     container_name: shiye-redis
     ports:
       - "${REDIS_PORT:-16379}:6379"
