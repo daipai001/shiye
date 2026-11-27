@@ -91,7 +91,7 @@ docker compose -f docker-compose.yml -f docker-compose.https.yml \
   -f docker-compose.loadtest.yml up -d --build
 ```
 
-只用于本地压测；生产不要叠加该文件。具体脚本和结果见 `scripts/README.md`、`docs/load-test-2026-11-21.md`。
+只用于本地压测；生产不要叠加该文件。具体脚本和结果见 `scripts/README.md`、`docs/load-test-2026-11-21.md`、`docs/load-test-2026-11-27.md`。
 
 ## 健康检查
 

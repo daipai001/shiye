@@ -353,6 +353,12 @@ jobs:
         env:
           E2E_BASE_URL: http://127.0.0.1:15174
         run: npx playwright test e2e/admin.spec.ts
+      - name: Team and ingest load smoke
+        env:
+          BASE_URL: http://127.0.0.1:18080/api/v1
+        run: |
+          CONCURRENCY=2 TOTAL=4 node scripts/load-test-import.mjs
+          VUS=2 DURATION=3s node scripts/load-test-team.mjs
       - name: Show logs on failure
         if: failure()
         run: |

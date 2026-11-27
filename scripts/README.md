@@ -66,6 +66,22 @@ node scripts/load-test-chat.mjs
 
 > mock 只验证链路和资源使用，不代表真实模型质量/延迟；生产不要启用该 overlay。
 
+## 团队问答与入库并发
+
+```powershell
+$env:BASE_URL='http://127.0.0.1:18080/api/v1'
+$env:VUS='5'; $env:DURATION='10s'
+node scripts/load-test-team.mjs
+
+$env:CONCURRENCY='5'; $env:TOTAL='20'
+node scripts/load-test-import.mjs
+```
+
+- 团队脚本会自动注册两个用户、建团队、共享资料，再发 TEAM 范围流式问答。
+- 入库脚本先并发入库唯一 URL，再用同一 URL 并发验证单文章锁；预期 `200 + 409`，不应出现 5xx。
+- 默认 `chatRateLimitPerMinute=10` 会主动返回 429；测吞吐时需要调高 `system_settings.chatRateLimitPerMinute`。
+- 2026-11-27 mock 结果见 `docs/load-test-2026-11-27.md`。
+
 ## HNSW 集成回归
 
 `scripts/ci-hnsw-smoke.sh` 需要带 RediSearch 的 Redis（CI 使用 `redis/redis-stack-server:7.4.0-v8`）：

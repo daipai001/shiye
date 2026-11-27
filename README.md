@@ -272,7 +272,7 @@ RAG 问答闭环已打通：
 - 备份与恢复：`deploy/scripts/backup.ps1` / `backup.sh`、`restore-verify.ps1`；已完成本机 MySQL 恢复演练
 - 读接口压测：`scripts/load-test.mjs`；2,000 篇/6,000 切片、20 VUs 下 246 RPS、P95 159ms
 - AI/RAG 压测：`scripts/mock-ai.mjs` + `scripts/load-test-chat.mjs`；10 VUs 下 229 请求、0 失败、15.27 RPS、P95 1111ms（服务端记录延迟平均 118ms）
-- 压测记录：`docs/load-test-2026-11-21.md`
+- 压测记录：`docs/load-test-2026-11-21.md`、`docs/load-test-2026-11-27.md`
 - RAG 评测：30 条回归用例，recall@5/引用/正确率 1.0，成本 ¥0.05028（见 `docs/rag-eval-2026-11-21.md`）
 - 前端已改为路由懒加载 + Element Plus 按需组件，主包从约 869KB 降到约 54KB（另有共享 client/select 块）
 - 测试与压测说明：`scripts/README.md`
