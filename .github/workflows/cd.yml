@@ -49,6 +49,7 @@ jobs:
           fi
 
           docker build \
+            --build-arg INSTALL_OCR=${{ vars.INSTALL_OCR || 'false' }} \
             -t "${registry}/shiye-user-api:${tag}" \
             -t "${registry}/shiye-user-api:latest" \
             -f backend/shiye-user-api/Dockerfile backend/shiye-user-api
