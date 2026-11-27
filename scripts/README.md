@@ -62,6 +62,16 @@ node scripts/load-test-chat.mjs
 
 > mock 只验证链路和资源使用，不代表真实模型质量/延迟；生产不要启用该 overlay。
 
+## HNSW 集成回归
+
+`scripts/ci-hnsw-smoke.sh` 需要带 RediSearch 的 Redis（CI 使用 `redis/redis-stack-server:7.4.0-v8`）：
+
+```bash
+VECTOR_STORE=redisearch VECTOR_BACKFILL=true bash scripts/ci-hnsw-smoke.sh
+```
+
+覆盖：旧索引维度/字段不匹配自动重建、共享资料写入 `team_id`/`vector_bin`、`FT.SEARCH @team_id` 可召回、团队范围流式问答产生引用。CI 的 `hnsw-integration` job 会自动执行。
+
 ## RAG 评测回归
 
 ```powershell

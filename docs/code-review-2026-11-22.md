@@ -59,12 +59,12 @@
 
 | 级别 | 问题 | 建议 |
 |---|---|---|
-| P1 | 向量召回仍是应用层余弦，最多扫描 5000 个切片；数据量再大需要 RediSearch HNSW | 已提供可选 `VECTOR_STORE=redisearch` HNSW 路径（个人 ALL 范围），Redis Stack 不可用时自动回退；首次启用用 `VECTOR_BACKFILL=true` 回填旧向量。团队范围仍走 pipeline |
-| P1 | 收集/上传/重建索引没有单文章锁，并发可能重复删/插切片 | 已加 Redis 单文章锁 `shiye:ingest:lock:{id}`，Redis 不可用时 fail-open；同一资料同时只跑一个入库/重建任务 |
-| P1 | 个人配额/全局预算并发 check-then-act | 个人/团队配额已做行锁预留；全局预算已改为 `global_usage_monthly` 独立原子计数器（预留/实际/释放），3 并发实测 1 个 200 + 2 个 42903，无 500 |
-| P2 | 评测 worker 崩溃后运行可能永久 RUNNING；失败运行状态仍显示 DONE | worker 每次 tick 将超过 `EVAL_STALE_MINUTES` 的 RUNNING 标记为 FAILED；管理端按 metrics.error 显示 FAILED |
-| P2 | 被移除成员创建但未使用的邀请码仍可重新加入 | 移除/退出成员时删除该成员在该团队创建的未使用邀请码；实测移除后旧邀请码返回 40105 |
-| P2 | 认证接口信任客户端 `X-Forwarded-For` | 只信任受控代理，或使用代理写入的 `X-Real-IP`；生产不要暴露 API 端口 |
+| P1 | 向量召回仍是应用层余弦，最多扫描 5000 个切片；数据量再大需要 RediSearch HNSW | 已支持 `VECTOR_STORE=redisearch`，覆盖个人 ALL、团队、团队标签/文件夹、个人标签/文件夹/单篇资料；启动用 `FT.INFO` 校验维度/字段并自动重建，回填未完成时回退 pipeline；CI 新增 Redis Stack 集成 job |
+| P1 | 收集/上传/重建索引没有单文章锁，并发可能重复删/插切片 | 已加 Redis 单文章锁 `shiye:ingest:lock:{id}` 覆盖上传/收集/重建索引；锁冲突统一返回 40904，reindex 不再假 PENDING |
+| P1 | 个人配额/全局预算并发 check-then-act | 个人/团队/全站均做原子预留，并写入 `usage_reservations` 流水；按剩余额度动态预留，崩溃后 15 分钟 TTL 回收 |
+| P2 | 评测 worker 崩溃后运行可能永久 RUNNING；失败运行状态仍显示 DONE | 增加 `last_progress_at` 心跳；超时 RUNNING 标记 FAILED，`finishRun` 只允许完成一次 |
+| P2 | 被移除成员创建但未使用的邀请码仍可重新加入 | 移除/退出成员时删除未使用邀请码，并提供 `2026-11-26-invite-cleanup.sql` 清理存量 |
+| P2 | 认证接口信任客户端 `X-Forwarded-For` | 已新增 `ClientIpResolver`，只信任 `TRUSTED_PROXIES` 内直连对端，并从右向左取第一个非代理地址；生产仍需禁止公网访问 18080/18081 |
 | P2 | 会话表没有 team_id，团队历史依赖 scope 解析 | 后续可加 `conversations.team_id`，便于审计和清理 |
 
 ## 结论
