@@ -29,7 +29,21 @@ admin.shiye.myhyw.asia  A  8.163.136.113
 
 不要占用 `myhyw.asia` 根域名，避免与已有项目冲突。等待 DNS 生效后再申请证书。
 
-## 3. 部署
+## 3. 服务器预检
+
+首次部署前先执行只读预检，把输出发回确认端口/内存/容器：
+
+```bash
+bash deploy/scripts/server-preflight.sh
+```
+
+重点确认：
+
+- 25173/25174/28080/28081/23306/26379 没有被 `offerdesk` 或其他项目占用。
+- 80/443 由宝塔 Nginx 占用（预期）。
+- 剩余内存足够：拾页 MySQL + Redis + 两个 API + 两个 web 约 1.5～2GB；4GB 服务器不建议启用 HNSW。
+
+## 4. 部署
 
 ```bash
 cd /opt/shiye   # 代码目录
@@ -45,7 +59,7 @@ bash deploy/scripts/deploy-production.sh
 
 首次启动后立即登录 `https://admin.shiye.myhyw.asia` 修改管理员初始密码。
 
-## 4. 宝塔反向代理
+## 5. 宝塔反向代理
 
 在宝塔“网站”中新建两个站点（不要删除/修改 offerdesk 站点）：
 
@@ -78,7 +92,7 @@ location / {
 
 `proxy_buffering off` 必须保留，否则 SSE 流式问答会被缓冲。
 
-## 5. 防火墙/安全组
+## 6. 防火墙/安全组
 
 只放行：
 
@@ -88,7 +102,7 @@ location / {
 
 在宝塔“安全”和阿里云安全组同时限制。
 
-## 6. 验证
+## 7. 验证
 
 ```bash
 curl -fsS https://shiye.myhyw.asia/api/v1/health
@@ -102,7 +116,7 @@ curl -fsS https://shiye.myhyw.asia/
 - 管理端登录 → 团队审计 → 审计日志 → 团队与配额
 - 流式回答应逐字输出，不能一次性返回
 
-## 7. 备份
+## 8. 备份
 
 `deploy-production.sh` 默认在部署前备份到 `BACKUP_DIR`（示例 `/opt/shiye/backups`）。也可以单独执行：
 
@@ -115,7 +129,7 @@ bash deploy/scripts/backup.sh
 
 建议加宝塔计划任务每天执行，并把备份同步到对象存储。
 
-## 8. 与 offerdesk 共存的注意事项
+## 9. 与 offerdesk 共存的注意事项
 
 - 不要执行 `docker system prune -a`，会删除其他项目镜像。
 - 不要修改 `offerdesk` 的网络/卷/端口。
