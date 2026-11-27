@@ -13,6 +13,7 @@ const ModelsView = () => import('../views/ModelsView.vue')
 const SettingsView = () => import('../views/SettingsView.vue')
 const EvalView = () => import('../views/EvalView.vue')
 const AuditView = () => import('../views/AuditView.vue')
+const TeamAuditView = () => import('../views/TeamAuditView.vue')
 const AdminsView = () => import('../views/AdminsView.vue')
 
 const router = createRouter({
@@ -34,6 +35,7 @@ const router = createRouter({
         { path: 'settings', component: SettingsView, meta: { superAdmin: true } },
         { path: 'eval', component: EvalView },
         { path: 'audit', component: AuditView },
+        { path: 'team-audit', component: TeamAuditView },
         { path: 'admins', component: AdminsView, meta: { superAdmin: true } },
       ],
     },

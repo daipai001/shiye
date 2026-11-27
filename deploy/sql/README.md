@@ -16,7 +16,7 @@ USE shiye;
 mysql -uroot -p --default-character-set=utf8mb4 shiye < deploy/sql/schema.sql
 ```
 
-完整字段说明见 `docs/schema.md`；初始迁移为 `deploy/sql/migrations/V001__init.sql`，后续迁移按顺序执行：V002–V005、`2026-11-20-team-space.sql`、`2026-11-26-global-usage.sql`、`2026-11-26-invite-cleanup.sql`、`2026-11-26-eval-progress.sql`、`2026-11-27-usage-reservations.sql`。
+完整字段说明见 `docs/schema.md`；初始迁移为 `deploy/sql/migrations/V001__init.sql`，后续迁移按顺序执行：V002–V005、`2026-11-20-team-space.sql`、`2026-11-26-global-usage.sql`、`2026-11-26-invite-cleanup.sql`、`2026-11-26-eval-progress.sql`、`2026-11-27-usage-reservations.sql`、`2026-11-27-team-audit.sql`。
 
 ## 3. 初始化管理员
 

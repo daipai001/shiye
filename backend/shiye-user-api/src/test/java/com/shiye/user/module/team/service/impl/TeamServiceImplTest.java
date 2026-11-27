@@ -9,12 +9,14 @@ import com.shiye.user.module.team.domain.entity.TeamMemberEntity;
 import com.shiye.user.module.team.mapper.TeamInviteMapper;
 import com.shiye.user.module.team.mapper.TeamMapper;
 import com.shiye.user.module.team.mapper.TeamMemberMapper;
+import com.shiye.user.module.team.service.TeamAuditService;
 import com.shiye.common.exception.BizException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,8 +29,9 @@ class TeamServiceImplTest {
     private final TeamInviteMapper inviteMapper = mock(TeamInviteMapper.class);
     private final AuthService authService = mock(AuthService.class);
     private final EmailTokenService emailTokenService = mock(EmailTokenService.class);
+    private final TeamAuditService auditService = mock(TeamAuditService.class);
     private final TeamServiceImpl service = new TeamServiceImpl(
-            teamMapper, memberMapper, inviteMapper, authService, emailTokenService);
+            teamMapper, memberMapper, inviteMapper, authService, emailTokenService, auditService);
 
     @Test
     void ownerCannotLeaveTeam() {
@@ -71,6 +74,19 @@ class TeamServiceImplTest {
 
         verify(memberMapper).delete(1L, 11L);
         verify(inviteMapper).deleteUnusedByInviter(1L, 11L);
+        verify(auditService).record(eq(1L), eq(10L), eq("MEMBER_REMOVE"),
+                eq("USER"), eq(11L), any());
+    }
+
+    @Test
+    void memberLeaveIsAudited() {
+        when(memberMapper.findActive(1L, 11L)).thenReturn(member(11L, "MEMBER"));
+
+        service.leave(11L, 1L);
+
+        verify(memberMapper).delete(1L, 11L);
+        verify(auditService).record(eq(1L), eq(11L), eq("MEMBER_LEAVE"),
+                eq("USER"), eq(11L), any());
     }
 
     @Test
@@ -97,6 +113,8 @@ class TeamServiceImplTest {
         verify(teamMapper).updateOwner(1L, 11L);
         verify(memberMapper).updateRole(1L, 11L, "OWNER");
         verify(memberMapper).updateRole(1L, 10L, "ADMIN");
+        verify(auditService).record(eq(1L), eq(10L), eq("OWNER_TRANSFER"),
+                eq("USER"), eq(11L), any());
     }
 
     @Test

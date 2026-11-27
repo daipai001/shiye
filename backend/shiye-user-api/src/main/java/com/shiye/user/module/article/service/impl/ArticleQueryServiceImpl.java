@@ -21,6 +21,7 @@ import com.shiye.user.module.article.support.ArticleSourceType;
 import com.shiye.user.module.article.support.ArticleStatus;
 import com.shiye.user.module.tag.domain.vo.TagVO;
 import com.shiye.user.module.tag.service.TagService;
+import com.shiye.user.module.team.service.TeamAuditService;
 import com.shiye.user.module.team.service.TeamService;
 import com.shiye.user.module.team.service.TeamTaxonomyService;
 import com.shiye.user.module.team.support.TeamAccess;
@@ -43,6 +44,7 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
     private final TagService tagService;
     private final TeamService teamService;
     private final TeamTaxonomyService teamTaxonomyService;
+    private final TeamAuditService teamAuditService;
 
     public ArticleQueryServiceImpl(ArticleMapper articleMapper,
                                    ArticleChunkMapper chunkMapper,
@@ -50,7 +52,8 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
                                    ChunkVectorStore vectorStore,
                                    TagService tagService,
                                    TeamService teamService,
-                                   TeamTaxonomyService teamTaxonomyService) {
+                                   TeamTaxonomyService teamTaxonomyService,
+                                   TeamAuditService teamAuditService) {
         this.articleMapper = articleMapper;
         this.chunkMapper = chunkMapper;
         this.folderMapper = folderMapper;
@@ -58,6 +61,7 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         this.tagService = tagService;
         this.teamService = teamService;
         this.teamTaxonomyService = teamTaxonomyService;
+        this.teamAuditService = teamAuditService;
     }
 
     @Override
@@ -262,6 +266,8 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         for (ArticleChunkEntity chunk : chunkMapper.findByArticle(articleId, userId)) {
             vectorStore.addToTeam(teamId, chunk.getId());
         }
+        teamAuditService.record(teamId, userId, "ARTICLE_SHARE", "ARTICLE", articleId,
+                Map.of("ownerUserId", article.getUserId()));
     }
 
     @Override
@@ -284,6 +290,8 @@ public class ArticleQueryServiceImpl implements ArticleQueryService {
         for (ArticleChunkEntity chunk : chunkMapper.findByArticle(articleId, article.getUserId())) {
             vectorStore.removeFromTeam(teamId, chunk.getId());
         }
+        teamAuditService.record(teamId, userId, "ARTICLE_UNSHARE", "ARTICLE", articleId,
+                Map.of("ownerUserId", article.getUserId()));
     }
 
     @Override

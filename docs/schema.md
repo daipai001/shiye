@@ -122,6 +122,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 | 团队 | `team_members` | 团队成员与角色 | 已启用 |
 | 团队 | `team_usage_monthly` | 团队月用量（配额） | 已启用 |
 | 团队 | `team_invites` | 团队邀请码 | 已启用 |
+| 团队 | `team_audit_logs` | 团队操作独立审计 | 已启用 |
 | 团队 | `team_tags` | 团队标签 | 已启用 |
 | 团队 | `article_team_tags` | 资料-团队标签关系 | 已启用 |
 | 团队 | `team_folders` | 团队文件夹 | 已启用 |
@@ -1059,6 +1060,28 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 ---
 
+### 4.34.1 `team_audit_logs`
+
+| 字段 | 类型 | 空 | 默认 | 说明 |
+|---|---|---|---|---|
+| `id` | BIGINT UNSIGNED | 否 | AUTO_INCREMENT | 主键 |
+| `team_id` | BIGINT UNSIGNED | 否 | — | 团队 |
+| `operator_id` | BIGINT UNSIGNED | 否 | — | 操作人 |
+| `action` | VARCHAR(64) | 否 | — | 动作，见下表 |
+| `target_type` | VARCHAR(32) | 是 | NULL | TEAM / USER / INVITE / ARTICLE |
+| `target_id` | VARCHAR(64) | 是 | NULL | 目标 ID |
+| `detail` | JSON | 是 | NULL | 结构化详情 |
+| `ip` / `user_agent` | VARCHAR(45) / VARCHAR(512) | 是 | NULL | 请求来源 |
+| `created_at` | DATETIME(3) | 否 | CURRENT_TIMESTAMP(3) | 创建 |
+
+**索引**：`idx_team_audit_team (team_id, id)`、`idx_team_audit_operator (operator_id, id)`、`idx_team_audit_action (action, id)`、`idx_team_audit_created (created_at)`。
+
+**动作**：`TEAM_CREATE`、`TEAM_UPDATE`、`TEAM_DISSOLVE`、`MEMBER_ADD`、`MEMBER_INVITE`、`MEMBER_JOIN`、`MEMBER_ROLE_UPDATE`、`MEMBER_REMOVE`、`MEMBER_LEAVE`、`OWNER_TRANSFER`、`ARTICLE_SHARE`、`ARTICLE_UNSHARE`。
+
+**说明**：与业务操作同事务写入；管理员通过 admin-api `GET /admin/api/v1/team-audits` 查询。流水表缺失时记录错误日志并降级，不阻塞团队操作。
+
+---
+
 ### 4.35 `team_tags`
 
 | 字段 | 类型 | 空 | 默认 | 说明 |
@@ -1209,7 +1232,7 @@ admin_users 1 ── n model_prices / system_settings（updated_by）
 
 ## 8. 迁移策略
 
-- 迁移文件：`deploy/sql/migrations/V001__init.sql`、`V002__chunk_fulltext.sql`、`V003__plugin_default_scope.sql`、`V004__eval_answer_details.sql`、`V005__plugin_general_mode.sql`、`2026-11-26-global-usage.sql`、`2026-11-26-invite-cleanup.sql`、`2026-11-26-eval-progress.sql`、`2026-11-27-usage-reservations.sql`。
+- 迁移文件：`deploy/sql/migrations/V001__init.sql`、`V002__chunk_fulltext.sql`、`V003__plugin_default_scope.sql`、`V004__eval_answer_details.sql`、`V005__plugin_general_mode.sql`、`2026-11-26-global-usage.sql`、`2026-11-26-invite-cleanup.sql`、`2026-11-26-eval-progress.sql`、`2026-11-27-usage-reservations.sql`、`2026-11-27-team-audit.sql`。
 - 每个迁移必须幂等/可重复执行；记录到 `schema_migrations`。
 - 不修改已发布的迁移；新增迁移。
 - 大表加字段用 `ALGORITHM=INPLACE` 或分批回填。

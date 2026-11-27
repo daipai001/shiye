@@ -153,6 +153,24 @@ CREATE TABLE IF NOT EXISTS `team_invites` (
   KEY `idx_team_invites_team_expires` (`team_id`, `expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='团队邀请码';
 
+CREATE TABLE IF NOT EXISTS `team_audit_logs` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `team_id`     BIGINT UNSIGNED NOT NULL,
+  `operator_id` BIGINT UNSIGNED NOT NULL,
+  `action`      VARCHAR(64)     NOT NULL,
+  `target_type` VARCHAR(32)     NULL DEFAULT NULL,
+  `target_id`   VARCHAR(64)     NULL DEFAULT NULL,
+  `detail`      JSON            NULL DEFAULT NULL,
+  `ip`          VARCHAR(45)     NULL DEFAULT NULL,
+  `user_agent`  VARCHAR(512)    NULL DEFAULT NULL,
+  `created_at`  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_team_audit_team` (`team_id`, `id`),
+  KEY `idx_team_audit_operator` (`operator_id`, `id`),
+  KEY `idx_team_audit_action` (`action`, `id`),
+  KEY `idx_team_audit_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='团队操作审计';
+
 CREATE TABLE IF NOT EXISTS `team_tags` (
   `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `team_id`         BIGINT UNSIGNED NOT NULL,

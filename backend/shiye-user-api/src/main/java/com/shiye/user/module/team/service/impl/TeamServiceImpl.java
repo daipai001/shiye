@@ -24,6 +24,7 @@ import com.shiye.user.module.team.domain.vo.TeamVO;
 import com.shiye.user.module.team.mapper.TeamInviteMapper;
 import com.shiye.user.module.team.mapper.TeamMapper;
 import com.shiye.user.module.team.mapper.TeamMemberMapper;
+import com.shiye.user.module.team.service.TeamAuditService;
 import com.shiye.user.module.team.service.TeamService;
 import com.shiye.user.module.team.support.TeamAccess;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -53,17 +55,20 @@ public class TeamServiceImpl implements TeamService {
     private final TeamInviteMapper inviteMapper;
     private final AuthService authService;
     private final EmailTokenService emailTokenService;
+    private final TeamAuditService auditService;
 
     public TeamServiceImpl(TeamMapper teamMapper,
                            TeamMemberMapper memberMapper,
                            TeamInviteMapper inviteMapper,
                            AuthService authService,
-                           EmailTokenService emailTokenService) {
+                           EmailTokenService emailTokenService,
+                           TeamAuditService auditService) {
         this.teamMapper = teamMapper;
         this.memberMapper = memberMapper;
         this.inviteMapper = inviteMapper;
         this.authService = authService;
         this.emailTokenService = emailTokenService;
+        this.auditService = auditService;
     }
 
     @Override
@@ -90,6 +95,8 @@ public class TeamServiceImpl implements TeamService {
         member.setRole(ROLE_OWNER);
         member.setStatus(STATUS_ACTIVE);
         memberMapper.insert(member);
+        auditService.record(team.getId(), userId, "TEAM_CREATE", "TEAM",
+                team.getId(), Map.of("name", team.getName()));
 
         return detail(userId, team.getId());
     }
@@ -111,6 +118,10 @@ public class TeamServiceImpl implements TeamService {
         if (updated == null) {
             throw new BizException(ErrorCode.NOT_FOUND, "团队不存在");
         }
+        auditService.record(teamId, userId, "TEAM_UPDATE", "TEAM", teamId, Map.of(
+                "name", updated.getName(),
+                "monthlyTokenQuota", updated.getMonthlyTokenQuota(),
+                "monthlyCostQuota", updated.getMonthlyCostQuota()));
         updated.setMyRole(access.role());
         return TeamVO.from(updated);
     }
@@ -153,6 +164,8 @@ public class TeamServiceImpl implements TeamService {
         if (saved == null) {
             throw new BizException(ErrorCode.INTERNAL_ERROR);
         }
+        auditService.record(teamId, userId, "MEMBER_ADD", "USER", targetUserId,
+                Map.of("role", role));
         return TeamMemberVO.from(saved);
     }
 
@@ -174,6 +187,8 @@ public class TeamServiceImpl implements TeamService {
         invite.setRole(role);
         invite.setExpiresAt(expiresAt);
         inviteMapper.insert(invite);
+        auditService.record(teamId, userId, "MEMBER_INVITE", "INVITE", invite.getId(),
+                Map.of("role", role, "expiresAt", expiresAt.toString()));
         if (request.email() != null && !request.email().isBlank()) {
             try {
                 emailTokenService.sendTeamInvite(
@@ -209,6 +224,8 @@ public class TeamServiceImpl implements TeamService {
         if (inviteMapper.markUsed(invite.getId()) == 0) {
             throw new BizException(ErrorCode.INVALID_AUTH_CODE, "邀请码已被使用");
         }
+        auditService.record(invite.getTeamId(), userId, "MEMBER_JOIN", "USER", userId,
+                Map.of("inviteId", invite.getId(), "role", invite.getRole()));
         return detail(userId, invite.getTeamId());
     }
 
@@ -229,8 +246,11 @@ public class TeamServiceImpl implements TeamService {
                 && (ROLE_ADMIN.equals(target.getRole()) || ROLE_ADMIN.equals(role))) {
             throw new BizException(ErrorCode.FORBIDDEN, "只有团队所有者可以管理管理员");
         }
+        String previousRole = target.getRole();
         memberMapper.updateRole(teamId, targetUserId, role);
         target.setRole(role);
+        auditService.record(teamId, userId, "MEMBER_ROLE_UPDATE", "USER", targetUserId,
+                Map.of("from", previousRole, "to", role));
         return TeamMemberVO.from(target);
     }
 
@@ -250,6 +270,8 @@ public class TeamServiceImpl implements TeamService {
         }
         memberMapper.delete(teamId, targetUserId);
         inviteMapper.deleteUnusedByInviter(teamId, targetUserId);
+        auditService.record(teamId, userId, "MEMBER_REMOVE", "USER", targetUserId,
+                Map.of("role", target.getRole()));
     }
 
     @Override
@@ -266,6 +288,8 @@ public class TeamServiceImpl implements TeamService {
         teamMapper.updateOwner(teamId, targetUserId);
         memberMapper.updateRole(teamId, targetUserId, ROLE_OWNER);
         memberMapper.updateRole(teamId, userId, ROLE_ADMIN);
+        auditService.record(teamId, userId, "OWNER_TRANSFER", "USER", targetUserId,
+                Map.of("fromUserId", userId, "toUserId", targetUserId));
         return detail(userId, teamId);
     }
 
@@ -278,6 +302,8 @@ public class TeamServiceImpl implements TeamService {
         }
         memberMapper.delete(teamId, userId);
         inviteMapper.deleteUnusedByInviter(teamId, userId);
+        auditService.record(teamId, userId, "MEMBER_LEAVE", "USER", userId,
+                Map.of("role", member.getRole()));
     }
 
     @Override

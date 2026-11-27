@@ -1927,6 +1927,20 @@ admin-web → POST /admin/api/v1/auth/login
 
 ---
 
+#### GET `/team-audits`
+
+**认证**：管理员
+
+**Query**：`page`、`pageSize`、`teamId?`、`operatorId?`、`action?`、`from?`、`to?`
+
+**响应**：分页团队审计日志，字段包含 `teamId`、`teamName`、`operatorId`、`operatorEmail`、`action`、`targetType`、`targetId`、`detail`、`ip`、`userAgent`、`createdAt`。
+
+> `action` 常见值：`TEAM_CREATE`、`TEAM_UPDATE`、`TEAM_DISSOLVE`、`MEMBER_ADD`、`MEMBER_INVITE`、`MEMBER_JOIN`、`MEMBER_ROLE_UPDATE`、`MEMBER_REMOVE`、`MEMBER_LEAVE`、`OWNER_TRANSFER`、`ARTICLE_SHARE`、`ARTICLE_UNSHARE`。
+>
+> 团队审计只追加、不提供修改或删除接口；管理端页面为“团队审计”。
+
+---
+
 #### GET `/eval/cases`
 
 **认证**：管理员
@@ -2147,7 +2161,7 @@ admin-web → POST /admin/api/v1/auth/login
 | 12 | 管理后台-模型配置 | `GET/PUT /admin/api/v1/models`、`POST /admin/api/v1/models/test` |
 | 13 | 管理后台-系统设置 | `GET/PUT /admin/api/v1/settings`、`PUT /admin/api/v1/budget`、`POST /admin/api/v1/settings/alert-test` |
 | 14 | 管理后台-RAG 评测 | `GET/POST /admin/api/v1/eval/cases`、`GET/POST /admin/api/v1/eval/runs`、`GET /admin/api/v1/eval/runs/{id}` |
-| 15 | 管理后台-审计日志 | `GET /admin/api/v1/audit-logs` |
+| 15 | 管理后台-审计日志 | `GET /admin/api/v1/audit-logs`、`GET /admin/api/v1/team-audits` |
 | 16 | 插件-悬浮球 | `POST /chat/stream`、`POST /chat/page-stream`、`POST /articles/collect`、`GET/PUT /users/me/plugin-settings` |
 | 17 | 插件-书签导入 | `POST /bookmark-imports`、`GET /bookmark-imports/{id}/items` |
 | 18 | 插件-登录授权 | `POST /auth/extension-code`、`POST /auth/extension-token` |
